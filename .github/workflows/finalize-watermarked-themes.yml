@@ -1,0 +1,133 @@
+name: Finalize watermarked themes
+
+on:
+  push:
+    branches:
+      - update-watermarked-themes-final
+    paths:
+      - .github/workflows/finalize-watermarked-themes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: update-watermarked-themes-final
+
+      - name: Apply MWRC marks
+        shell: python
+        run: |
+          from pathlib import Path
+
+          mwrc_files = [
+              Path('src/rfsuite/widgets/dashboard/themes/mwrc/preflight.lua'),
+              Path('src/rfsuite/widgets/dashboard/themes/mwrc/inflight.lua'),
+              Path('src/rfsuite/widgets/dashboard/themes/mwrc/postflight.lua'),
+          ]
+
+          mwrc_old_decl = '''local HEADER_TEXT_1 = "ETHOS "
+          local HEADER_TEXT_2 = "// "
+          local HEADER_TEXT_3 = "ROTORFLIGHT"
+          local headerTextWidth1 = nil
+          local headerTextWidth2 = nil
+          local headerTextWidth3 = nil'''.replace('          ', '')
+          mwrc_new_decl = '''local HEADER_TEXT_1 = "ETHOS "
+          local HEADER_TEXT_2 = "// "
+          local HEADER_TEXT_3 = "ROTORFLIGHT"
+          local HEADER_WATERMARK = "MWRC"
+          local headerTextWidth1 = nil
+          local headerTextWidth2 = nil
+          local headerTextWidth3 = nil
+          local headerWatermarkWidth = nil'''.replace('          ', '')
+          mwrc_anchor = '''    lcd.color(rc.white)
+              lcd.drawText(x + 5 + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)'''.replace('              ', '    ')
+          mwrc_insert = mwrc_anchor + '''
+
+              local watermarkX = x + 5 + headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10
+              lcd.color(rc.amber)
+              lcd.drawLine(watermarkX - 5, y + 9, watermarkX - 5, y + 25)
+              lcd.font(FONT_XS or FONT_XXS or 0)
+              if headerWatermarkWidth == nil then headerWatermarkWidth = lcd.getTextSize(HEADER_WATERMARK) end
+              lcd.color(rc.cyan)
+              lcd.drawText(watermarkX, y + 8, HEADER_WATERMARK)'''.replace('              ', '    ')
+
+          for path in mwrc_files:
+              text = path.read_text()
+              if 'HEADER_WATERMARK = "MWRC"' not in text:
+                  if mwrc_old_decl not in text or mwrc_anchor not in text:
+                      raise RuntimeError(f'Expected MWRC header pattern not found in {path}')
+                  text = text.replace(mwrc_old_decl, mwrc_new_decl, 1)
+                  text = text.replace(mwrc_anchor, mwrc_insert, 1)
+                  path.write_text(text)
+
+          aegis_files = [
+              Path('src/rfsuite/widgets/dashboard/themes/aegis/preflight.lua'),
+              Path('src/rfsuite/widgets/dashboard/themes/aegis/inflight.lua'),
+              Path('src/rfsuite/widgets/dashboard/themes/aegis/postflight.lua'),
+          ]
+
+          aegis_old = '''                    local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"
+                              local tw1, th = lcd.getTextSize(t1)
+                              local tw2 = lcd.getTextSize(t2)
+                              local tw3 = lcd.getTextSize(t3)
+                              local totalW = tw1 + tw2 + tw3
+                              local tx = floor(x + (w - totalW) / 2)
+                              local ty = floor(y + (h - th) / 2)
+
+                              lcd.color(C.cyan)
+                              lcd.drawText(tx, ty, t1)
+                              lcd.color(C.amber)
+                              lcd.drawText(tx + tw1, ty, t2)
+                              lcd.color(C.white)
+                              lcd.drawText(tx + tw1 + tw2, ty, t3)'''.replace('                              ', '                    ')
+
+          aegis_new = '''                    local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"
+                              local tw1, th = lcd.getTextSize(t1)
+                              local tw2 = lcd.getTextSize(t2)
+                              local tw3 = lcd.getTextSize(t3)
+                              local watermarkFont = utils.resolveFont("FONT_XS", nil)
+                              local watermarkText = "MWRC"
+                              local watermarkWidth, watermarkHeight = 0, 0
+                              if type(watermarkFont) == "number" then
+                                  lcd.font(watermarkFont)
+                                  watermarkWidth, watermarkHeight = lcd.getTextSize(watermarkText)
+                                  lcd.font(font)
+                              end
+                              local titleW = tw1 + tw2 + tw3
+                              local dividerGap = watermarkWidth > 0 and 14 or 0
+                              local totalW = titleW + dividerGap + watermarkWidth
+                              local tx = floor(x + (w - totalW) / 2)
+                              local ty = floor(y + (h - th) / 2)
+                              lcd.color(C.cyan)
+                              lcd.drawText(tx, ty, t1)
+                              lcd.color(C.amber)
+                              lcd.drawText(tx + tw1, ty, t2)
+                              lcd.color(C.white)
+                              lcd.drawText(tx + tw1 + tw2, ty, t3)
+                              if watermarkWidth > 0 then
+                                  local dividerX = tx + titleW + 6
+                                  lcd.color(C.line2)
+                                  lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)
+                                  lcd.font(watermarkFont)
+                                  lcd.color(C.cyan)
+                                  lcd.drawText(dividerX + 7, floor(y + (h - watermarkHeight) / 2), watermarkText)
+                              end'''.replace('                              ', '                    ')
+
+          for path in aegis_files:
+              text = path.read_text()
+              if 'local watermarkText = "MWRC"' not in text:
+                  if aegis_old not in text:
+                      raise RuntimeError(f'Expected Aegis header pattern not found in {path}')
+                  path.write_text(text.replace(aegis_old, aegis_new, 1))
+
+      - name: Commit finalized themes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/rfsuite/widgets/dashboard/themes
+          git commit -m "Add MWRC marks to dashboard themes"
+          git push origin HEAD:update-watermarked-themes-final
