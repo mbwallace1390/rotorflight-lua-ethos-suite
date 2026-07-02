@@ -1,1 +1,1 @@
-# Singularity Dashboard Theme
+# Singularity Dashboard Theme v1.2
