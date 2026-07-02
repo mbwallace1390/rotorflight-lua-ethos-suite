@@ -1,19 +1,15 @@
 name: Finalize watermarked themes
-
 on:
   push:
-    branches:
-      - update-watermarked-themes-final
+    branches: [update-watermarked-themes-final]
     paths:
       - .github/workflows/finalize-watermarked-themes.yml
+      - .github/scripts/apply_theme_marks.py
   pull_request:
-    branches:
-      - master
+    branches: [master]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   finalize:
     runs-on: ubuntu-latest
@@ -21,104 +17,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: update-watermarked-themes-final
-
-      - name: Apply MWRC marks
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          mwrc_files = [
-              Path('src/rfsuite/widgets/dashboard/themes/mwrc/preflight.lua'),
-              Path('src/rfsuite/widgets/dashboard/themes/mwrc/inflight.lua'),
-              Path('src/rfsuite/widgets/dashboard/themes/mwrc/postflight.lua'),
-          ]
-
-          for path in mwrc_files:
-              lines = path.read_text().splitlines()
-              if any('HEADER_WATERMARK = "MWRC"' in line for line in lines):
-                  continue
-
-              declaration = next(i for i, line in enumerate(lines) if 'local HEADER_TEXT_3 = "ROTORFLIGHT"' in line)
-              lines.insert(declaration + 1, 'local HEADER_WATERMARK = "MWRC"')
-
-              width_line = next(i for i, line in enumerate(lines) if 'local headerTextWidth3 = nil' in line)
-              lines.insert(width_line + 1, 'local headerWatermarkWidth = nil')
-
-              anchor = next(i for i, line in enumerate(lines) if 'lcd.drawText(x + 5 + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)' in line)
-              indent = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
-              extra = [
-                  '',
-                  indent + 'local watermarkX = x + 5 + headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10',
-                  indent + 'lcd.color(rc.amber)',
-                  indent + 'lcd.drawLine(watermarkX - 5, y + 9, watermarkX - 5, y + 25)',
-                  indent + 'lcd.font(FONT_XS or FONT_XXS or 0)',
-                  indent + 'if headerWatermarkWidth == nil then headerWatermarkWidth = lcd.getTextSize(HEADER_WATERMARK) end',
-                  indent + 'lcd.color(rc.cyan)',
-                  indent + 'lcd.drawText(watermarkX, y + 8, HEADER_WATERMARK)',
-              ]
-              lines[anchor + 1:anchor + 1] = extra
-              path.write_text('\n'.join(lines) + '\n')
-
-          aegis_files = [
-              Path('src/rfsuite/widgets/dashboard/themes/aegis/preflight.lua'),
-              Path('src/rfsuite/widgets/dashboard/themes/aegis/inflight.lua'),
-              Path('src/rfsuite/widgets/dashboard/themes/aegis/postflight.lua'),
-          ]
-
-          for path in aegis_files:
-              lines = path.read_text().splitlines()
-              if any('local watermarkText = "MWRC"' in line for line in lines):
-                  continue
-
-              start = next(i for i, line in enumerate(lines) if 'local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"' in line)
-              end = next(i for i in range(start, len(lines)) if 'lcd.drawText(tx + tw1 + tw2, ty, t3)' in lines[i])
-              indent = lines[start][:len(lines[start]) - len(lines[start].lstrip())]
-              block = [
-                  indent + 'local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"',
-                  indent + 'local tw1, th = lcd.getTextSize(t1)',
-                  indent + 'local tw2 = lcd.getTextSize(t2)',
-                  indent + 'local tw3 = lcd.getTextSize(t3)',
-                  indent + 'local watermarkFont = utils.resolveFont("FONT_XS", nil)',
-                  indent + 'local watermarkText = "MWRC"',
-                  indent + 'local watermarkWidth, watermarkHeight = 0, 0',
-                  indent + 'if type(watermarkFont) == "number" then',
-                  indent + '    lcd.font(watermarkFont)',
-                  indent + '    watermarkWidth, watermarkHeight = lcd.getTextSize(watermarkText)',
-                  indent + '    lcd.font(font)',
-                  indent + 'end',
-                  indent + 'local titleW = tw1 + tw2 + tw3',
-                  indent + 'local dividerGap = watermarkWidth > 0 and 14 or 0',
-                  indent + 'local totalW = titleW + dividerGap + watermarkWidth',
-                  indent + 'local tx = floor(x + (w - totalW) / 2)',
-                  indent + 'local ty = floor(y + (h - th) / 2)',
-                  '',
-                  indent + 'lcd.color(C.cyan)',
-                  indent + 'lcd.drawText(tx, ty, t1)',
-                  indent + 'lcd.color(C.amber)',
-                  indent + 'lcd.drawText(tx + tw1, ty, t2)',
-                  indent + 'lcd.color(C.white)',
-                  indent + 'lcd.drawText(tx + tw1 + tw2, ty, t3)',
-                  indent + 'if watermarkWidth > 0 then',
-                  indent + '    local dividerX = tx + titleW + 6',
-                  indent + '    lcd.color(C.line2)',
-                  indent + '    lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)',
-                  indent + '    lcd.font(watermarkFont)',
-                  indent + '    lcd.color(C.cyan)',
-                  indent + '    lcd.drawText(dividerX + 7, floor(y + (h - watermarkHeight) / 2), watermarkText)',
-                  indent + 'end',
-              ]
-              lines[start:end + 1] = block
-              path.write_text('\n'.join(lines) + '\n')
-          PY
-
-      - name: Commit finalized themes
+      - name: Apply theme marks
+        run: python .github/scripts/apply_theme_marks.py
+      - name: Commit updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/rfsuite/widgets/dashboard/themes
-          if git diff --cached --quiet; then
-            echo "Theme marks already applied"
-          else
+          if ! git diff --cached --quiet; then
             git commit -m "Add MWRC marks to dashboard themes"
             git push origin HEAD:update-watermarked-themes-final
           fi
