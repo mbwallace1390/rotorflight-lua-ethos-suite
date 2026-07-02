@@ -1,0 +1,1 @@
+Aegis v1.8. MWRC mark is shown in the common header.
