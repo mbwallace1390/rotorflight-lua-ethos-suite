@@ -1243,6 +1243,8 @@ function ui.cleanupCurrentPage()
         end)
     end
 
+    if app.themeBridge and app.themeBridge.clearPage then app.themeBridge.clearPage() end
+
     -- Release Ethos-side form references before wiping Lua refs.
     -- form.clear() causes Ethos to drop its C++ references to form field callback
     -- closures synchronously, so the subsequent GC cycle can collect them along
@@ -1505,6 +1507,13 @@ local function getMainMenuPressHandler(menuIndex)
     return handlers[menuIndex]
 end
 
+local function addThemedSectionHeader(text)
+    local line = form.addLine("")
+    local field = form.addStaticText(line, nil, text)
+    if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(field, "accent") end
+    return line
+end
+
 function ui.openMainMenu(activesection)
 
     if openMenuSectionById(activesection) then return end
@@ -1596,12 +1605,12 @@ function ui.openMainMenu(activesection)
                 if groupChanged then
                     lc = 0
                     if pidx > 1 and type(menuItem.groupTitle) == "string" and menuItem.groupTitle ~= "" then
-                        form.addLine(menuItem.groupTitle)
+                        addThemedSectionHeader(menuItem.groupTitle)
                     end
                 elseif menuItem.newline and (not treatAsMixedShortcut) then
                     -- Legacy fallback for older manifests; grouped menus should use group/groupTitle.
                     lc = 0
-                    form.addLine(menuItem.groupTitle or "@i18n(app.header_system)@")
+                    addThemedSectionHeader(menuItem.groupTitle or "@i18n(app.header_system)@")
                 end
 
                 if lc == 0 then y = form.height() + ((preferences.general.iconsize == 2) and app.radio.buttonPadding or app.radio.buttonPaddingSmall) end
@@ -1941,6 +1950,7 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
 
     if lineRef and formFields then
         formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
         return
     end
 
@@ -1951,14 +1961,18 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
 
     if formFields then
         formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
     else
-        form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        local titleField = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(titleField, "accent") end
     end
 end
 
 function ui.fieldHeader(title)
     local radio = app.radio
     local formFields = app.formFields
+
+    if app.themeBridge and app.themeBridge.clearPage then app.themeBridge.clearPage() end
 
     local navButtons = (app.Page and app.Page.navButtons) or {menu = true, save = true, reload = true, help = true}
     local metrics = ui.getHeaderMetrics(navButtons)
@@ -2420,6 +2434,9 @@ function ui.navigationButtons(x, y, w, h, opts)
                     press = def.press
                 })
                 app.formNavigationFields[def.key]:enable(true)
+                if app.themeBridge and app.themeBridge.registerNavigationRect then
+                    app.themeBridge.registerNavigationRect({x = bx, y = y, w = width, h = h}, def.key)
+                end
                 rightEdge = bx - padding
             end
         end
@@ -2471,6 +2488,14 @@ function ui.navigationButtons(x, y, w, h, opts)
         app.formNavigationFields["reload"]:enable(enabledState.reload)
         app.formNavigationFields["tool"]:enable(enabledState.tool)
         app.formNavigationFields["help"]:enable(enabledState.help)
+
+        if app.themeBridge and app.themeBridge.registerNavigationRect then
+            if enabledState.menu then app.themeBridge.registerNavigationRect({x = menuOffset, y = y, w = w, h = h}, "menu") end
+            if enabledState.save then app.themeBridge.registerNavigationRect({x = saveOffset, y = y, w = w, h = h}, "save") end
+            if enabledState.reload then app.themeBridge.registerNavigationRect({x = reloadOffset, y = y, w = w, h = h}, "reload") end
+            if enabledState.tool then app.themeBridge.registerNavigationRect({x = toolOffset, y = y, w = wS, h = h}, "tool") end
+            if enabledState.help then app.themeBridge.registerNavigationRect({x = helpOffset, y = y, w = wS, h = h}, "help") end
+        end
     end
 
     local focused = false
