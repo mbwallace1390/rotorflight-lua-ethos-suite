@@ -181,7 +181,10 @@ local function onSaveMenu()
             end
         end
         rfsuite.ini.save_ini_file("SCRIPTS:/" .. rfsuite.config.preferences .. "/preferences.ini", prefs)
-        rfsuite.app.MainMenu = assert(loadfile("app/modules/init.lua"))()
+        -- Invalidate rather than rebuild inline: reparsing the manifest here would stack
+        -- on top of this same tick's file I/O and can exceed Ethos's per-tick instruction
+        -- budget. The next screen that needs app.MainMenu rebuilds it lazily instead.
+        rfsuite.app.MainMenu = nil
         rfsuite.app.triggers.closeSave = true
         return true
     end
