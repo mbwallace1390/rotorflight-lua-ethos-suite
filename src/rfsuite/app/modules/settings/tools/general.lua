@@ -155,7 +155,10 @@ local function onSaveMenu()
         rfsuite.app.ui.progressDisplaySave(msg:gsub("%?$", "."))
         for key, value in pairs(config) do rfsuite.preferences.general[key] = value end
         rfsuite.ini.save_ini_file("SCRIPTS:/" .. rfsuite.config.preferences .. "/preferences.ini", rfsuite.preferences)
-        rfsuite.app.MainMenu = assert(loadfile("app/modules/init.lua"))()
+        -- Invalidate rather than rebuild inline: reparsing the manifest here would stack
+        -- on top of this same tick's file I/O and can exceed Ethos's per-tick instruction
+        -- budget. The next screen that needs app.MainMenu rebuilds it lazily instead.
+        rfsuite.app.MainMenu = nil
         if rfsuite.app.themeBridge and rfsuite.app.themeBridge.invalidate then rfsuite.app.themeBridge.invalidate() end
         rfsuite.app.triggers.closeSave = true
         return true
