@@ -692,6 +692,17 @@ local function getApiCore()
     return apiCore
 end
 
+-- app.MainMenu is only trustworthy once it has a sections table. On cold boot,
+-- storage/session state can still be settling when the menu first tries to
+-- build, which can yield an incomplete app.MainMenu; retry the build rather
+-- than caching that incomplete result permanently.
+local function ensureMainMenu()
+    if type(app.MainMenu) ~= "table" or type(app.MainMenu.sections) ~= "table" then
+        app.MainMenu = assert(loadfile("app/modules/init.lua"))()
+    end
+    return app.MainMenu
+end
+
 function ui.openMenuContext(defaultSectionId, showProgress, speed)
     -- Keep menu transitions allocation-light; opening/closing progress dialogs here
     -- can cause substantial native-memory churn on some radios.
@@ -714,8 +725,7 @@ function ui.openMenuContext(defaultSectionId, showProgress, speed)
         return
     end
 
-    if not app.MainMenu then app.MainMenu = assert(loadfile("app/modules/init.lua"))() end
-    local targetSectionId = navigation.resolveMenuContext(app.MainMenu, app.lastMenu, defaultSectionId)
+    local targetSectionId = navigation.resolveMenuContext(ensureMainMenu(), app.lastMenu, defaultSectionId)
     if targetSectionId then
         ui.openMainMenu(targetSectionId)
         return
@@ -1388,8 +1398,7 @@ end
 local function openMenuSectionById(sectionId)
     if not sectionId or sectionId == "mainmenu" then return false end
 
-    if not app.MainMenu then app.MainMenu = assert(loadfile("app/modules/init.lua"))() end
-    local mainMenu = app.MainMenu
+    local mainMenu = ensureMainMenu()
     local section, sectionIndex = navigation.findSection(mainMenu, sectionId)
     if not section then return false end
 
@@ -1566,8 +1575,7 @@ function ui.openMainMenu(activesection)
 
     -- Prefer the already-built menu structure; fallback resolves through modules/init normalization,
     -- caching the result back so a stale/invalidated app.MainMenu is only rebuilt once.
-    if not app.MainMenu then app.MainMenu = assert(loadfile("app/modules/init.lua"))() end
-    local Menu = app.MainMenu.sections
+    local Menu = ensureMainMenu().sections
 
     local lc, bx, y = 0, 0, 0
 
