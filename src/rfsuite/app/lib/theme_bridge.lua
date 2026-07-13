@@ -238,6 +238,17 @@ function M.refresh(force)
     return true
 end
 
+-- Mark the cached palette stale without recompiling it inline. compilePalette()
+-- does file I/O to load a theme's init.lua, which is too heavy to run in the
+-- same tick as a caller's own expensive work (e.g. a full menu rebuild) -
+-- doing both back-to-back can trip Ethos's per-tick instruction budget. The
+-- next M.wakeup() picks up the change and recompiles on its own tick instead.
+function M.invalidate()
+    activePath = nil
+    activePhase = nil
+    nextCheck = 0
+end
+
 function M.wakeup()
     local now = osClock()
     if now < nextCheck then return end

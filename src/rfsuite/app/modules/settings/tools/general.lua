@@ -156,7 +156,7 @@ local function onSaveMenu()
         for key, value in pairs(config) do rfsuite.preferences.general[key] = value end
         rfsuite.ini.save_ini_file("SCRIPTS:/" .. rfsuite.config.preferences .. "/preferences.ini", rfsuite.preferences)
         rfsuite.app.MainMenu = assert(loadfile("app/modules/init.lua"))()
-        if rfsuite.app.themeBridge and rfsuite.app.themeBridge.refresh then rfsuite.app.themeBridge.refresh(true) end
+        if rfsuite.app.themeBridge and rfsuite.app.themeBridge.invalidate then rfsuite.app.themeBridge.invalidate() end
         rfsuite.app.triggers.closeSave = true
         return true
     end
