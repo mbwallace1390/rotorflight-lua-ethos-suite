@@ -1615,7 +1615,7 @@ function ui.openMainMenu(activesection)
 
                 if lc == 0 then y = form.height() + ((preferences.general.iconsize == 2) and app.radio.buttonPadding or app.radio.buttonPaddingSmall) end
 
-                bx = (buttonW + padding) * lc
+                bx = (app.radio.linePaddingLeft or 0) + (buttonW + padding) * lc
 
                 if preferences.general.iconsize ~= 0 then
                     app.gfx_buttons["mainmenu"][menuIndex] = ui.loadMask(menuItem.image)
@@ -1917,7 +1917,7 @@ function ui.getHeaderMetrics(navButtons)
     end
 
     local titleRightEdge = navX - reserved
-    local titleWidth = math.max(40, titleRightEdge - 8)
+    local titleWidth = math.max(40, titleRightEdge - 8 - (radio.linePaddingLeft or 0))
     return {
         windowWidth = w,
         buttonW = buttonW,
@@ -1948,8 +1948,10 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
     local lineObj = lineRef or (formFields and formFields["menu"]) or nil
     if not lineObj then return end
 
+    local titleX = radio.linePaddingLeft or 0
+
     if lineRef and formFields then
-        formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        formFields["title"] = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
         if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
         return
     end
@@ -1960,10 +1962,10 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
     end
 
     if formFields then
-        formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        formFields["title"] = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
         if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
     else
-        local titleField = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        local titleField = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
         if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(titleField, "accent") end
     end
 end
@@ -2270,7 +2272,8 @@ function ui.openPage(opts)
 
     if app.Page.headerLine then
         local headerLine = form.addLine("")
-        form.addStaticText(headerLine, {x = 0, y = app.radio.linePaddingTop, w = app.lcdWidth, h = app.radio.navbuttonHeight}, app.Page.headerLine)
+        local headerLineX = app.radio.linePaddingLeft or 0
+        form.addStaticText(headerLine, {x = headerLineX, y = app.radio.linePaddingTop, w = app.lcdWidth - headerLineX, h = app.radio.navbuttonHeight}, app.Page.headerLine)
     end
 
     app.formLineCnt = 0
