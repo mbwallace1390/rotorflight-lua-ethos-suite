@@ -612,10 +612,15 @@ function utils.loadImage(image1, image2, image3)
     return getCachedBitmap(image1, candidates(image1)) or getCachedBitmap(image2, candidates(image2)) or getCachedBitmap(image3, candidates(image3))
 end
 
+local simSensorsDirReady = false
+
 function utils.simSensors(id)
-    os.mkdir("LOGS:")
-    os.mkdir("LOGS:/rfsuite")
-    os.mkdir("LOGS:/rfsuite/sensors")
+    if not simSensorsDirReady then
+        os.mkdir("LOGS:")
+        os.mkdir("LOGS:/rfsuite")
+        os.mkdir("LOGS:/rfsuite/sensors")
+        simSensorsDirReady = true
+    end
 
     if id == nil then
         return 0
