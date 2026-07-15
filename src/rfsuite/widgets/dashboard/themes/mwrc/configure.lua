@@ -14,7 +14,7 @@ local config = {}
 -- Keep these values aligned with preflight.lua, inflight.lua and postflight.lua.
 local THEME_DEFAULTS = {
     rpm_min = 0,
-    rpm_max = 2500,
+    rpm_max = 3000,
     bec_min = 6.5,
     bec_warn = 8.0,
     bec_max = 12.0,
