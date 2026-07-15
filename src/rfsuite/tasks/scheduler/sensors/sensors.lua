@@ -26,6 +26,8 @@ local battery
 local log = rfsuite.utils.log
 local tasks = rfsuite.tasks
 
+local isSimulation = (system and system.getVersion and system.getVersion().simulation) == true
+
 local function ensureHelperModule(path, current)
     if current ~= nil then return current end
     return assert(loadfile(path))(config)
@@ -58,7 +60,7 @@ local function loadSensorModule()
 
     local protocol = tasks.msp.protocol.mspProtocol
 
-    if system:getVersion().simulation == true then
+    if isSimulation then
         if not loadedSensorModule or loadedSensorModule.name ~= "sim" then loadedSensorModule = {name = "sim", module = assert(loadfile("tasks/scheduler/sensors/sim.lua"))(config)} end
     elseif protocol == "crsf" then
         if not loadedSensorModule or loadedSensorModule.name ~= "elrs" then loadedSensorModule = {name = "elrs", module = assert(loadfile("tasks/scheduler/sensors/elrs.lua"))(config)} end

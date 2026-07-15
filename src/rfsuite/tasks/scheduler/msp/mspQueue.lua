@@ -23,6 +23,8 @@ local DEFAULT_BUSY_STATUS_COOLDOWN_SECONDS = 0.35
 local MAX_MSP_LOG_BYTES = 96
 local QUEUE_COMPACT_THRESHOLD = 64
 local MspQueueController = {}
+
+local isSimulation = (system and system.getVersion and system.getVersion().simulation) == true
 MspQueueController.__index = MspQueueController
 
 local lastQueueCount = 0 -- for queue size logging
@@ -394,7 +396,7 @@ function MspQueueController:processQueue()
     local lastTimeInterval = (mspProtocol and mspProtocol.mspIntervalOveride) or 0.25
     if lastTimeInterval == nil then lastTimeInterval = 1 end
 
-    if not system.getVersion().simulation then
+    if not isSimulation then
         -- Real MSP: send once, then wait; only resend after backoff/timeout
         if self.currentMessage then
             local now2 = os_clock()
@@ -592,7 +594,7 @@ function MspQueueController:processQueue()
         end
 
         -- After a successful completion, briefly drain duplicate/late replies for this cmd
-        if not system.getVersion().simulation then
+        if not isSimulation then
             local completedCommand = self.currentMessage and self.currentMessage.command
             if completedCommand ~= nil then
                 drainAfterSuccess(self, completedCommand)
