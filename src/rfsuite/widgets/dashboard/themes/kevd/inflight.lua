@@ -19,7 +19,7 @@ local colorMode = utils.themeColors()
 
 local theme_section = "system/kevd"
 
-local THEME_DEFAULTS = {throttle_max = 100, rpm_min = 0, rpm_max = 5500, bec_min = 6.0, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 120, esctemp_max = 300}
+local THEME_DEFAULTS = {throttle_max = 100, rpm_min = 0, rpm_max = 3000, bec_min = 6.0, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 120, esctemp_max = 300}
 
 local function estimateCellCountFromVoltage(voltage)
     voltage = tonumber(voltage) or 0

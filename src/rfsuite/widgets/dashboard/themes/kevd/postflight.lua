@@ -21,7 +21,7 @@ local panelBgColor = colorMode.tbbgcolor or colorMode.headerbgcolor or pageBgCol
 
 local theme_section = "system/kevd"
 
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 5500, bec_min = 6.0, bec_warn = 7.0, bec_max = 12.0}
+local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 6.0, bec_warn = 7.0, bec_max = 12.0}
 
 local function estimateCellCountFromVoltage(voltage)
     voltage = tonumber(voltage) or 0

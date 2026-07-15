@@ -62,7 +62,7 @@ local colorMode = {
 
 local theme_section = "system/mwrc"
 
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 2500, bec_min = 6.5, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 110, esctemp_max = 150}
+local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 6.5, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 110, esctemp_max = 150}
 
 local function getStrobeColor(baseColor, isCritical)
     if isCritical then

@@ -44,7 +44,7 @@ local C = {
 
 local THEME_SECTION = "system/singularity"
 local DEFAULTS = {
-    rpm_max = 2500,
+    rpm_max = 3000,
     bec_min = 6.5,
     bec_warn = 7.0,
     esc_warn = 110,
