@@ -247,7 +247,8 @@ function container.create(cfg)
             if app.ui and app.ui.setHeaderTitle then
                 app.ui.setHeaderTitle(pageTitle, header, MENU_ONLY_NAV_BUTTONS)
             else
-                form.addStaticText(header, {x = 0, y = headerTitleY, w = windowWidth - 115, h = headerButtonH}, pageTitle or "")
+                local headerTitleX = app.radio.linePaddingLeft or 0
+                form.addStaticText(header, {x = headerTitleX, y = headerTitleY, w = windowWidth - 115 - headerTitleX, h = headerButtonH}, pageTitle or "")
             end
             local navX = windowWidth - 110
             app.formNavigationFields["menu"] = form.addButton(header, {x = navX, y = headerButtonY, w = 100, h = headerButtonH}, {
@@ -309,7 +310,7 @@ function container.create(cfg)
                     y = form.height() + ((prefs.general.iconsize == 2) and app.radio.buttonPadding or app.radio.buttonPaddingSmall)
                 end
 
-                local bx = (buttonW + padding) * lc
+                local bx = (app.radio.linePaddingLeft or 0) + (buttonW + padding) * lc
 
                 if prefs.general.iconsize ~= 0 then
                     local iconPath = iconPathFor(cfg, item)

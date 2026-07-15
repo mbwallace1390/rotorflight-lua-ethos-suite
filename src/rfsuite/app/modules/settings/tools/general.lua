@@ -61,6 +61,11 @@ local function openPage(opts)
     local line = addFieldLine(displayPanel, "@i18n(app.modules.settings.txt_iconsize)@")
     rfsuite.app.formFields[formFieldCount] = form.addChoiceField(line, nil, {{"@i18n(app.modules.settings.txt_text)@", 0}, {"@i18n(app.modules.settings.txt_small)@", 1}, {"@i18n(app.modules.settings.txt_large)@", 2}}, function() return config.iconsize ~= nil and config.iconsize or 1 end, function(newValue) config.iconsize = newValue end)
 
+    line = addFieldLine(displayPanel, "@i18n(app.modules.settings.txt_follow_dashboard_theme)@")
+    rfsuite.app.formFields[formFieldCount] = form.addBooleanField(line, nil, function()
+        return prefBool(config.follow_dashboard_theme, true)
+    end, function(newValue) config.follow_dashboard_theme = newValue end)
+
     line = addFieldLine(displayPanel, "@i18n(app.modules.settings.txt_batttype)@")
     local txbattChoices = {{"@i18n(app.modules.settings.txt_battdef)@", 0}, {"@i18n(app.modules.settings.txt_batttext)@", 1}, {"@i18n(app.modules.settings.txt_battdig)@", 2}}
     rfsuite.app.formFields[formFieldCount] = form.addChoiceField(line, nil, txbattChoices, function() return config.txbatt_type ~= nil and config.txbatt_type or 0 end, function(newValue) config.txbatt_type = newValue end)
@@ -150,7 +155,11 @@ local function onSaveMenu()
         rfsuite.app.ui.progressDisplaySave(msg:gsub("%?$", "."))
         for key, value in pairs(config) do rfsuite.preferences.general[key] = value end
         rfsuite.ini.save_ini_file("SCRIPTS:/" .. rfsuite.config.preferences .. "/preferences.ini", rfsuite.preferences)
-        rfsuite.app.MainMenu = assert(loadfile("app/modules/init.lua"))()
+        -- Invalidate rather than rebuild inline: reparsing the manifest here would stack
+        -- on top of this same tick's file I/O and can exceed Ethos's per-tick instruction
+        -- budget. The next screen that needs app.MainMenu rebuilds it lazily instead.
+        rfsuite.app.MainMenu = nil
+        if rfsuite.app.themeBridge and rfsuite.app.themeBridge.invalidate then rfsuite.app.themeBridge.invalidate() end
         rfsuite.app.triggers.closeSave = true
         return true
     end

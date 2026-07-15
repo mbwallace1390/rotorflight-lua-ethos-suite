@@ -692,6 +692,17 @@ local function getApiCore()
     return apiCore
 end
 
+-- app.MainMenu is only trustworthy once it has a sections table. On cold boot,
+-- storage/session state can still be settling when the menu first tries to
+-- build, which can yield an incomplete app.MainMenu; retry the build rather
+-- than caching that incomplete result permanently.
+local function ensureMainMenu()
+    if type(app.MainMenu) ~= "table" or type(app.MainMenu.sections) ~= "table" then
+        app.MainMenu = assert(loadfile("app/modules/init.lua"))()
+    end
+    return app.MainMenu
+end
+
 function ui.openMenuContext(defaultSectionId, showProgress, speed)
     -- Keep menu transitions allocation-light; opening/closing progress dialogs here
     -- can cause substantial native-memory churn on some radios.
@@ -714,7 +725,7 @@ function ui.openMenuContext(defaultSectionId, showProgress, speed)
         return
     end
 
-    local targetSectionId = navigation.resolveMenuContext(app.MainMenu, app.lastMenu, defaultSectionId)
+    local targetSectionId = navigation.resolveMenuContext(ensureMainMenu(), app.lastMenu, defaultSectionId)
     if targetSectionId then
         ui.openMainMenu(targetSectionId)
         return
@@ -1243,6 +1254,8 @@ function ui.cleanupCurrentPage()
         end)
     end
 
+    if app.themeBridge and app.themeBridge.clearPage then app.themeBridge.clearPage() end
+
     -- Release Ethos-side form references before wiping Lua refs.
     -- form.clear() causes Ethos to drop its C++ references to form field callback
     -- closures synchronously, so the subsequent GC cycle can collect them along
@@ -1385,7 +1398,7 @@ end
 local function openMenuSectionById(sectionId)
     if not sectionId or sectionId == "mainmenu" then return false end
 
-    local mainMenu = app.MainMenu or assert(loadfile("app/modules/init.lua"))()
+    local mainMenu = ensureMainMenu()
     local section, sectionIndex = navigation.findSection(mainMenu, sectionId)
     if not section then return false end
 
@@ -1505,6 +1518,13 @@ local function getMainMenuPressHandler(menuIndex)
     return handlers[menuIndex]
 end
 
+local function addThemedSectionHeader(text)
+    local line = form.addLine("")
+    local field = form.addStaticText(line, nil, text)
+    if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(field, "accent") end
+    return line
+end
+
 function ui.openMainMenu(activesection)
 
     if openMenuSectionById(activesection) then return end
@@ -1553,8 +1573,9 @@ function ui.openMainMenu(activesection)
     app.gfx_buttons["mainmenu"] = app.gfx_buttons["mainmenu"] or {}
     preferences.menulastselected["mainmenu"] = preferences.menulastselected["mainmenu"] or 1
 
-    -- Prefer the already-built menu structure; fallback resolves through modules/init normalization.
-    local Menu = (app.MainMenu and app.MainMenu.sections) or (assert(loadfile("app/modules/init.lua"))().sections)
+    -- Prefer the already-built menu structure; fallback resolves through modules/init normalization,
+    -- caching the result back so a stale/invalidated app.MainMenu is only rebuilt once.
+    local Menu = ensureMainMenu().sections
 
     local lc, bx, y = 0, 0, 0
 
@@ -1596,17 +1617,17 @@ function ui.openMainMenu(activesection)
                 if groupChanged then
                     lc = 0
                     if pidx > 1 and type(menuItem.groupTitle) == "string" and menuItem.groupTitle ~= "" then
-                        form.addLine(menuItem.groupTitle)
+                        addThemedSectionHeader(menuItem.groupTitle)
                     end
                 elseif menuItem.newline and (not treatAsMixedShortcut) then
                     -- Legacy fallback for older manifests; grouped menus should use group/groupTitle.
                     lc = 0
-                    form.addLine(menuItem.groupTitle or "@i18n(app.header_system)@")
+                    addThemedSectionHeader(menuItem.groupTitle or "@i18n(app.header_system)@")
                 end
 
                 if lc == 0 then y = form.height() + ((preferences.general.iconsize == 2) and app.radio.buttonPadding or app.radio.buttonPaddingSmall) end
 
-                bx = (buttonW + padding) * lc
+                bx = (app.radio.linePaddingLeft or 0) + (buttonW + padding) * lc
 
                 if preferences.general.iconsize ~= 0 then
                     app.gfx_buttons["mainmenu"][menuIndex] = ui.loadMask(menuItem.image)
@@ -1908,7 +1929,7 @@ function ui.getHeaderMetrics(navButtons)
     end
 
     local titleRightEdge = navX - reserved
-    local titleWidth = math.max(40, titleRightEdge - 8)
+    local titleWidth = math.max(40, titleRightEdge - 8 - (radio.linePaddingLeft or 0))
     return {
         windowWidth = w,
         buttonW = buttonW,
@@ -1939,8 +1960,11 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
     local lineObj = lineRef or (formFields and formFields["menu"]) or nil
     if not lineObj then return end
 
+    local titleX = radio.linePaddingLeft or 0
+
     if lineRef and formFields then
-        formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        formFields["title"] = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
         return
     end
 
@@ -1950,15 +1974,19 @@ function ui.setHeaderTitle(rawTitle, lineRef, navButtons)
     end
 
     if formFields then
-        formFields["title"] = form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        formFields["title"] = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(formFields["title"], "accent") end
     else
-        form.addStaticText(lineObj, {x = 0, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        local titleField = form.addStaticText(lineObj, {x = titleX, y = titleY, w = metrics.titleWidth, h = radio.navbuttonHeight}, displayTitle)
+        if app.themeBridge and app.themeBridge.styleStaticText then app.themeBridge.styleStaticText(titleField, "accent") end
     end
 end
 
 function ui.fieldHeader(title)
     local radio = app.radio
     local formFields = app.formFields
+
+    if app.themeBridge and app.themeBridge.clearPage then app.themeBridge.clearPage() end
 
     local navButtons = (app.Page and app.Page.navButtons) or {menu = true, save = true, reload = true, help = true}
     local metrics = ui.getHeaderMetrics(navButtons)
@@ -2256,7 +2284,8 @@ function ui.openPage(opts)
 
     if app.Page.headerLine then
         local headerLine = form.addLine("")
-        form.addStaticText(headerLine, {x = 0, y = app.radio.linePaddingTop, w = app.lcdWidth, h = app.radio.navbuttonHeight}, app.Page.headerLine)
+        local headerLineX = app.radio.linePaddingLeft or 0
+        form.addStaticText(headerLine, {x = headerLineX, y = app.radio.linePaddingTop, w = app.lcdWidth - headerLineX, h = app.radio.navbuttonHeight}, app.Page.headerLine)
     end
 
     app.formLineCnt = 0
@@ -2420,6 +2449,9 @@ function ui.navigationButtons(x, y, w, h, opts)
                     press = def.press
                 })
                 app.formNavigationFields[def.key]:enable(true)
+                if app.themeBridge and app.themeBridge.registerNavigationRect then
+                    app.themeBridge.registerNavigationRect({x = bx, y = y, w = width, h = h}, def.key)
+                end
                 rightEdge = bx - padding
             end
         end
@@ -2471,6 +2503,14 @@ function ui.navigationButtons(x, y, w, h, opts)
         app.formNavigationFields["reload"]:enable(enabledState.reload)
         app.formNavigationFields["tool"]:enable(enabledState.tool)
         app.formNavigationFields["help"]:enable(enabledState.help)
+
+        if app.themeBridge and app.themeBridge.registerNavigationRect then
+            if enabledState.menu then app.themeBridge.registerNavigationRect({x = menuOffset, y = y, w = w, h = h}, "menu") end
+            if enabledState.save then app.themeBridge.registerNavigationRect({x = saveOffset, y = y, w = w, h = h}, "save") end
+            if enabledState.reload then app.themeBridge.registerNavigationRect({x = reloadOffset, y = y, w = w, h = h}, "reload") end
+            if enabledState.tool then app.themeBridge.registerNavigationRect({x = toolOffset, y = y, w = wS, h = h}, "tool") end
+            if enabledState.help then app.themeBridge.registerNavigationRect({x = helpOffset, y = y, w = wS, h = h}, "help") end
+        end
     end
 
     local focused = false
