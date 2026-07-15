@@ -91,11 +91,11 @@ local function loadWidget(widget)
         if status then
             widget.loadedWidget = result
         else
-            print("Error executing widget " .. tool.object .. ": " .. tostring(result))
+            rfsuite.utils.log("Error executing widget " .. tool.object .. ": " .. tostring(result), "info")
         end
     else
         if err and not string.find(tostring(err), "No such file") then
-            print("Error loading widget file " .. file .. ": " .. tostring(err))
+            rfsuite.utils.log("Error loading widget file " .. file .. ": " .. tostring(err), "info")
         end
     end
 end

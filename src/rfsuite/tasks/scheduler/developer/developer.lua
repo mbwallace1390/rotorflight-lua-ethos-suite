@@ -28,8 +28,6 @@ function developer.wakeup()
 
     if api then
         api.setIniFile(iniName)
-        local pitch = api.readValue("pitch")
-        print(pitch)
         api.setValue("pitch", math_random(-300, 300))
         local ok, err = api.write()
         if not ok then print("Failed to save INI: " .. tostring(err)) end
