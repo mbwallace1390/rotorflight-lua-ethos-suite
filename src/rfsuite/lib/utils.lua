@@ -748,8 +748,23 @@ local function versionParts(value)
     return parts
 end
 
+-- rfsuite.session.apiVersion is set once per connection and read very frequently
+-- (every sensors.wakeup tick plus 100+ call sites), so cache its parsed form
+-- rather than re-parsing the same string with gmatch on every call.
+local _apiVersionCacheKey = nil
+local _apiVersionCacheParts = nil
+
 function utils.apiVersionCompare(op, req)
-    local a, b = versionParts(rfsuite.session.apiVersion or "12.06"), versionParts(req)
+    local verStr = rfsuite.session.apiVersion or "12.06"
+    local a
+    if _apiVersionCacheKey == verStr then
+        a = _apiVersionCacheParts
+    else
+        a = versionParts(verStr)
+        _apiVersionCacheKey = verStr
+        _apiVersionCacheParts = a
+    end
+    local b = versionParts(req)
     if #a == 0 or #b == 0 then return false end
 
     local len = math.max(#a, #b)
