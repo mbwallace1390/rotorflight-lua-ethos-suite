@@ -12291,6 +12291,13 @@
           "reverse_text": true,
           "max_length": 5
         },
+        "txt_follow_dashboard_theme": {
+          "english": "Follow dashboard theme",
+          "max_length": 23,
+          "needs_translation": true,
+          "translation": "Follow dashboard theme",
+          "reverse_text": false
+        },
         "txt_iconsize": {
           "english": "Icon Size",
           "max_length": 9,
