@@ -10558,6 +10558,12 @@
           "needs_translation": false,
           "translation": "READY"
         },
+        "txt_follow_dashboard_theme": {
+          "english": "Follow dashboard theme",
+          "max_length": 23,
+          "needs_translation": false,
+          "translation": "Follow dashboard theme"
+        },
         "txt_iconsize": {
           "english": "Icon Size",
           "max_length": 9,

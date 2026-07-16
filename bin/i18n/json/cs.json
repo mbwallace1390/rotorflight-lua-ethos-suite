@@ -12291,6 +12291,13 @@
           "reverse_text": false,
           "max_length": 5
         },
+        "txt_follow_dashboard_theme": {
+          "english": "Follow dashboard theme",
+          "translation": "Follow dashboard theme",
+          "needs_translation": true,
+          "max_length": 23,
+          "reverse_text": false
+        },
         "txt_iconsize": {
           "english": "Icon Size",
           "translation": "Velikost ikony",
