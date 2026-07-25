@@ -196,7 +196,7 @@ end
 
 -- we take the raw data from APIDATA and process it into FORMDATA for easier use in the form
 -- the reverse is done in the save step
-function apiDataToFormData() 
+local function apiDataToFormData() 
 
     -- get raw data from api table
     local CYCLIC_CALIBRATION = APIDATA["GET_MIXER_INPUT_PITCH"]["values"].rate_stabilized_pitch
@@ -257,7 +257,7 @@ function apiDataToFormData()
 end
 
 -- the reverse of apiDataToFormData: take the values from FORMDATA and convert them back into raw API values
-function copyFormToApiValues()
+local function copyFormToApiValues()
     local apiValues = APIDATA
     if not apiValues then return false end
 

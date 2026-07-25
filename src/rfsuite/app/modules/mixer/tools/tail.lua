@@ -118,7 +118,7 @@ end
 
 -- we take the raw data from APIDATA and process it into FORMDATA for easier use in the form
 -- the reverse is done in the save step
-function apiDataToFormData() 
+local function apiDataToFormData() 
 
     -- get raw data from api table
     local TAIL_ROTOR_MODE = APIDATA["MIXER_CONFIG"]["values"].tail_rotor_mode
@@ -129,7 +129,7 @@ function apiDataToFormData()
     local YAW_CCW_LIMIT = APIDATA["GET_MIXER_INPUT_YAW"]["values"].max_stabilized_yaw
 
     -- determine directions
-    YAW_DIRECTION = rateToDir(APIDATA["GET_MIXER_INPUT_YAW"]["values"].rate_stabilized_yaw)
+    local YAW_DIRECTION = rateToDir(APIDATA["GET_MIXER_INPUT_YAW"]["values"].rate_stabilized_yaw)
 
     -- transforms
     YAW_CALIBRATION = u16_to_s16(YAW_CALIBRATION)
@@ -180,7 +180,7 @@ function apiDataToFormData()
 end
 
 -- the reverse of apiDataToFormData: take the values from FORMDATA and convert them back into raw API values
-function copyFormToApiValues()
+local function copyFormToApiValues()
     local apiValues = APIDATA
     if not apiValues then return false end
 

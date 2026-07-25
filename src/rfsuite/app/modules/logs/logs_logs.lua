@@ -165,9 +165,9 @@ local function openPage(opts)
         local eposX = ew / 2 - etsizeW / 2
         local eposY = eh / 2 - etsizeH / 2
 
-        local posErr = {w = etsizeW, h = app.radio.navbuttonHeight, x = eposX, y = ePosY}
+        local posErr = {w = etsizeW, h = app.radio.navbuttonHeight, x = eposX, y = eposY}
 
-        line = form.addLine("", nil, false)
+        local line = form.addLine("", nil, false)
         form.addStaticText(line, posErr, str)
 
     else
@@ -195,7 +195,7 @@ local function openPage(opts)
                     app.gfx_buttons["logs_logs"][currentButtonIndex] = nil
                 end
 
-                app.formFields[currentButtonIndex] = form.addButton(line, {x = x, y = y, w = buttonW, h = buttonH}, {
+                app.formFields[currentButtonIndex] = form.addButton(nil, {x = x, y = y, w = buttonW, h = buttonH}, {
                     text = extractHourMinute(pageName),
                     icon = app.gfx_buttons["logs_logs"][currentButtonIndex],
                     options = FONT_S,

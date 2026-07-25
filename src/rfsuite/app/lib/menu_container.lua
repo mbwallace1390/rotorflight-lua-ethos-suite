@@ -330,7 +330,7 @@ function container.create(cfg)
                     parentScript = script,
                     currentMenuId = currentMenuId
                 }
-                app.formFields[i] = form.addButton(line, {x = bx, y = y, w = buttonW, h = buttonH}, {
+                app.formFields[i] = form.addButton(nil, {x = bx, y = y, w = buttonW, h = buttonH}, {
                     text = item.name,
                     icon = app.gfx_buttons[moduleKey][i],
                     options = FONT_S,

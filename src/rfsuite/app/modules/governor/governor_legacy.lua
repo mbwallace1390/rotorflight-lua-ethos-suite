@@ -62,9 +62,10 @@ local function wakeup(self)
 
 
     if session.governorMode == nil then
+        local tasks = rfsuite.tasks
         if tasks and tasks.msp and tasks.msp.helpers then
             tasks.msp.helpers.governorMode(function(governorMode)
-                utils.log("Received governor mode: " .. tostring(governorMode), "info")
+                rfsuite.utils.log("Received governor mode: " .. tostring(governorMode), "info")
             end, rfsuite.app and rfsuite.app.lastScript)
         end
     else 
