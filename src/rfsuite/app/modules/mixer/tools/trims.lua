@@ -11,6 +11,7 @@ local fields = {}
 
 local triggerOverRide = false
 local inOverRide = false
+local inFocus = false
 local lastChangeTime = os.clock()
 local currentRollTrim
 local currentRollTrimLast

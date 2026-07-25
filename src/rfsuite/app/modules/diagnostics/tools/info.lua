@@ -64,13 +64,13 @@ local function wakeup()
     end
 end
 
-local function event(widget, category, value, x, y)
-    return pageRuntime.handleCloseEvent(category, value, {onClose = onNavMenu})
-end
-
 local function onNavMenu()
     pageRuntime.openMenuContext()
     return true
+end
+
+local function event(widget, category, value, x, y)
+    return pageRuntime.handleCloseEvent(category, value, {onClose = onNavMenu})
 end
 
 return {apidata = apidata, reboot = false, eepromWrite = false, minBytes = 0, wakeup = wakeup, refreshswitch = false, simulatorResponse = {}, onNavMenu = onNavMenu, event = event, navButtons = {menu = true, save = false, reload = false, tool = false, help = false}, API = {}}

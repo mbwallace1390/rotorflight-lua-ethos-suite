@@ -567,7 +567,6 @@ function elrs.reset()
     resetSensors()
     elrs._relevantSidSet = nil
     elrs._relevantSig = nil
-    _lastSlotsSig = nil
     sensorsList = {}
     activeSensorsListSig = nil
     elrs.telemetryFrameId = 0

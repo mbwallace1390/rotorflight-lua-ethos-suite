@@ -14,6 +14,8 @@ local function loadMask(path)
     return lcd.loadMask(path)
 end
 
+local inFocus = false
+
 local servoTable = {}
 servoTable = {}
 servoTable['sections'] = {}

@@ -237,7 +237,7 @@ local function wakeup()
         updateProgressLoaderMessage()
         app.ui.registerProgressDialog(progressLoader, progressLoaderBaseMessage)
 
-        API = tasks.msp.api.loadPage("TELEMETRY_CONFIG")
+        local API = tasks.msp.api.loadPage("TELEMETRY_CONFIG")
         API.setUUID("sensors-tlm-read")
         API.setCompleteHandler(function(self, buf)
             local data = API.data()
@@ -282,7 +282,6 @@ local function onToolMenu(self)
             action = function()
 
                 repairSensors = true
-                writePayload = nil
                 return true
             end
         }, {label = "@i18n(app.btn_cancel)@", action = function() return true end}
@@ -292,13 +291,13 @@ local function onToolMenu(self)
 
 end
 
-local function event(widget, category, value, x, y)
-    return pageRuntime.handleCloseEvent(category, value, {onClose = onNavMenu})
-end
-
 local function onNavMenu()
     pageRuntime.openMenuContext()
     return true
+end
+
+local function event(widget, category, value, x, y)
+    return pageRuntime.handleCloseEvent(category, value, {onClose = onNavMenu})
 end
 
 return {reboot = false, eepromWrite = false, minBytes = 0, wakeup = wakeup, refreshswitch = false, simulatorResponse = {}, postLoad = postLoad, postRead = postRead, openPage = openPage, onNavMenu = onNavMenu, event = event, navButtons = {menu = true, save = false, reload = false, tool = false, help = false}, API = {}}

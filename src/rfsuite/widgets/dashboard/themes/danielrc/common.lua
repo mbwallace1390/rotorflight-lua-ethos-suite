@@ -399,6 +399,7 @@ local function readSpec(box, spec, telemetry, slotKey)
     local session = rfsuite.session or {}
     local kind = spec.kind or "telemetry"
     local rawValue, displayValue, dynamicUnit, thresholds = nil, nil, nil, spec.thresholds
+    local _
 
     if kind == "telemetry" then
         rawValue, _, dynamicUnit, _, _, thresholds = readTelemetry(spec, telemetry)
