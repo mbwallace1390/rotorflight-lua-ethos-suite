@@ -34,7 +34,6 @@ return {
     apidata = apidata,
     eepromWrite = false,
     reboot = false,
-    escinfo = escinfo,
     svFlags = 0,
     preSavePayload = function(payload)
         payload[2] = 0

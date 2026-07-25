@@ -285,7 +285,7 @@ function MspQueueController.new(opts)
     self.timeout = opts.timeout or 2.0
 
     -- Minimum seconds between re-sends of the same message (prevents pipelined retries)
-    self.retryBackoff = opts.retryBackoff or RETRY_BACKOFF_SECONDS or DEFAULT_RETRY_BACKOFF_SECONDS
+    self.retryBackoff = opts.retryBackoff or DEFAULT_RETRY_BACKOFF_SECONDS
 
     -- After a successful reply, briefly poll to drain any duplicate/late replies for the same cmd
     -- (common with slow/bursty links when retries were attempted).
@@ -405,7 +405,7 @@ function MspQueueController:processQueue()
             local canSendByInterval = (not self.lastTimeCommandSent) or ((self.lastTimeCommandSent + lastTimeInterval) < now2)
 
             -- Retry/backoff gate: we only resend if we've either never sent, or we've waited long enough.
-            local backoff = (self.currentMessage.retryBackoff or self.retryBackoff or RETRY_BACKOFF_SECONDS or DEFAULT_RETRY_BACKOFF_SECONDS)
+            local backoff = (self.currentMessage.retryBackoff or self.retryBackoff or DEFAULT_RETRY_BACKOFF_SECONDS)
             local canSendByBackoff = (self.retryCount == 0) or ((self.lastTimeCommandSent and (now2 - self.lastTimeCommandSent) >= backoff) or false)
 
             if canSendByInterval and canSendByBackoff and (self.retryCount <= self.maxRetries) then

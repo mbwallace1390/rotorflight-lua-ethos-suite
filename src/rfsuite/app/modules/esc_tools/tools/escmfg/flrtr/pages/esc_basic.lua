@@ -41,7 +41,6 @@ return {
     apidata = apidata,
     eepromWrite = false,
     reboot = false,
-    escinfo = escinfo,
     svFlags = 0,
     simulatorResponse = simulatorResponse,
     postLoad = postLoad,

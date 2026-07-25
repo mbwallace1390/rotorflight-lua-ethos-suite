@@ -1719,6 +1719,19 @@ function dashboard.close()
     clearDashboardRuntimeCaches()
 end
 
+-- Loader sits below the header strip on a fullscreen layout, same rule
+-- renderLayout() applies. Both call sites below previously read isFullScreen
+-- and headerLayout as globals, which do not exist in this scope -- the `and`
+-- short-circuited on nil, so the offset was always 0 and the loader painted
+-- over the header.
+local function loaderOffsetY(W, H)
+    if not dashboard.utils.isFullScreen(W, H) then return 0 end
+    local module = loadedStateModules[dashboard.flightmode or "preflight"]
+    local headerLayout = module and resolveMaybe(module.header_layout)
+    local height = headerLayout and headerLayout.height
+    return (type(height) == "number") and height or 0
+end
+
 function dashboard.paint(widget)
 
     if not dashboard.utils then return end
@@ -1743,7 +1756,7 @@ function dashboard.paint(widget)
 
     if firstWakeup then
         local W, H = lcd.getWindowSize()
-        local loaderY = (isFullScreen and headerLayout.height) or 0
+        local loaderY = loaderOffsetY(W, H)
         dashboard.loader(0, loaderY, W, H - loaderY)
         return
     end
@@ -1755,7 +1768,7 @@ function dashboard.paint(widget)
             lastModelPath = newModelPath
 
             local W, H = lcd.getWindowSize()
-            local loaderY = (isFullScreen and headerLayout.height) or 0
+            local loaderY = loaderOffsetY(W, H)
             dashboard.loader(0, loaderY, W, H - loaderY)
             return
         end

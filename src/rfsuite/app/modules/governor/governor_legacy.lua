@@ -78,4 +78,4 @@ local function wakeup(self)
 end
 
 
-return {apidata = apidata, reboot = true, eepromWrite = true, labels = labels, setGovernorMode = setGovernorMode, fields = fields, postLoad = postLoad, postSave = postSave, wakeup = wakeup}
+return {apidata = apidata, reboot = true, eepromWrite = true, setGovernorMode = setGovernorMode, postLoad = postLoad, postSave = postSave, wakeup = wakeup}

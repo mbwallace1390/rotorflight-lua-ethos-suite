@@ -45,6 +45,10 @@ local function postLoad()
     rfsuite.app.triggers.closeProgressLoader = true
 end
 
+-- Forward-declared so close() below captures the local rather than a nil
+-- global; the assignment happens further down, after escToolsPage is used.
+local isolatedSave
+
 local function close()
     if isolatedSave then isolatedSave.close() end
     local mspApi = rfsuite.tasks and rfsuite.tasks.msp and rfsuite.tasks.msp.api
@@ -63,7 +67,7 @@ end
 
 local navHandlers = escToolsPage.createSubmenuHandlers(folder)
 local postSave = escToolsPage.createEsc4WayPostSaveHandler(folder, ESC)
-local isolatedSave = escToolsPage.createIsolatedSaveMenuHandler(folder, ESC)
+isolatedSave = escToolsPage.createIsolatedSaveMenuHandler(folder, ESC)
 
 return {
     apidata = apidata,
