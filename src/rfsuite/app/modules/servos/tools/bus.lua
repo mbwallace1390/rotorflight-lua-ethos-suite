@@ -18,7 +18,6 @@ local inFocus = false
 
 local servoTable = {}
 servoTable = {}
-servoTable['sections'] = {}
 
 local triggerOverRide = false
 local triggerOverRideAll = false
@@ -62,7 +61,6 @@ local function buildServoTable()
             if rfsuite.session.tailMode == 0 then
                 servoTable[4]['title'] = "@i18n(app.modules.servos.tail)@"
                 servoTable[4]['image'] = "tail.png"
-                servoTable[4]['section'] = 1
             end
         elseif rfsuite.session.swashMode == 2 or rfsuite.session.swashMode == 3 or rfsuite.session.swashMode == 4 then
 
@@ -197,21 +195,6 @@ local function openPage(opts)
     for pidx, pvalue in ipairs(servoTable) do
 
         if pvalue.disabled ~= true then
-
-            if pvalue.section == "swash" and lc == 0 then
-                local headerLine = form.addLine("")
-                local headerLineText = form.addStaticText(headerLine, {x = 0, y = rfsuite.app.radio.linePaddingTop, w = rfsuite.app.lcdWidth, h = rfsuite.app.radio.navbuttonHeight}, headerLineText())
-            end
-
-            if pvalue.section == "tail" then
-                local headerLine = form.addLine("")
-                local headerLineText = form.addStaticText(headerLine, {x = 0, y = rfsuite.app.radio.linePaddingTop, w = rfsuite.app.lcdWidth, h = rfsuite.app.radio.navbuttonHeight}, "@i18n(app.modules.servos.tail)@")
-            end
-
-            if pvalue.section == "other" then
-                local headerLine = form.addLine("")
-                local headerLineText = form.addStaticText(headerLine, {x = 0, y = rfsuite.app.radio.linePaddingTop, w = rfsuite.app.lcdWidth, h = rfsuite.app.radio.navbuttonHeight}, "@i18n(app.modules.servos.tail)@")
-            end
 
             if lc == 0 then
                 if rfsuite.preferences.general.iconsize == 0 then y = form.height() + rfsuite.app.radio.buttonPaddingSmall end
