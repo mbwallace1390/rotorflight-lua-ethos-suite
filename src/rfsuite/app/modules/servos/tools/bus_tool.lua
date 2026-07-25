@@ -575,8 +575,6 @@ return {
     reboot = false,
     event = event,
     close = close,
-    setValues = setValues,
-    servoChanged = servoChanged,
     servoCenterFocusOn = servoCenterFocusOn,
     servoCenterFocusOff = servoCenterFocusOff,
     servoCenterFocusAllOn = servoCenterFocusAllOn,

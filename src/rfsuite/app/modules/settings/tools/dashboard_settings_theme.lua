@@ -135,7 +135,6 @@ local function wakeup()
 end
 
 return {
-    pages = pages,
     openPage = openPage,
     API = {},
     navButtons = {menu = true, save = true, reload = false, tool = false, help = false},

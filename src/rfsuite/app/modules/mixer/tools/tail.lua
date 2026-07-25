@@ -530,7 +530,6 @@ return {
     openPage = openPage, 
     onNavMenu=onNavMenu, 
     onSaveMenu = onSaveMenu, 
-    postLoad = postLoad, 
     wakeup = wakeup, 
     onReloadMenu = onReloadMenu,
     navButtons = {

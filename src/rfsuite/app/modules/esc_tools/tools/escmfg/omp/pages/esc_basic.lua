@@ -41,5 +41,5 @@ local navHandlers = escToolsPage.createSubmenuHandlers(folder)
 local function wakeup(self) if activateWakeup == true and rfsuite.tasks.msp.mspQueue:isProcessed() then activateWakeup = false end end
 
 
-return {apidata = apidata, eepromWrite = false, reboot = false, escinfo = escinfo, svFlags = 0, postLoad = postLoad, navButtons = navHandlers.navButtons, onNavMenu = navHandlers.onNavMenu, event = navHandlers.event, pageTitle = "@i18n(app.modules.esc_tools.name)@" .. " / " .. "@i18n(app.modules.esc_tools.mfg.omp.name)@" .. " / " .. "@i18n(app.modules.esc_tools.mfg.omp.basic)@", headerLine = rfsuite.escHeaderLineText, wakeup = wakeup}
+return {apidata = apidata, eepromWrite = false, reboot = false, svFlags = 0, postLoad = postLoad, navButtons = navHandlers.navButtons, onNavMenu = navHandlers.onNavMenu, event = navHandlers.event, pageTitle = "@i18n(app.modules.esc_tools.name)@" .. " / " .. "@i18n(app.modules.esc_tools.mfg.omp.name)@" .. " / " .. "@i18n(app.modules.esc_tools.mfg.omp.basic)@", headerLine = rfsuite.escHeaderLineText, wakeup = wakeup}
 

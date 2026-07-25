@@ -34,7 +34,6 @@ return {
     eepromWrite = false,
     reboot = false,
     title = "Limits",
-    escinfo = escinfo,
     svFlags = 0,
     preSavePayload = function(payload)
         payload[2] = 0

@@ -399,4 +399,4 @@ local function onReloadMenu()
     app.triggers.triggerReloadFull = true
 end
 
-return {apidata = apidata, reboot = true, onSaveMenu = onSaveMenu, onReloadMenu = onReloadMenu, eepromWrite = true, paint = paint, openPage = openPage, postSave = postSave, onNavMenu = onNavMenu, event = event, wakeup = wakeup, navButtons = {menu = true, save = true, reload = true, tool = false, help = false}}
+return {apidata = apidata, reboot = true, onSaveMenu = onSaveMenu, onReloadMenu = onReloadMenu, eepromWrite = true, paint = paint, openPage = openPage, onNavMenu = onNavMenu, event = event, wakeup = wakeup, navButtons = {menu = true, save = true, reload = true, tool = false, help = false}}

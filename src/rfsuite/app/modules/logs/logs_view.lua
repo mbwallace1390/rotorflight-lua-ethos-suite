@@ -346,7 +346,7 @@ local function drawKey(name, keyunit, keyminmax, keyfloor, color, minimum, maxim
         max_str = " ↑ " .. (max_trunc or maximum) .. keyunit
     else
         min_str = ""
-        max_str = "↑ " .. (max_trun or maximum) .. keyunit
+        max_str = "↑ " .. (max_trunc or maximum) .. keyunit
     end
 
     local mmY = y + boxHeight + 2

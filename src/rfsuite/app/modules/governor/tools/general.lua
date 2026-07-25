@@ -120,4 +120,4 @@ local function onNavMenu()
     return navHandlers.onNavMenu()
 end
 
-return {apidata = apidata, reboot = true, eepromWrite = true, setGovernorMode = setGovernorMode, postLoad = postLoad, postSave = postSave, onNavMenu = onNavMenu, event = event, wakeup = wakeup}
+return {apidata = apidata, reboot = true, eepromWrite = true, postLoad = postLoad, postSave = postSave, onNavMenu = onNavMenu, event = event, wakeup = wakeup}

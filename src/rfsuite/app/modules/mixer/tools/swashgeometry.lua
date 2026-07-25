@@ -777,7 +777,6 @@ return {
     onToolMenu = onToolMenu,
     mixerOn = mixerOn,
     mixerOff = mixerOff,
-    postLoad = postLoad, 
     wakeup = wakeup, 
     onReloadMenu = onReloadMenu,
     close = close,

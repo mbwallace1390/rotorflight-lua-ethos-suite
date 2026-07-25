@@ -275,4 +275,4 @@ local function canSave()
     return rfsuite.app.pageDirty == true
 end
 
-return {apidata = apidata, title = "@i18n(app.modules.rates_advanced.name)@", onNavMenu = navHandlers.onNavMenu, event = navHandlers.event, reboot = false, openPage = openPage, eepromWrite = true, refreshOnRateChange = true, rTableName = rTableName, postLoad = postLoad, wakeup = wakeup, API = {}, onToolMenu = onToolMenu, canSave = canSave, navButtons = {menu = true, save = true, reload = true, tool = false, help = true}}
+return {apidata = apidata, title = "@i18n(app.modules.rates_advanced.name)@", onNavMenu = navHandlers.onNavMenu, event = navHandlers.event, reboot = false, openPage = openPage, eepromWrite = true, refreshOnRateChange = true, postLoad = postLoad, wakeup = wakeup, API = {}, onToolMenu = onToolMenu, canSave = canSave, navButtons = {menu = true, save = true, reload = true, tool = false, help = true}}
