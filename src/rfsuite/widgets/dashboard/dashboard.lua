@@ -493,7 +493,6 @@ local function clearDashboardRuntimeCaches()
     if dashboard._pendingInvalidates then clearArray(dashboard._pendingInvalidates) end
     if dashboard._pendingInvalidatesPool then clearArray(dashboard._pendingInvalidatesPool) end
     if dashboard._headerGeoms then clearArray(dashboard._headerGeoms) end
-    if dashboard._headerGeomsPaint then clearArray(dashboard._headerGeomsPaint) end
     if dashboard._allBoxes then clearArray(dashboard._allBoxes) end
     if dashboard._boxSigScratch then clearArray(dashboard._boxSigScratch) end
     if lastLoadedBoxSigParts then clearArray(lastLoadedBoxSigParts) end
@@ -908,6 +907,61 @@ local function getBoxPosition(box, w, h, boxWidth, boxHeight, PADDING, WIDGET_W,
     end
 end
 
+-- Header boxes sit on their own grid (header_layout's cols/rows/padding over
+-- the header strip), not the body grid, so their geometry has to be derived
+-- from header_layout. Both the rect pass and the paint pass below consume the
+-- result, which is why this returns a single shared table rather than each
+-- side computing its own: they previously disagreed, leaving the hit-test and
+-- partial-invalidate rects at body-grid coordinates while the boxes were drawn
+-- at header-grid ones.
+--
+-- The rightmost box is stretched to the screen edge here, once, so callers can
+-- use geom.w directly.
+local function buildHeaderGeoms(headerBoxes, headerLayout, W_raw)
+    local geoms = dashboard._headerGeoms or {}
+    dashboard._headerGeoms = geoms
+
+    local h_cols = headerLayout.cols or 1
+    local h_rows = headerLayout.rows or 1
+    local h_pad = headerLayout.padding or 0
+    local headerH = headerLayout.height or 0
+
+    local adjustedW = adjustDimension(W_raw, h_cols, h_cols - 1, h_pad)
+    local adjustedH = adjustDimension(headerH, h_rows, h_rows - 1, h_pad)
+    local h_boxW = (adjustedW - ((h_cols - 1) * h_pad)) / h_cols
+    local h_boxH = (adjustedH - ((h_rows - 1) * h_pad)) / h_rows
+
+    local rightmost_idx, rightmost_x = 1, 0
+    local count = 0
+    for idx, box in ipairs(headerBoxes) do
+        if box then
+            local w, h = getBoxSize(box, h_boxW, h_boxH, h_pad, adjustedW, adjustedH)
+            local x, y = getBoxPosition(box, w, h, h_boxW, h_boxH, h_pad, adjustedW, adjustedH)
+            local geom = geoms[idx]
+            if not geom then
+                geom = {}
+                geoms[idx] = geom
+            end
+            geom.x = x
+            geom.y = y
+            geom.w = w
+            geom.h = h
+            geom.box = box
+            count = idx
+            if x > rightmost_x then
+                rightmost_idx = idx
+                rightmost_x = x
+            end
+        end
+    end
+    for i = count + 1, #geoms do geoms[i] = nil end
+
+    local last = geoms[rightmost_idx]
+    if last then last.w = W_raw - last.x end
+
+    return geoms
+end
+
 function dashboard.renderLayout(widget, config)
     if not config then return end
     if not dashboard.utils then return end
@@ -1049,36 +1103,9 @@ function dashboard.renderLayout(widget, config)
         end
 
         if isFullScreen then
-            local headerGeoms = dashboard._headerGeoms or {}
-            dashboard._headerGeoms = headerGeoms
-            local rightmost_idx, rightmost_x = 1, 0
-            local headerBoxesCount = #headerBoxes
-            for idx, box in ipairs(headerBoxes) do
-                if box then
-                    local w, h = getBoxSize(box, boxW, boxH, pad, W_raw, headerLayout.height)
-                    local x, y = getBoxPosition(box, w, h, boxW, boxH, pad, W_raw, headerLayout.height)
-                    local geom = headerGeoms[idx]
-                    if not geom then
-                        geom = {}
-                        headerGeoms[idx] = geom
-                    end
-                    geom.x = x
-                    geom.y = y
-                    geom.w = w
-                    geom.h = h
-                    geom.box = box
-                    if x > rightmost_x then
-                        rightmost_idx = idx
-                        rightmost_x = x
-                    end
-                end
-            end
-            for i = headerBoxesCount + 1, #headerGeoms do headerGeoms[i] = nil end
+            local headerGeoms = buildHeaderGeoms(headerBoxes, headerLayout, W_raw)
 
-            for idx, geom in ipairs(headerGeoms) do
-                local w = geom.w
-                if idx == rightmost_idx then w = W_raw - geom.x end
-
+            for _, geom in ipairs(headerGeoms) do
                 rectCount = rectCount + 1
                 local rect = boxRects[rectCount]
                 if not rect then
@@ -1087,7 +1114,7 @@ function dashboard.renderLayout(widget, config)
                 end
                 rect.x = geom.x
                 rect.y = geom.y
-                rect.w = w
+                rect.w = geom.w
                 rect.h = geom.h
                 rect.box = geom.box
                 rect.isHeader = true
@@ -1181,49 +1208,17 @@ function dashboard.renderLayout(widget, config)
         end
     end
 
+    -- Guard on config.header_layout, not the resolved headerLayout: the latter
+    -- falls back to EMPTY (truthy), which would start painting header boxes for
+    -- a theme that declares header_boxes without a header_layout. No shipped
+    -- theme does that, but a user theme could.
     if isFullScreen and config.header_layout and #headerBoxes > 0 then
-        local header = config.header_layout
-        local h_cols = header.cols or 1
-        local h_rows = header.rows or 1
-        local h_pad = header.padding or 0
+        -- Reuse the geometry the rect pass already built (and cached) rather
+        -- than deriving a second, independent copy per paint.
+        local headerGeoms = dashboard._headerGeoms or EMPTY
 
-        local headerW = W_raw
-        local headerH = header.height or 0
-
-        local adjustedW = adjustDimension(headerW, h_cols, h_cols - 1, h_pad)
-        local adjustedH = adjustDimension(headerH, h_rows, h_rows - 1, h_pad)
-
-        local contentW = adjustedW - ((h_cols - 1) * h_pad)
-        local contentH = adjustedH - ((h_rows - 1) * h_pad)
-        local h_boxW = contentW / h_cols
-        local h_boxH = contentH / h_rows
-
-        local rightmost_idx, rightmost_x = 1, 0
-        local headerGeoms = dashboard._headerGeomsPaint or {}
-        dashboard._headerGeomsPaint = headerGeoms
-        for idx, box in ipairs(headerBoxes) do
-            local w, h = getBoxSize(box, h_boxW, h_boxH, h_pad, adjustedW, adjustedH)
-            local x, y = getBoxPosition(box, w, h, h_boxW, h_boxH, h_pad, adjustedW, adjustedH)
-            local geom = headerGeoms[idx]
-            if not geom then
-                geom = {}
-                headerGeoms[idx] = geom
-            end
-            geom.x = x
-            geom.y = y
-            geom.w = w
-            geom.h = h
-            geom.box = box
-            if x > rightmost_x then
-                rightmost_idx = idx
-                rightmost_x = x
-            end
-        end
-        for i = (#headerBoxes) + 1, #headerGeoms do headerGeoms[i] = nil end
-
-        for idx, geom in ipairs(headerGeoms) do
+        for _, geom in ipairs(headerGeoms) do
             local w = geom.w
-            if idx == rightmost_idx then w = W_raw - geom.x end
             if geom.box then
                 local obj = dashboard.objectsByType[geom.box.type]
                 if obj and obj.paint then
@@ -1250,7 +1245,17 @@ function dashboard.renderLayout(widget, config)
             end
         end
 
-        if isFullScreen and headerLayout and headerLayout.showgrid then
+        if headerLayout.showgrid then
+            -- Debug overlay only; derive the header grid here rather than
+            -- keeping those values live through the hot path above.
+            local h_cols = headerLayout.cols or 1
+            local h_rows = headerLayout.rows or 1
+            local h_pad = headerLayout.padding or 0
+            local adjustedW = adjustDimension(W_raw, h_cols, h_cols - 1, h_pad)
+            local adjustedH = adjustDimension(headerLayout.height or 0, h_rows, h_rows - 1, h_pad)
+            local h_boxW = (adjustedW - ((h_cols - 1) * h_pad)) / h_cols
+            local h_boxH = (adjustedH - ((h_rows - 1) * h_pad)) / h_rows
+
             lcd.color(headerLayout.showgrid)
             lcd.pen(1)
 
