@@ -39,7 +39,14 @@ python bin/package/validate_ethos_manifest_zip.py <name>.zip
 ```
 VS Code tasks (`Deploy & Launch [SIM]`, `Deploy Radio`, `Deploy Radio [Fast]`, `Deploy Radio + Serial Debug`) wrap these; the `Ethos` VS Code extension is required for the simulator/radio workflow.
 
-There is no Lua unit test suite in this repo. CI (`.github/workflows/pr.yml`, `push.yml`, `release.yml`) only verifies menu manifest freshness (`generate.py --check`), builds per-locale packages, and validates the Ethos manifest inside each zip.
+**Lua tests** (requires `lua5.4` on PATH; run from the repo root):
+```bash
+lua5.4 bin/test/run.lua           # all tests
+lua5.4 bin/test/run.lua header    # filter by filename substring
+```
+Tests live in `bin/test/` and run against a mock Ethos API (`bin/test/lib/ethos_mock.lua`). Coverage is partial — currently only `widgets/dashboard/dashboard.lua` layout logic — and every `lcd` draw call is stubbed to a no-op, so these verify geometry, caching and control flow, never rendering. Passing them is not a substitute for a simulator or radio check. See `bin/test/README.md` before adding tests.
+
+CI (`.github/workflows/pr.yml`, `push.yml`, `release.yml`) does not run these tests; it verifies menu manifest freshness (`generate.py --check`), builds per-locale packages, and validates the Ethos manifest inside each zip.
 
 ## Architecture
 
