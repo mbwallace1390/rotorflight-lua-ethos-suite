@@ -822,7 +822,7 @@ function common.headerBoxes(cache)
     end
 
     if cache.boxes == nil or cache.txbatt_type ~= txbatt_type or cache.theme_signature ~= signature then
-        cache.boxes = utils.standardHeaderBoxes(i18n, common.getHeaderColorMode(), utils.getHeaderOptions(), txbatt_type)
+        cache.boxes = utils.standardHeaderBoxes(common.getHeaderColorMode(), utils.getHeaderOptions(), txbatt_type)
         cache.txbatt_type = txbatt_type
         cache.theme_signature = signature
     end

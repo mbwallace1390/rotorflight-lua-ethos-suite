@@ -30,7 +30,7 @@ local function header_boxes()
     end
 
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
-        local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
+        local boxes = utils.standardHeaderBoxes(colorMode, headeropts, txbatt_type)
 
         -- Keep the native ETHOS header widgets, but replace the stock logo
         -- with the shared America 250 / MWRC title treatment.
