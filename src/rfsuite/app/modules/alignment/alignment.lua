@@ -34,6 +34,60 @@ local CAMERA_DIST = 7.0
 local CAMERA_NEAR_EPS = 0.25
 local SHOW_BACKGROUND_GRID = false
 local HIGH_DETAIL_MODEL = false
+
+-- Constant model geometry. Hoisted out of drawVisual(), which paint() calls
+-- directly and wakeup() re-arms at ~12.5 fps: these 46 three-element tables
+-- depend on nothing computed per frame (only cx/cy/scale and the three
+-- rotation scalars vary), and rotatePoint/collectTriangle3D only read them.
+local nose = {2.35, 0.0, -0.02}
+local tail = {-2.65, 0.0, 0.03}
+local lf = {1.10, -0.62, 0.02}
+local rf = {1.10, 0.62, 0.02}
+local lb = {-0.55, -0.46, 0.05}
+local rb = {-0.55, 0.46, 0.05}
+local top = {0.05, 0.0, 0.84}
+local podAftTop = {-0.66, 0.0, 0.56}
+local podAftBot = {-0.66, 0.0, -0.12}
+local podAftL = {-0.66, -0.30, 0.14}
+local podAftR = {-0.66, 0.30, 0.14}
+local mast = {0.0, 0.0, 1.02}
+local finU = {-2.25, 0.0, 0.45}
+local finD = {-2.25, 0.0, -0.18}
+local boomSL = {-0.88, -0.10, 0.11}
+local boomSR = {-0.88, 0.10, 0.11}
+local boomSU = {-0.88, 0.0, 0.18}
+local boomSD = {-0.88, 0.0, 0.06}
+local boomEL = {-2.35, -0.06, 0.08}
+local boomER = {-2.35, 0.06, 0.08}
+local boomEU = {-2.35, 0.0, 0.12}
+local boomED = {-2.35, 0.0, 0.05}
+local stabL = {-2.35, -0.30, 0.10}
+local stabR = {-2.35, 0.30, 0.10}
+
+local skidL1 = {1.12, -0.66, -0.69}
+local skidL2 = {0.76, -0.66, -0.64}
+local skidL3 = {0.00, -0.66, -0.62}
+local skidL4 = {-0.96, -0.66, -0.63}
+local skidL5 = {-1.24, -0.66, -0.67}
+local skidR1 = {1.12, 0.66, -0.69}
+local skidR2 = {0.76, 0.66, -0.64}
+local skidR3 = {0.00, 0.66, -0.62}
+local skidR4 = {-0.96, 0.66, -0.63}
+local skidR5 = {-1.24, 0.66, -0.67}
+
+local strutLFTop = {0.52, -0.50, -0.12}
+local strutLFBot = {0.48, -0.66, -0.63}
+local strutLBTop = {-0.52, -0.44, -0.10}
+local strutLBBot = {-0.58, -0.66, -0.63}
+local strutRFTop = {0.52, 0.50, -0.12}
+local strutRFBot = {0.48, 0.66, -0.63}
+local strutRBTop = {-0.52, 0.44, -0.10}
+local strutRBBot = {-0.58, 0.66, -0.63}
+
+local rotorA = {0.0, -1.9, 1.02}
+local rotorB = {0.0, 1.9, 1.02}
+local rotorC = {-1.9, 0.0, 1.02}
+local rotorD = {1.9, 0.0, 1.02}
 local attitudeAPI
 local lastAttitudeData
 
@@ -404,9 +458,11 @@ local function collectTriangle3D(list, a, b, c, cx, cy, scale, pitchR, yawR, rol
     }
 end
 
+local function zLess(a, b) return a.z < b.z end
+
 local function drawTriangleList(list)
     if #list == 0 then return end
-    t_sort(list, function(a, b) return a.z < b.z end)
+    t_sort(list, zLess)
     for i = 1, #list do
         local t = list[i]
         lcd.color(t.color)
@@ -544,56 +600,6 @@ local function drawVisual()
     local scale = max(8, min(gw0, gh0) * 0.2112)
 
     -- Simplified heli wireframe for clearer orientation cues.
-    local nose = {2.35, 0.0, -0.02}
-    local tail = {-2.65, 0.0, 0.03}
-    local lf = {1.10, -0.62, 0.02}
-    local rf = {1.10, 0.62, 0.02}
-    local lb = {-0.55, -0.46, 0.05}
-    local rb = {-0.55, 0.46, 0.05}
-    local top = {0.05, 0.0, 0.84}
-    local podAftTop = {-0.66, 0.0, 0.56}
-    local podAftBot = {-0.66, 0.0, -0.12}
-    local podAftL = {-0.66, -0.30, 0.14}
-    local podAftR = {-0.66, 0.30, 0.14}
-    local mast = {0.0, 0.0, 1.02}
-    local finU = {-2.25, 0.0, 0.45}
-    local finD = {-2.25, 0.0, -0.18}
-    local boomSL = {-0.88, -0.10, 0.11}
-    local boomSR = {-0.88, 0.10, 0.11}
-    local boomSU = {-0.88, 0.0, 0.18}
-    local boomSD = {-0.88, 0.0, 0.06}
-    local boomEL = {-2.35, -0.06, 0.08}
-    local boomER = {-2.35, 0.06, 0.08}
-    local boomEU = {-2.35, 0.0, 0.12}
-    local boomED = {-2.35, 0.0, 0.05}
-    local stabL = {-2.35, -0.30, 0.10}
-    local stabR = {-2.35, 0.30, 0.10}
-
-    local skidL1 = {1.12, -0.66, -0.69}
-    local skidL2 = {0.76, -0.66, -0.64}
-    local skidL3 = {0.00, -0.66, -0.62}
-    local skidL4 = {-0.96, -0.66, -0.63}
-    local skidL5 = {-1.24, -0.66, -0.67}
-    local skidR1 = {1.12, 0.66, -0.69}
-    local skidR2 = {0.76, 0.66, -0.64}
-    local skidR3 = {0.00, 0.66, -0.62}
-    local skidR4 = {-0.96, 0.66, -0.63}
-    local skidR5 = {-1.24, 0.66, -0.67}
-
-    local strutLFTop = {0.52, -0.50, -0.12}
-    local strutLFBot = {0.48, -0.66, -0.63}
-    local strutLBTop = {-0.52, -0.44, -0.10}
-    local strutLBBot = {-0.58, -0.66, -0.63}
-    local strutRFTop = {0.52, 0.50, -0.12}
-    local strutRFBot = {0.48, 0.66, -0.63}
-    local strutRBTop = {-0.52, 0.44, -0.10}
-    local strutRBBot = {-0.58, 0.66, -0.63}
-
-    local rotorA = {0.0, -1.9, 1.02}
-    local rotorB = {0.0, 1.9, 1.02}
-    local rotorC = {-1.9, 0.0, 1.02}
-    local rotorD = {1.9, 0.0, 1.02}
-
     local fuselage = {}
     collectTriangle3D(fuselage, nose, lf, top, cx, cy, scale, pitchR, yawR, rollR, bodyLight)
     collectTriangle3D(fuselage, nose, top, rf, cx, cy, scale, pitchR, yawR, rollR, bodyLight)

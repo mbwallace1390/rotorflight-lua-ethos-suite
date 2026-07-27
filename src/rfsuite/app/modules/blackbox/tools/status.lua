@@ -24,6 +24,11 @@ local SDCARD_STATE = {
 }
 
 local wakeupScheduler = 0
+-- Last text written to each status field, so the per-tick call below only
+-- touches the form when the rendered string actually changed. Reset in
+-- postLoad because form fields are rebuilt on every page open.
+local lastDataflashText
+local lastSdcardText
 local dataflashAPI
 local sdcardAPI
 local eraseAPI
@@ -147,11 +152,15 @@ local function syncStatusFromApis()
 end
 
 local function updateStatusFields()
-    if app.formFields[FIELD.DATAFLASH] and app.formFields[FIELD.DATAFLASH].value then
-        app.formFields[FIELD.DATAFLASH]:value(formatDataflashStatus())
+    local f = app.formFields[FIELD.DATAFLASH]
+    if f and f.value then
+        local text = formatDataflashStatus()
+        if text ~= lastDataflashText then lastDataflashText = text; f:value(text) end
     end
-    if app.formFields[FIELD.SDCARD] and app.formFields[FIELD.SDCARD].value then
-        app.formFields[FIELD.SDCARD]:value(formatSDCardStatus())
+    f = app.formFields[FIELD.SDCARD]
+    if f and f.value then
+        local text = formatSDCardStatus()
+        if text ~= lastSdcardText then lastSdcardText = text; f:value(text) end
     end
 end
 
@@ -174,6 +183,7 @@ end
 local function postLoad()
     ensureApis()
     wakeupScheduler = 0
+    lastDataflashText, lastSdcardText = nil, nil
     pollDataflashSummary()
     pollSDCardSummary()
     app.triggers.closeProgressLoader = true

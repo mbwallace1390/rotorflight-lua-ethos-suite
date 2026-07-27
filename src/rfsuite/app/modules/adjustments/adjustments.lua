@@ -1113,17 +1113,16 @@ local function updateLiveFields()
         end
     end
 
-    if state.liveFields.preview and state.liveFields.preview.value then
+    -- calcPreview and getAdjustmentType are pure over adjRange, so the two
+    -- blocks below were computing an identical result twice per tick.
+    local hasPreview = state.liveFields.preview and state.liveFields.preview.value
+    local hasPreviewCompact = state.liveFields.previewCompact and state.liveFields.previewCompact.value
+    if hasPreview or hasPreviewCompact then
         local preview = calcPreview(adjRange, getAdjustmentType(adjRange), enaUs, adjUs)
         local valueText = preview.text
         if preview.active then valueText = valueText .. "*" end
-        state.liveFields.preview:value("Output: " .. valueText)
-    end
-    if state.liveFields.previewCompact and state.liveFields.previewCompact.value then
-        local preview = calcPreview(adjRange, getAdjustmentType(adjRange), enaUs, adjUs)
-        local valueText = preview.text
-        if preview.active then valueText = valueText .. "*" end
-        state.liveFields.previewCompact:value("O:" .. valueText)
+        if hasPreview then state.liveFields.preview:value("Output: " .. valueText) end
+        if hasPreviewCompact then state.liveFields.previewCompact:value("O:" .. valueText) end
     end
 end
 
