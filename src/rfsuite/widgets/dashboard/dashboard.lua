@@ -1275,7 +1275,9 @@ function dashboard.renderLayout(widget, config)
     end
 
     if layout.showgrid or rfsuite.preferences.developer.overlaygrid then
-        lcd.color(layout.showgrid)
+        -- The developer overlaygrid preference can be on while no theme sets
+        -- layout.showgrid, which passed nil straight to lcd.color.
+        lcd.color(layout.showgrid or utils.resolveColor("grey") or lcd.RGB(128, 128, 128))
         lcd.pen(1)
 
         local headerOffset = (isFullScreen and headerLayout and headerLayout.height) or 0

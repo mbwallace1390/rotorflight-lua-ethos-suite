@@ -4,6 +4,9 @@
 ]] --
 
 local rfsuite = require("rfsuite")
+
+-- Hoisted: apiVersionCompare re-parses its argument, and these run per tick.
+local API_12_0_8 = {12, 0, 8}
 local pageRuntime = assert(loadfile("app/lib/page_runtime.lua"))()
 local navHandlers = pageRuntime.createMenuHandlers({defaultSection = "hardware"})
 
@@ -138,15 +141,15 @@ local function updateVisibility()
     if state.form.mode and state.form.mode.enable then state.form.mode:enable(edit) end
 
     if state.form.initialErase and state.form.initialErase.enable then
-        state.form.initialErase:enable(edit and device == 1 and rfsuite.utils.apiVersionCompare(">=", {12, 0, 8}))
+        state.form.initialErase:enable(edit and device == 1 and rfsuite.utils.apiVersionCompare(">=", API_12_0_8))
     end
 
     if state.form.rollingErase and state.form.rollingErase.enable then
-        state.form.rollingErase:enable(edit and device == 1 and rfsuite.utils.apiVersionCompare(">=", {12, 0, 8}))
+        state.form.rollingErase:enable(edit and device == 1 and rfsuite.utils.apiVersionCompare(">=", API_12_0_8))
     end
 
     if state.form.gracePeriod and state.form.gracePeriod.enable then
-        state.form.gracePeriod:enable(edit and device ~= 0 and (mode == 1 or mode == 2) and rfsuite.utils.apiVersionCompare(">=", {12, 0, 8}))
+        state.form.gracePeriod:enable(edit and device ~= 0 and (mode == 1 or mode == 2) and rfsuite.utils.apiVersionCompare(">=", API_12_0_8))
     end
 
     updateSaveEnabled()

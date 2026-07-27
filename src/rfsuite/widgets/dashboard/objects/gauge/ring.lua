@@ -96,7 +96,16 @@ function render.wakeup(box)
         fuel = telemetry.getSensor("fuel") or 0
         consumption = telemetry.getSensor("consumption") or 0
         percent = max(0, min(1, fuel / 100))
-        mahUnit = format("%dmah", floor(consumption + 0.5))
+        local qConsumption = floor(consumption + 0.5)
+        local cc = box._cache
+        if cc and cc._qConsumption == qConsumption and cc._mahStr then
+            mahUnit = cc._mahStr
+        else
+            mahUnit = format("%dmah", qConsumption)
+            if not cc then cc = {}; box._cache = cc end
+            cc._qConsumption = qConsumption
+            cc._mahStr = mahUnit
+        end
 
         local override = getParam(box, "ringbattsubtext")
         if override == "" or override == false then

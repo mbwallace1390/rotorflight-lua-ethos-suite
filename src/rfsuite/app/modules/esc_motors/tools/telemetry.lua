@@ -4,6 +4,9 @@
 ]] --
 
 local rfsuite = require("rfsuite")
+
+-- Hoisted: apiVersionCompare re-parses its argument, and these run per tick.
+local API_12_0_8 = {12, 0, 8}
 local pageRuntime = assert(loadfile("app/lib/page_runtime.lua"))()
 
 local enableWakeup = false
@@ -71,7 +74,7 @@ local function wakeup()
     if protocolValue == 0 then  -- NONE
         formFields[FIELDKEY.HALF_DUPLEX]:enable(false)
         formFields[FIELDKEY.PIN_SWAP]:enable(false)
-        if rfsuite.utils.apiVersionCompare(">=", {12, 0, 8}) then
+        if rfsuite.utils.apiVersionCompare(">=", API_12_0_8) then
             formFields[FIELDKEY.VOLTAGE_CORRECTION]:enable(false)
             formFields[FIELDKEY.CURRENT_CORRECTION]:enable(false)
             formFields[FIELDKEY.CONSUMPTION_CORRECTION]:enable(false)
@@ -79,7 +82,7 @@ local function wakeup()
     else  -- ENABLED
         formFields[FIELDKEY.HALF_DUPLEX]:enable(true)
         formFields[FIELDKEY.PIN_SWAP]:enable(true)
-        if rfsuite.utils.apiVersionCompare(">=", {12, 0, 8}) then
+        if rfsuite.utils.apiVersionCompare(">=", API_12_0_8) then
             formFields[FIELDKEY.VOLTAGE_CORRECTION]:enable(true)
             formFields[FIELDKEY.CURRENT_CORRECTION]:enable(true)
             formFields[FIELDKEY.CONSUMPTION_CORRECTION]:enable(true)

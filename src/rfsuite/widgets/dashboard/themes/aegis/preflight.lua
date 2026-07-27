@@ -321,17 +321,18 @@ for i = 0, 5 do
 end
 
 local function drawHex(x, y, radius, color)
-    local points = {}
+    -- Streams vertices rather than building a point list: 7 throwaway tables
+    -- per call, twice per paint frame. Same closed 6-gon, same per-point floor.
+    lcd.color(color)
+    local firstx, firsty, px, py
     for i = 1, 6 do
         local u = HEX_UNIT[i]
-        points[i] = {x + u[1] * radius, y + u[2] * radius}
+        local hx = floor(x + u[1] * radius)
+        local hy = floor(y + u[2] * radius)
+        if i == 1 then firstx, firsty = hx, hy else lcd.drawLine(px, py, hx, hy) end
+        px, py = hx, hy
     end
-    lcd.color(color)
-    for i = 1, 6 do
-        local a = points[i]
-        local b = points[(i % 6) + 1]
-        lcd.drawLine(floor(a[1]), floor(a[2]), floor(b[1]), floor(b[2]))
-    end
+    lcd.drawLine(px, py, firstx, firsty)
 end
 
 local layout = {cols = 12, rows = 12, padding = 0}

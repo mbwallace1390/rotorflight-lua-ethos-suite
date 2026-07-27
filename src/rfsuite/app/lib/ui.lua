@@ -18,6 +18,9 @@ local app = rfsuite.app
 local session = rfsuite.session
 local rfutils = rfsuite.utils
 
+-- Shared immutable empty table for `x or EMPTY` fallbacks.
+local EMPTY = {}
+
 local ui = {}
 
 local function refreshSession()
@@ -3380,7 +3383,10 @@ function ui.adminStatsOverlay()
         local labelW = lcdGetTextSize(row.label)
         local valueW = lcdGetTextSize(row.value)
         local blockW = labelW + labelGap + valueW
-        blocks[i] = {label = row.label, value = row.value, labelW = labelW, valueW = valueW, width = blockW}
+        -- row.color must be carried through: line ~3395 reads block.color to
+        -- pick the per-row colour (e.g. the CPU-load warning) and previously
+        -- always fell back to statColor because it was never set here.
+        blocks[i] = {label = row.label, value = row.value, color = row.color, labelW = labelW, valueW = valueW, width = blockW}
         if i > 1 then totalWidth = totalWidth + blockGap end
         totalWidth = totalWidth + blockW
     end
