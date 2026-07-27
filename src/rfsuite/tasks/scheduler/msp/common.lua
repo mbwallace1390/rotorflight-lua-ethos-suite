@@ -63,15 +63,17 @@ local function setProtocolVersion(v)
     _mspVersion = (v == 2) and 2 or 1
 end
 
+-- These tuning knobs determine how aggressively polling scales. Hoisted to file
+-- scope: they are constants, and pollBudget() runs per MSP poll, so building the
+-- table inside it was one throwaway allocation per poll.
+local TUNE = {
+    threshold_windows = 6,   -- Boost after N poll windows
+    step_seconds      = 0.03,-- Extra seconds per window beyond threshold
+    cap_seconds       = 0.35 -- Hard max
+}
+
 -- Computes poll timeout budget dynamically based on message size
 local function pollBudget()
-    -- These tuning knobs determine how aggressively polling scales
-    local TUNE = {
-        threshold_windows = 6,   -- Boost after N poll windows
-        step_seconds      = 0.03,-- Extra seconds per window beyond threshold
-        cap_seconds       = 0.35 -- Hard max
-    }
-
     -- Protocol-specific throughput
     local proto   = rfsuite.tasks and rfsuite.tasks.msp and rfsuite.tasks.msp.protocol or {}
     -- Default poll budget: keep this modest to reduce instruction burn on the radio.

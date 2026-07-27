@@ -119,7 +119,20 @@ function mock.install()
     mock.realloadfile = realloadfile
     loadfile = function(path, ...)
         if type(path) == "string" then
+            -- Ethos-style absolute paths.
             path = path:gsub("^SCRIPTS:/rfsuite/", REPO_SRC):gsub("^SCRIPTS:/", REPO_SRC)
+            -- Modules also load siblings by a path relative to the suite root
+            -- (e.g. "tasks/scheduler/telemetry/sources/sensor_table.lua"). On a
+            -- radio the interpreter's cwd IS that root; here it is the repo
+            -- root, so redirect those under src/rfsuite/ when they resolve.
+            if not path:find("^" .. REPO_SRC) and path:find("^[%w_]+/") then
+                local rebased = REPO_SRC .. path
+                local probe = io.open(rebased, "r")
+                if probe then
+                    probe:close()
+                    path = rebased
+                end
+            end
         end
         local f = realloadfile(path, ...)
         if not f then
