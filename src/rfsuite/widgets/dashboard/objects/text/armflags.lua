@@ -96,7 +96,7 @@ function render.wakeup(box)
     if disableflags ~= nil and armingDisableFlagsToString then
         disableflags = floor(disableflags)
         local reason = armingDisableFlagsToString(disableflags)
-        if reason and reason ~= "OK" then
+        if reason and reason ~= rfsuite.utils.ARMING_OK_TEXT then
             displayValue = reason
             showReason = true
         end

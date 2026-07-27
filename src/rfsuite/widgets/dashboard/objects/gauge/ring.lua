@@ -217,8 +217,13 @@ function render.paint(x, y, w, h, box)
 
         drawArc(cx, cy, radius, thickness, 0, 360, c.fillbgcolor)
 
-        local startAngle = 360 - (c.percent * 360)
-        drawArc(cx, cy, radius, thickness, startAngle, 360, c.fillcolor)
+        -- drawArc normalises both angles mod 360, so percent == 0 yields
+        -- startAngle 0 / endAngle 0 -> a full 360 sweep, i.e. a ring that
+        -- reads as completely full when fuel is 0 or the sensor is missing.
+        if c.percent and c.percent > 0 then
+            local startAngle = 360 - (c.percent * 360)
+            drawArc(cx, cy, radius, thickness, startAngle, 360, c.fillcolor)
+        end
 
         drawArc(cx, cy, radius - thickness, c.innerringthickness, 0, 360, c.innerringcolor)
     else

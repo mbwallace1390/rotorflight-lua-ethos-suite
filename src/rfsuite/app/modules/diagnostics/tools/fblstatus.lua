@@ -234,12 +234,12 @@ local function wakeup()
                 if status.realTimeLoad ~= nil then
                     local value = math.floor(status.realTimeLoad / 10)
                     setFieldValue(5, tostring(value) .. "%")
-                    if value >= 60 then setFieldColor(4, RED) end
+                    if value >= 60 then setFieldColor(5, RED) end
                 end
                 if status.cpuLoad ~= nil then
                     local value = status.cpuLoad / 10
                     setFieldValue(6, tostring(value) .. "%")
-                    if value >= 60 then setFieldColor(4, RED) end
+                    if value >= 60 then setFieldColor(6, RED) end
                 end
 
             end

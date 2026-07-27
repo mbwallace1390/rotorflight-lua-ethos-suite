@@ -355,7 +355,7 @@ local function readArmflags(telemetry, showReason)
 
     if showReason and disableflags ~= nil and rfsuite.utils.armingDisableFlagsToString then
         local reason = rfsuite.utils.armingDisableFlagsToString(floor(disableflags))
-        if reason and reason ~= "OK" then return reason end
+        if reason and reason ~= rfsuite.utils.ARMING_OK_TEXT then return reason end
     end
 
     if value == nil then return nil end

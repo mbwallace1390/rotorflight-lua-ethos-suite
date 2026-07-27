@@ -7,6 +7,14 @@ local rfsuite = require("rfsuite")
 
 local utils = {}
 
+-- The "no arming flags" sentinel returned by armingDisableFlagsToString is a
+-- BUILD-SUBSTITUTED, LOCALIZED string. Comparing it against the English
+-- literal "OK" silently failed in every locale that translates the key --
+-- he ("\u05d0\u05d9\u05e9\u05d5\u05e8") and zh-cn ("\u786e\u5b9a") -- so the OK text was reported as a
+-- fault reason. Callers outside this file must compare against this.
+local ARMING_OK_TEXT = "@i18n(app.modules.fblstatus.ok):upper()@"
+utils.ARMING_OK_TEXT = ARMING_OK_TEXT
+
 local arg = {...}
 local config = arg[1]
 
@@ -285,7 +293,7 @@ function utils.armingDisableFlagsToString(flags)
         [25] = "@i18n(app.modules.fblstatus.arming_disable_flag_25):upper()@"
     }
 
-    if flags == nil or flags == 0 then return "@i18n(app.modules.fblstatus.ok):upper()@" end
+    if flags == nil or flags == 0 then return ARMING_OK_TEXT end
 
     local names = {}
     for i = 0, 25 do
@@ -295,7 +303,7 @@ function utils.armingDisableFlagsToString(flags)
         end
     end
 
-    if #names == 0 then return "@i18n(app.modules.fblstatus.ok):upper()@" end
+    if #names == 0 then return ARMING_OK_TEXT end
 
     return table.concat(names, ", ")
 end
@@ -334,7 +342,7 @@ function utils.getGovernorState(value)
     if armdisableflags ~= nil then
         armdisableflags = math.floor(armdisableflags)
         local armstring = utils.armingDisableFlagsToString(armdisableflags)
-        if armstring ~= "OK" then returnvalue = armstring end
+        if armstring ~= ARMING_OK_TEXT then returnvalue = armstring end
     end
 
     return returnvalue
