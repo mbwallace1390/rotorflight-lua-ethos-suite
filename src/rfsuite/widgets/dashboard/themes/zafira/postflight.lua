@@ -98,7 +98,7 @@ end
 
 local function readStat(telemetry, source, statType)
     local data
-    if telemetry.getSensorStats then
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
         data = telemetry.getSensorStats(source)
     else
         local stats = telemetry.sensorStats
@@ -494,7 +494,6 @@ local function drawReportCard(x, y, w, h, title, value, accent, pct)
 end
 
 local function postflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
