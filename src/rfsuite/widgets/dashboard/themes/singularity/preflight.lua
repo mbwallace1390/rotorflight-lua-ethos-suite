@@ -157,6 +157,21 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix)
+    local key = roundedKey(value, decimals)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix)
+    end
+    return key
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -200,7 +215,7 @@ end
 
 local function drawNode(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     if subtitle then drawTextAligned(x + 11, y + h - 22, w - 22, subtitle, "FONT_XXS", C.muted, "left") end
 end
 
@@ -442,12 +457,35 @@ local function preflightWakeup(box, telemetry)
     if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
         c.escUnit = resolvedEscUnit
         c.escSuffix = " " .. resolvedEscUnit
+        c._escTextKey = nil
     end
     c.link = sensor(telemetry, "vfr")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
     c.voltage = sensor(telemetry, "voltage")
     c.reactorState, c.reactorColor = getReactorState(telemetry)
+
+    local fuelKey = roundedKey(c.fuel, 0)
+    if c._energyTextKey ~= fuelKey or c.energyText == nil then
+        c._energyTextKey = fuelKey
+        c.energyText = "ENERGY " .. fmt(c.fuel, 0, "%")
+    end
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%")
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escSuffix)
+
+    local rateKey = roundedKey(c.rate, 0)
+    local pidKey = roundedKey(c.pid, 0)
+    if c._matrixRateKey ~= rateKey or c._matrixPidKey ~= pidKey or c.matrixText == nil then
+        c._matrixRateKey = rateKey
+        c._matrixPidKey = pidKey
+        c.matrixText = "R" .. fmt(c.rate, 0, "") .. "  P" .. fmt(c.pid, 0, "")
+    end
+    local voltageKey = roundedKey(c.voltage, 1)
+    if c._packTextKey ~= voltageKey or c.packText == nil then
+        c._packTextKey = voltageKey
+        c.packText = "PACK " .. fmt(c.voltage, 1, " V")
+    end
 
     c.fuelWarn = getThemeValue("fuel_warn")
     c.becMin = getThemeValue("bec_min")
@@ -553,7 +591,7 @@ local function preflightPaint(x, y, w, h, box, c)
     drawTextAligned(cx - coreR, cy + 2, coreR * 2, c.launchSub or "CONNECT TELEMETRY", "FONT_XS", c.launchColor or C.muted, "center")
     drawTextAligned(cx - coreR, cy + 35, coreR * 2, c.reactorState or "STATE --", "FONT_S", c.reactorColor or C.muted, "center")
     drawTextAligned(cx - coreR, cy + 64, coreR * 2, "REACTOR CORE", "FONT_XXS", C.muted, "center")
-    drawTextAligned(cx - coreR, cy - coreR * 1.26, coreR * 2, "ENERGY " .. fmt(c.fuel,0,"%"), "FONT_XS", fuelColor, "center")
+    drawTextAligned(cx - coreR, cy - coreR * 1.26, coreR * 2, c.energyText or "ENERGY --", "FONT_XS", fuelColor, "center")
 
     local nodeW, nodeH = floor(w * 0.20), floor(h * 0.18)
     local leftX = x + 14
@@ -565,10 +603,10 @@ local function preflightPaint(x, y, w, h, box, c)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.cyan) or C.muted
 
-    drawNode(leftX, topY, nodeW, nodeH, "POWER CORE", fmt(c.bec,1," V"), becColor, "BEC STABILITY")
-    drawNode(leftX, lowY, nodeW, nodeH, "SIGNAL CONSTELLATION", fmt(c.link,0,"%"), linkColor, "LINK LOCK")
-    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", fmt(c.esc,0,c.escSuffix), escColor, "ESC TEMPERATURE")
-    drawNode(rightX, lowY, nodeW, nodeH, "FLIGHT MATRIX", "R" .. fmt(c.rate,0,"") .. "  P" .. fmt(c.pid,0,""), C.violet, "PACK " .. fmt(c.voltage,1," V"))
+    drawNode(leftX, topY, nodeW, nodeH, "POWER CORE", c.becText or "--", becColor, "BEC STABILITY")
+    drawNode(leftX, lowY, nodeW, nodeH, "SIGNAL CONSTELLATION", c.linkText or "--", linkColor, "LINK LOCK")
+    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", c.escText or "--", escColor, "ESC TEMPERATURE")
+    drawNode(rightX, lowY, nodeW, nodeH, "FLIGHT MATRIX", c.matrixText or "R--  P--", C.violet, c.packText or "PACK --")
 
     drawOrbitalMarker(cx, cy, coreR * 1.85, coreR * 0.72, 205, becColor, 7)
     drawOrbitalMarker(cx, cy, coreR * 1.85, coreR * 0.72, 335, escColor, 7)
