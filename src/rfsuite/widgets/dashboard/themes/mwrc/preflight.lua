@@ -161,7 +161,7 @@ local function header_boxes()
         local headerBgColor = "transparent"
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
-            box.offsety = (box.offsety or 0) + topbarShiftY
+            box.yoffset = (box.yoffset or 0) + topbarShiftY
 
             if box.type == "image" then
                 box.type = "func"
@@ -248,11 +248,11 @@ local function wakeSegmentedFuel(box, telemetry)
 
     local raw = nil
     if telemetry and telemetry.getSensor then
-        raw = telemetry.getSensor(cache.source)
+        raw = tonumber((telemetry.getSensor(cache.source)))
     end
 
     if raw ~= nil then
-        local value = max(0, min(100, tonumber(raw) or 0))
+        local value = max(0, min(100, raw))
         local valueKey = floor(value + 0.5)
 
         if cache.valueKey ~= valueKey then
@@ -265,7 +265,10 @@ local function wakeSegmentedFuel(box, telemetry)
             cache.color = getFuelSegmentColor(valueKey)
         end
         cache.hasValue = true
-    elseif not cache.hasValue then
+    elseif cache.hasValue then
+        cache.hasValue = false
+        cache.value = 0
+        cache.valueKey = false
         cache.valueText = "--%"
         cache.activeSegments = 0
         cache.color = rc.dim
@@ -275,7 +278,6 @@ local function wakeSegmentedFuel(box, telemetry)
 end
 
 local function paintSegmentedFuel(x, y, w, h, box, cache)
-    x, y = utils.applyOffset(x, y, box)
     cache = cache or box._cache
     if not cache then return end
 
@@ -352,36 +354,68 @@ local function wakeAesGauge(box, telemetry)
         cache = {
             _mode = "neon_arc",
             source = box.source,
-            value = 0,
+            value = nil,
             valueKey = false,
             maxKey = false,
-            valText = "0",
+            valText = "--",
             maxText = "",
             rangeText = "",
             maxVal = -9999,
             color = box.accentcolor or colorMode.fillcolor,
             pct = 0,
-            activeTicks = 0
+            activeTicks = 0,
+            hasValue = false,
+            unit = box.unit or ""
         }
-        local unit = box.unit or ""
-        cache.rangeText = "RANGE " .. formatGaugeValue(box.min or 0, box.decimals or 0) .. "–" .. formatGaugeValue(box.max or 100, box.decimals or 0) .. unit
         box._cache = cache
     end
 
-    local val = cache.value or 0
+    local val = nil
+    local unit = box.unit or ""
+    local minValue = box.min or 0
+    local maxValue = box.max or 100
+    local thresholds = box.thresholds
+    -- Present the value, range, unit, and thresholds in one unit system.
     if telemetry and telemetry.getSensor then
-        local raw = telemetry.getSensor(cache.source)
-        if raw ~= nil then
-            if raw == 0 and (cache.value or 0) > 5 and box.holdzero ~= false then
-                val = cache.value
-            else
-                val = raw
-            end
-        end
+        local sensorUnit, sensorMin, sensorMax, sensorThresholds
+        val, _, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
+        val = tonumber(val)
+        if box.unit == nil and sensorUnit ~= nil then unit = sensorUnit end
+        if sensorMin ~= nil then minValue = sensorMin end
+        if sensorMax ~= nil then maxValue = sensorMax end
+        if sensorThresholds ~= nil then thresholds = sensorThresholds end
     end
-    cache.value = val
 
     local decimals = box.decimals or 0
+    cache.unit = unit
+    -- Rebuild the range label only when its presented form changes.
+    if cache.rangeMin ~= minValue or cache.rangeMax ~= maxValue or cache.rangeDecimals ~= decimals or cache.rangeUnit ~= unit then
+        cache.rangeText = "RANGE " .. formatGaugeValue(minValue, decimals) .. "–" .. formatGaugeValue(maxValue, decimals) .. unit
+        cache.rangeMin = minValue
+        cache.rangeMax = maxValue
+        cache.rangeDecimals = decimals
+        cache.rangeUnit = unit
+    end
+    if val == nil then
+        if cache.hasValue then
+            cache.hasValue = false
+            cache.value = nil
+            cache.valueKey = false
+            cache.valText = "--"
+            cache.pct = 0
+            cache.activeTicks = 0
+            cache.color = box.accentcolor or colorMode.fillcolor
+            if box.arcmax then
+                cache.maxKey = false
+                cache.maxUnit = nil
+                cache.maxText = ""
+            end
+        end
+        return cache
+    end
+    cache.hasValue = true
+    cache.value = val
+
     local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
     local valueKey = floor(val * multiplier + 0.5)
     if cache.valueKey ~= valueKey then
@@ -392,23 +426,22 @@ local function wakeAesGauge(box, telemetry)
     if box.arcmax then
         if val > cache.maxVal then cache.maxVal = val end
         local maxKey = floor(cache.maxVal * multiplier + 0.5)
-        if cache.maxKey ~= maxKey then
-            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. (box.unit or "")
+        if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
+            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. unit
             cache.maxKey = maxKey
+            cache.maxUnit = unit
         end
     end
 
     local activeColor = box.accentcolor or colorMode.fillcolor
-    if box.thresholds then
-        for _, threshold in ipairs(box.thresholds) do
+    if thresholds then
+        for _, threshold in ipairs(thresholds) do
             activeColor = threshold.fillcolor or activeColor
             if val <= threshold.value then break end
         end
     end
     cache.color = activeColor
 
-    local minValue = box.min or 0
-    local maxValue = box.max or 100
     local span = maxValue - minValue
     local pct = span > 0 and ((val - minValue) / span) or 0
     cache.pct = max(0, min(1, pct))
@@ -420,7 +453,6 @@ end
 -- Multi-layer neon arc with glow rail, active ticks and a bright sweep marker.
 local function paintAesGauge(x, y, w, h, box, cache)
     if not cache or cache._mode ~= "neon_arc" then return end
-    x, y = utils.applyOffset(x, y, box)
 
     local radius = floor(min(w * 0.44, h * 0.39))
     if radius < 12 then return end
@@ -509,7 +541,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
         local valueY = floor(cy - valueH * 0.55)
         lcd.drawText(floor(cx - valueW / 2), valueY, cache.valText)
 
-        local unit = box.unit
+        local unit = cache.unit
         if unit and unit ~= "" then
             local unitFont = utils.resolveFont(box.unitfont or "FONT_XS", nil)
             if type(unitFont) == "number" then
@@ -544,21 +576,21 @@ local function buildBoxes(W)
             bgcolor = "transparent"
         },
         {
-            col = 4, row = 9, rowspan = 2, offsety = -15,
+            col = 4, row = 9, rowspan = 2, yoffset = -15,
             type = "text", subtype = "telemetry", source = "rate_profile", title = "RATES", titlepos = "bottom",
             font = opts.tilefont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.tilevaluepaddingtop, valuepaddingbottom = opts.tilevaluepaddingbottom,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor, transform = "floor",
             thresholds = {{value = 1.5, textcolor = rc.cyan}, {value = 2.5, textcolor = rc.amber}, {value = 6, textcolor = rc.green}}
         },
         {
-            col = 5, row = 9, rowspan = 2, offsety = -15,
+            col = 5, row = 9, rowspan = 2, yoffset = -15,
             type = "text", subtype = "telemetry", source = "pid_profile", title = "PROFILE", titlepos = "bottom",
             font = opts.tilefont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.tilevaluepaddingtop, valuepaddingbottom = opts.tilevaluepaddingbottom,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor, transform = "floor",
             thresholds = {{value = 1.5, textcolor = rc.cyan}, {value = 2.5, textcolor = rc.amber}, {value = 6, textcolor = rc.green}}
         },
         {
-            col = 6, row = 9, colspan = 2, rowspan = 2, offsetx = -5, offsety = -15,
+            col = 6, row = 9, colspan = 2, rowspan = 2, xoffset = -5, yoffset = -15,
             type = "time", subtype = "count", title = "FLIGHTS", titlepos = "bottom",
             font = opts.tilefont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.flightvaluepaddingtop, valuepaddingbottom = opts.flightvaluepaddingbottom,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor, textcolor = colorMode.textcolor
@@ -566,7 +598,7 @@ local function buildBoxes(W)
 
         -- Modern segmented Smart Fuel battery
         {
-            col = 1, row = 10, colspan = 3, rowspan = 3, offsetx = 4, offsety = -1,
+            col = 1, row = 10, colspan = 3, rowspan = 3, xoffset = 4, yoffset = -1,
             type = "func", subtype = "func",
             source = "smartfuel",
             wakeup = wakeSegmentedFuel,
@@ -586,7 +618,7 @@ local function buildBoxes(W)
         },
 
         {
-            col = 4, colspan = 2, row = 1, rowspan = 7, offsetx = 0, offsety = 0,
+            col = 4, colspan = 2, row = 1, rowspan = 7, xoffset = 0, yoffset = 0,
             type = "func", subtype = "func", wakeup = wakeAesGauge, paint = paintAesGauge,
             bgcolor = "transparent",
             source = "bec_voltage", title = "BEC VOLT", titlepos = "bottom", decimals = 1, unit = "V", accentcolor = rc.cyan, glowcolor = rc.cyanDim,
@@ -595,23 +627,23 @@ local function buildBoxes(W)
             thresholds = {{value = getThemeValue("bec_min"), fillcolor = rc.red}, {value = getThemeValue("bec_warn"), fillcolor = rc.amber}, {value = getThemeValue("bec_max"), fillcolor = rc.cyan}, {value = 100, fillcolor = rc.red}}
         },
         {
-            col = 4, row = 11, colspan = 2, rowspan = 2, offsety = -10,
+            col = 4, row = 11, colspan = 2, rowspan = 2, yoffset = -10,
             type = "text", subtype = "blackbox", title = "BLACKBOX", titlepos = "bottom",
             font = opts.tilefont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.tilevaluepaddingtop, valuepaddingbottom = opts.tilevaluepaddingbottom, decimals = 0,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor, transform = "floor",
             thresholds = {{value = 80, textcolor = colorMode.textcolor}, {value = 90, textcolor = rc.amber}, {value = 100, textcolor = rc.red}}
         },
         {
-            col = 6, colspan = 2, row = 1, rowspan = 7, offsetx = 0, offsety = 0,
+            col = 6, colspan = 2, row = 1, rowspan = 7, xoffset = 0, yoffset = 0,
             type = "func", subtype = "func", wakeup = wakeAesGauge, paint = paintAesGauge,
             bgcolor = "transparent",
-            source = "temp_esc", title = "ESC TEMP", titlepos = "bottom", unit = "°C", accentcolor = rc.orange, glowcolor = rc.amberDim,
+            source = "temp_esc", title = "ESC TEMP", titlepos = "bottom", accentcolor = rc.orange, glowcolor = rc.amberDim,
             font = "FONT_XL", titlefont = opts.arctitlefont, min = 0, max = getThemeValue("esctemp_max"),
             thickness = math.max(3, math.floor(opts.thickness * 0.4)),
             thresholds = {{value = getThemeValue("esctemp_warn"), fillcolor = rc.orange}, {value = getThemeValue("esctemp_max"), fillcolor = rc.amber}, {value = 10000, fillcolor = rc.red}}
         },
         {
-            col = 6, row = 11, colspan = 2, rowspan = 2, offsetx = -5, offsety = -10,
+            col = 6, row = 11, colspan = 2, rowspan = 2, xoffset = -5, yoffset = -10,
             type = "text", subtype = "governor", title = "GOVERNOR", titlepos = "bottom",
             font = opts.govfont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.tilevaluepaddingtop, valuepaddingbottom = opts.tilevaluepaddingbottom,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor,
