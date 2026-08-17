@@ -272,9 +272,16 @@ local function prepareGeometry(x, y, w, h, box, c)
     return g
 end
 
+local STAT_SOURCE_ALIASES = {
+    headspeed = "rpm",
+    smartconsumption = "consumption",
+    fuel = "smartfuel"
+}
+
 local function getStatsValue(telemetry, source, statType)
     if source == nil then return nil end
-    local stats = telemetry and telemetry.sensorStats and telemetry.sensorStats[source]
+    local allStats = telemetry and telemetry.sensorStats
+    local stats = allStats and (allStats[source] or allStats[STAT_SOURCE_ALIASES[source]])
     if stats and stats[statType] ~= nil then
         local value = stats[statType]
         local sensorDef = telemetry and telemetry.sensorTable and telemetry.sensorTable[source]
@@ -445,16 +452,18 @@ function render.wakeup(box)
     elseif source == "watts" and telemetry then
         dynamicUnit = "W"
 
-        local statType = cfg.stattype or "current"
-        local vStat = getStatsValue(telemetry, "voltage", statType)
-        local iStat = getStatsValue(telemetry, "current", statType)
-
-        if statType == "min" or statType == "max" or statType == "avg" then
-            if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
-        end
-
-        -- Fallback to live watts if stats are unavailable.
-        if value == nil then
+        if cfg.stattype then
+            -- Prefer the sampled watts statistic; independent voltage/current
+            -- peaks may occur at different times and their product is not a
+            -- true maximum. Older telemetry providers can use the component
+            -- statistics as a compatibility fallback.
+            value = getStatsValue(telemetry, "watts", cfg.stattype)
+            if value == nil then
+                local vStat = getStatsValue(telemetry, "voltage", cfg.stattype)
+                local iStat = getStatsValue(telemetry, "current", cfg.stattype)
+                if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
+            end
+        else
             local volts = readLiveSensor(telemetry, "voltage")
             local amps = readLiveSensor(telemetry, "current")
             if volts ~= nil and amps ~= nil then value = volts * amps end
@@ -477,11 +486,6 @@ function render.wakeup(box)
 
             dynamicUnit = dynamicUnit or getSensorUnit(telemetry, source)
 
-            -- If the requested stat is not ready yet, fall back to the live sensor so
-            -- the bar still populates instead of showing loading dots forever.
-            if value == nil then
-                value, dynamicUnit = readLiveSensor(telemetry, source)
-            end
         else
             value, dynamicUnit = readLiveSensor(telemetry, source)
         end
@@ -532,6 +536,13 @@ function render.wakeup(box)
         c._lastValidDisplayValue = displayValue
         c._lastValidUnit = unit
     else
+        -- Stats are cleared in place at the start of a flight. Do not let the
+        -- box-level cache resurrect a value from the previous flight.
+        if cfg.stattype then
+            c._lastValidValue = nil
+            c._lastValidDisplayValue = nil
+            c._lastValidUnit = nil
+        end
         if c._lastValidValue ~= nil then
             value = c._lastValidValue
             displayValue = c._lastValidDisplayValue

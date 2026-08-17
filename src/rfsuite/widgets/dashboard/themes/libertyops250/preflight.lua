@@ -283,7 +283,21 @@ local function wakeup(box, telemetry)
     c.fuel = getSensor and getSensor("smartfuel") or nil
     c.consumed = getSensor and getSensor("smartconsumption") or nil
     c.bec = getSensor and getSensor("bec_voltage") or nil
-    c.esc = getSensor and getSensor("temp_esc") or nil
+    local escWarn = getThemeValue("esctemp_warn")
+    local escMax = getThemeValue("esctemp_max")
+    local escValue, _, escUnit, presentedEscWarn, presentedEscMax
+    if getSensor then
+        escValue, _, escUnit, presentedEscWarn, presentedEscMax = getSensor("temp_esc", escWarn, escMax)
+    end
+    c.esc = escValue
+    c.escWarn = presentedEscWarn or escWarn
+    c.escMax = presentedEscMax or escMax
+    escUnit = escUnit or "°C"
+    if c.escUnit ~= escUnit or c.escSuffix == nil then
+        c.escUnit = escUnit
+        c.escSuffix = " " .. escUnit
+        c._escTextKey = nil
+    end
     c.link = getSensor and getSensor("vfr") or nil
 
     local govRaw = getSensor and getSensor("governor")
@@ -296,7 +310,7 @@ local function wakeup(box, telemetry)
     c.govColor = governorColor(c.governor)
     c.fuelColor = c.fuel and (c.fuel <= 25 and C.red or (c.fuel <= 50 and C.amber or C.green)) or C.muted
     c.becColor = c.bec and (c.bec < getThemeValue("bec_min") and C.red or (c.bec < getThemeValue("bec_warn") and C.amber or C.green)) or C.muted
-    c.escColor = c.esc and (c.esc >= getThemeValue("esctemp_max") and C.red or (c.esc >= getThemeValue("esctemp_warn") and C.amber or C.green)) or C.muted
+    c.escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
     c.linkColor = c.link and (c.link < 50 and C.amber or C.green) or C.muted
     c.controllerConnected = isFblConnected()
 
@@ -308,7 +322,7 @@ local function wakeup(box, telemetry)
     updateFormatted(c, "_fuelTextKey", "fuelText", c.fuel, 0, "%", "--")
     updateFormatted(c, "_consumedTextKey", "consumedText", c.consumed, 0, " mAh", "--")
     updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V", "--")
-    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, " C", "--")
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escSuffix, "--")
     updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%", "--")
     if c._modeRateKey ~= rateKey or c._modePidKey ~= pidKey then
         c._modeRateKey = rateKey
