@@ -150,6 +150,21 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix)
+    local key = roundedKey(value, decimals)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix)
+    end
+    return key
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -250,7 +265,7 @@ end
 
 local function drawMetric(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 13, y + 28, w - 26, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 13, y + 28, w - 26, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     if subtitle then drawTextAligned(x + 13, y + h - 23, w - 26, subtitle, "FONT_XXS", C.muted, "left") end
 end
 
@@ -378,22 +393,29 @@ end
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
 
-local function flightTimeText()
+local function updateFlightTime(cache)
     local session = rfsuite and rfsuite.session
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    seconds = max(0, seconds)
-    return format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
+    seconds = floor(max(0, seconds))
+    if cache._timerSecond ~= seconds or cache.timer == nil then
+        cache._timerSecond = seconds
+        cache.timer = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
 end
 
 local function inflightWakeup(box, telemetry)
     local c = box._cache or {}
     box._cache = c
-    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm") or 0
+    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm")
     c.maxRpm = stat(telemetry, "rpm", "max", "headspeed", "erpm") or c.rpm
-    c.throttle = sensor(telemetry, "throttle_percent", "throttle") or 0
+    c.throttle = sensor(telemetry, "throttle_percent", "throttle")
     local escUnit
     c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
-    c.escUnit = temperatureUnitLabel(escUnit)
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    if c.escUnit ~= resolvedEscUnit then
+        c.escUnit = resolvedEscUnit
+        c._escTextKey = nil
+    end
     c.fuel = sensor(telemetry, "smartfuel")
     c.current = sensor(telemetry, "current")
     c.watts = sensor(telemetry, "watts")
@@ -401,7 +423,27 @@ local function inflightWakeup(box, telemetry)
     c.link = sensor(telemetry, "vfr")
     c.consumed = sensor(telemetry, "smartconsumption", "consumption")
     c.flightState, c.flightColor = getFlightState(telemetry)
-    c.timer = flightTimeText()
+    updateFlightTime(c)
+
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escUnit)
+    updateFormatted(c, "_throttleTextKey", "throttleText", c.throttle, 0, "%")
+    updateFormatted(c, "_rpmTextKey", "rpmText", c.rpm, 0, "")
+    updateFormatted(c, "_currentTextKey", "currentText", c.current, 1, " A")
+    updateFormatted(c, "_wattsTextKey", "wattsText", c.watts, 0, " W")
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%")
+    updateFormatted(c, "_consumedTextKey", "consumedText", c.consumed, 0, " mAh")
+
+    local maxRpmKey = roundedKey(c.maxRpm, 0)
+    if c._maxRpmTextKey ~= maxRpmKey or c.maxRpmText == nil then
+        c._maxRpmTextKey = maxRpmKey
+        c.maxRpmText = "MAX " .. fmt(c.maxRpm, 0, " RPM")
+    end
+    local fuelKey = roundedKey(c.fuel, 0)
+    if c._fuelTextKey ~= fuelKey or c.fuelText == nil then
+        c._fuelTextKey = fuelKey
+        c.fuelText = "FUEL " .. fmt(c.fuel, 0, "%")
+    end
 
     -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
     -- calling getThemeValue() from paint(), which runs on every invalidate.
@@ -418,7 +460,7 @@ local function inflightWakeup(box, telemetry)
     return c
 end
 
-local function drawEmberColumn(x, y, w, h, value, maximum, unit, color)
+local function drawEmberColumn(x, y, w, h, value, maximum, valueText, color)
     drawPanel(x, y, w, h, color, "EMBER COLUMN")
     local pct = maximum > 0 and clamp((value or 0) / maximum, 0, 1) or 0
     local baseY = y + h - 27
@@ -427,11 +469,11 @@ local function drawEmberColumn(x, y, w, h, value, maximum, unit, color)
         local cy = baseY - i * 20
         drawDiamond(x + 34, cy, 8, i < active and color or C.line2, i < active and C.gold or nil)
     end
-    drawTextAligned(x + 62, y + 46, w - 74, fmt(value,0,unit), "FONT_L", C.white, "left")
+    drawTextAligned(x + 62, y + 46, w - 74, valueText, "FONT_L", value and C.white or C.muted, "left")
 end
 
-local function drawThrustRibbon(x, y, w, h, throttle)
-    drawPanel(x, y, w, h, C.turquoise, "THRUST RIBBON")
+local function drawThrustRibbon(x, y, w, h, throttle, valueText, color)
+    drawPanel(x, y, w, h, color, "THRUST RIBBON")
     local pct = clamp((throttle or 0) / 100, 0, 1)
     local active = floor(10 * pct + 0.999)
     for i = 0, 9 do
@@ -441,7 +483,7 @@ local function drawThrustRibbon(x, y, w, h, throttle)
         lcd.color(i < active and (i % 2 == 0 and C.turquoise or C.fuchsia) or C.line)
         lcd.drawFilledRectangle(floor(bx), floor(by), 6, bh)
     end
-    drawTextAligned(x + 16, y + 40, w - 32, fmt(throttle,0,"%"), "FONT_L", C.white, "center")
+    drawTextAligned(x + 16, y + 40, w - 32, valueText, "FONT_L", throttle and C.white or C.muted, "center")
 end
 
 local FEATHER_COUNT = 25
@@ -509,37 +551,39 @@ local function inflightPaint(x, y, w, h, box, c)
     local halfH = floor((bodyH - 10) / 2)
 
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.emerald)) or C.muted
-    drawEmberColumn(leftX, bodyY, sideW, halfH, c.esc, c.escMax, c.escUnit, escColor)
-    drawThrustRibbon(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle)
+    local throttleColor = c.throttle and C.turquoise or C.muted
+    drawEmberColumn(leftX, bodyY, sideW, halfH, c.esc, c.escMax, c.escText or "--", escColor)
+    drawThrustRibbon(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle, c.throttleText or "--", throttleColor)
 
     drawPanel(centerX, bodyY, centerW, bodyH, C.gold, nil)
     local cx, cy = centerX + centerW * 0.5, bodyY + bodyH * 0.49
     local radius = min(centerW, bodyH) * 0.43
     local rpmMax = c.rpmMax
-    local rpmColor = (c.rpm or 0) > rpmMax and C.red or C.violet
+    local rpmColor = c.rpm and (c.rpm > rpmMax and C.red or C.violet) or C.muted
     local fuel = c.fuel or 0
     local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)) or C.muted
     drawPlumeGauge(cx, cy, radius, c.rpm, rpmMax, rpmColor)
     drawDiamond(cx, cy, radius * 0.42, C.gold, C.fuchsia)
     drawDiamond(cx, cy, radius * 0.27, c.flightColor or C.turquoise, C.white)
-    drawTextAligned(cx - radius, cy - 48, radius * 2, fmt(c.rpm,0,""), "FONT_XXL", C.white, "center")
+    drawTextAligned(cx - radius, cy - 48, radius * 2, c.rpmText or "--", "FONT_XXL", c.rpm and C.white or C.muted, "center")
     drawTextAligned(cx - radius, cy + 6, radius * 2, "HEADSPEED RPM", "FONT_XS", C.muted, "center")
     drawTextAligned(cx - radius, cy + 35, radius * 2, c.flightState or "STATE --", "FONT_XS", c.flightColor or C.muted, "center")
 
     local gemsY = bodyY + bodyH - 54
     drawGemLine(centerX + 42, gemsY, centerW - 84, 12, fuel, fuelColor, C.line2)
-    drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, "MAX " .. fmt(c.maxRpm,0," RPM"), "FONT_XXS", C.gold, "left")
-    drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, "FUEL " .. fmt(c.fuel,0,"%"), "FONT_XXS", fuelColor, "right")
+    drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, c.maxRpmText or "MAX --", "FONT_XXS", c.maxRpm and C.gold or C.muted, "left")
+    drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, c.fuelText or "FUEL --", "FONT_XXS", fuelColor, "right")
 
     local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.fuchsia) or C.muted
     local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.violet) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.turquoise)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.turquoise) or C.muted
+    local consumedColor = c.consumed and C.gold or C.muted
     local nodeH = floor((bodyH - 30) / 4)
-    drawMetric(rightX, bodyY, sideW, nodeH, "RUBY CURRENT", fmt(c.current,1," A"), currentColor, fmt(c.watts,0," W"))
-    drawMetric(rightX, bodyY + nodeH + 10, sideW, nodeH, "SAPPHIRE BEC", fmt(c.bec,1," V"), becColor, "power clarity")
-    drawMetric(rightX, bodyY + (nodeH + 10) * 2, sideW, nodeH, "TURQUOISE LINK", fmt(c.link,0,"%"), linkColor, "radio clarity")
-    drawMetric(rightX, bodyY + (nodeH + 10) * 3, sideW, nodeH, "GOLD CONSUMED", fmt(c.consumed,0," mAh"), wattsColor, "flight energy")
+    drawMetric(rightX, bodyY, sideW, nodeH, "RUBY CURRENT", c.currentText or "--", currentColor, c.wattsText or "--")
+    drawMetric(rightX, bodyY + nodeH + 10, sideW, nodeH, "SAPPHIRE BEC", c.becText or "--", becColor, "power clarity")
+    drawMetric(rightX, bodyY + (nodeH + 10) * 2, sideW, nodeH, "TURQUOISE LINK", c.linkText or "--", linkColor, "radio clarity")
+    drawMetric(rightX, bodyY + (nodeH + 10) * 3, sideW, nodeH, "GOLD CONSUMED", c.consumedText or "--", consumedColor, "flight energy")
 end
 
 local boxes_cache

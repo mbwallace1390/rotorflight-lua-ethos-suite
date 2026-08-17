@@ -150,6 +150,21 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix)
+    local key = roundedKey(value, decimals)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix)
+    end
+    return key
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -250,7 +265,7 @@ end
 
 local function drawMetric(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 13, y + 28, w - 26, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 13, y + 28, w - 26, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     if subtitle then drawTextAligned(x + 13, y + h - 23, w - 26, subtitle, "FONT_XXS", C.muted, "left") end
 end
 
@@ -385,12 +400,37 @@ local function preflightWakeup(box, telemetry)
     c.bec = sensor(telemetry, "bec_voltage", "bec")
     local escUnit
     c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
-    c.escUnit = temperatureUnitLabel(escUnit)
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    if c.escUnit ~= resolvedEscUnit then
+        c.escUnit = resolvedEscUnit
+        c._escTextKey = nil
+    end
     c.link = sensor(telemetry, "vfr")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
     c.voltage = sensor(telemetry, "voltage")
     c.flightState, c.flightColor = getFlightState(telemetry)
+
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%")
+    updateFormatted(c, "_fuelTextKey", "fuelText", c.fuel, 0, "%")
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escUnit)
+
+    local rateKey = roundedKey(c.rate, 0)
+    if c._ratesTextKey ~= rateKey or c.ratesText == nil then
+        c._ratesTextKey = rateKey
+        c.ratesText = "RATES  " .. fmt(c.rate, 0, "")
+    end
+    local pidKey = roundedKey(c.pid, 0)
+    if c._pidTextKey ~= pidKey or c.pidText == nil then
+        c._pidTextKey = pidKey
+        c.pidText = "PID     " .. fmt(c.pid, 0, "")
+    end
+    local voltageKey = roundedKey(c.voltage, 1)
+    if c._packTextKey ~= voltageKey or c.packText == nil then
+        c._packTextKey = voltageKey
+        c.packText = "PACK   " .. fmt(c.voltage, 1, " V")
+    end
 
     -- Settings are stored in Celsius; compare against the sensor's presented unit.
     c.fuelWarn = getThemeValue("fuel_warn")
@@ -463,9 +503,9 @@ local function preflightPaint(x, y, w, h, box, c)
     local fuel = c.fuel or 0
     local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)) or C.muted
 
-    drawMetric(leftX, bodyY, sideW, cardH, "SAPPHIRE BEC", fmt(c.bec,1," V"), becColor, "regulated power")
+    drawMetric(leftX, bodyY, sideW, cardH, "SAPPHIRE BEC", c.becText or "--", becColor, "regulated power")
     drawProgress(leftX + 14, bodyY + cardH - 36, sideW - 28, 9, c.bec and c.bec / 15 or 0, becColor)
-    drawMetric(leftX, bodyY + cardH + 10, sideW, cardH, "TURQUOISE LINK", fmt(c.link,0,"%"), linkColor, "radio clarity")
+    drawMetric(leftX, bodyY + cardH + 10, sideW, cardH, "TURQUOISE LINK", c.linkText or "--", linkColor, "radio clarity")
     drawProgress(leftX + 14, bodyY + bodyH - 36, sideW - 28, 9, c.link and c.link / 100 or 0, linkColor)
 
     drawPanel(centerX, bodyY, centerW, bodyH, c.statusColor or C.gold, nil)
@@ -480,17 +520,17 @@ local function preflightPaint(x, y, w, h, box, c)
 
     local gemY = bodyY + bodyH - 82
     drawTextAligned(centerX + 18, gemY - 27, centerW - 36, "SMART FUEL JEWELS", "FONT_XXS", C.muted, "left")
-    drawTextAligned(centerX + 18, gemY - 28, centerW - 36, fmt(c.fuel,0,"%"), "FONT_S", c.fuel and C.white or C.muted, "right")
+    drawTextAligned(centerX + 18, gemY - 28, centerW - 36, c.fuelText or "--", "FONT_S", c.fuel and C.white or C.muted, "right")
     drawGemLine(centerX + 20, gemY, centerW - 40, 12, fuel, fuelColor, C.line2)
     drawPanel(centerX + 48, gemY + 20, centerW - 96, 29, c.flightColor or C.turquoise, nil)
     drawTextAligned(centerX + 58, gemY + 25, centerW - 116, c.flightState or "STATE --", "FONT_XXS", c.flightColor or C.muted, "center")
 
-    drawMetric(rightX, bodyY, sideW, cardH, "EMBER ESC", fmt(c.esc,0,c.escUnit), escColor, "thermal balance")
+    drawMetric(rightX, bodyY, sideW, cardH, "EMBER ESC", c.escText or "--", escColor, "thermal balance")
     drawProgress(rightX + 14, bodyY + cardH - 36, sideW - 28, 9, c.esc and c.esc / c.escMax or 0, escColor)
     drawPanel(rightX, bodyY + cardH + 10, sideW, cardH, C.violet, "FLIGHT TALISMAN")
-    drawTextAligned(rightX + 16, bodyY + cardH + 50, sideW - 32, "RATES  " .. fmt(c.rate,0,""), "FONT_XS", C.white, "left")
-    drawTextAligned(rightX + 16, bodyY + cardH + 84, sideW - 32, "PID     " .. fmt(c.pid,0,""), "FONT_XS", C.white, "left")
-    drawTextAligned(rightX + 16, bodyY + cardH + 118, sideW - 32, "PACK   " .. fmt(c.voltage,1," V"), "FONT_XS", C.white, "left")
+    drawTextAligned(rightX + 16, bodyY + cardH + 50, sideW - 32, c.ratesText or "RATES  --", "FONT_XS", c.rate and C.white or C.muted, "left")
+    drawTextAligned(rightX + 16, bodyY + cardH + 84, sideW - 32, c.pidText or "PID     --", "FONT_XS", c.pid and C.white or C.muted, "left")
+    drawTextAligned(rightX + 16, bodyY + cardH + 118, sideW - 32, c.packText or "PACK   --", "FONT_XS", c.voltage and C.white or C.muted, "left")
 end
 
 local boxes_cache
