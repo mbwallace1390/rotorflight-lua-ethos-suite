@@ -17,6 +17,7 @@ local mspApiVersion = requireModule("lib/msp_api_version.lua")
 local THEME_DIRS = {
   ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
   aerc = "widgets/dashboard/themes/aerc",
+  america250 = "widgets/dashboard/themes/america250",
   claude = "widgets/dashboard/themes/claude",
   danielrc = "widgets/dashboard/themes/danielrc",
   default = "widgets/dashboard/themes/default",
@@ -1108,7 +1109,7 @@ end
 
 local function setDashboardPreferences(widget, theme)
   ensureDashboardSettings(widget)
-  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
+  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme), "system/" .. theme)
 end
 
 local function prepareDashboard(widget)
