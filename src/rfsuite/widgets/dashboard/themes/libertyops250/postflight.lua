@@ -428,7 +428,7 @@ local function buildBoxes(W)
         -- Stat Gauges
         {
             col = 1, row = 10, colspan = 4, rowspan = 3, yoffset = -7,
-            type = "gauge", subtype = "bar", source = "altitude", stattype = "max", title = "Max Altitude", unit = "ft",
+            type = "gauge", subtype = "bar", source = "altitude", stattype = "max", title = "Max Altitude", unit = "m",
             min = 0, max = 450, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
@@ -525,7 +525,7 @@ local function buildBoxes(W)
         },
         {
             col = 9, row = 7, colspan = 4, rowspan = 3, yoffset = -7,
-            type = "gauge", subtype = "bar", source = "temp_esc", stattype = "max", title = "ESC Max Temp", unit = "°C",
+            type = "gauge", subtype = "bar", source = "temp_esc", stattype = "max", title = "ESC Max Temp",
             min = 0, max = getThemeValue("esctemp_max"), titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
