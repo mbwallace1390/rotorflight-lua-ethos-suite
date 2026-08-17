@@ -674,7 +674,7 @@ local function buildBoxes(W)
             type = "text", subtype = "governor", title = "GOV", titlepos = "bottom",
             font = "FONT_S", titlefont = "FONT_XS", bgcolor = "transparent",
             thresholds = {
-                {value = "DISARMED", textcolor = rc.red}, {value = "OFF", textcolor = rc.red}, {value = "IDLE", textcolor = rc.cyan}, {value = "SPOOLUP", textcolor = rc.cyan}, {value = "RECOVERY", textcolor = rc.amber}, {value = "ACTIVE", textcolor = rc.green}, {value = "@i18n(widgets.governor.THROFF)@", textcolor = rc.red}
+                {value = "DISARMED", textcolor = rc.red}, {value = "OFF", textcolor = rc.red}, {value = "IDLE", textcolor = rc.cyan}, {value = "SPOOLUP", textcolor = rc.cyan}, {value = "RECOVERY", textcolor = rc.amber}, {value = "ACTIVE", textcolor = rc.green}, {value = "THR OFF", textcolor = rc.red}
             }
         },
         {
