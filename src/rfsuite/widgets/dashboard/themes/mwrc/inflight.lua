@@ -254,16 +254,37 @@ local function wakeAesGauge(box, telemetry)
             color = box.accentcolor or colorMode.fillcolor,
             pct = 0,
             activeTicks = 0,
-            hasValue = false
+            hasValue = false,
+            unit = box.unit or ""
         }
-        local unit = box.unit or ""
-        cache.rangeText = "RANGE " .. formatGaugeValue(box.min or 0, box.decimals or 0) .. "–" .. formatGaugeValue(box.max or 100, box.decimals or 0) .. unit
         box._cache = cache
     end
 
     local val = nil
+    local unit = box.unit or ""
+    local minValue = box.min or 0
+    local maxValue = box.max or 100
+    local thresholds = box.thresholds
+    -- Present the value, range, unit, and thresholds in one unit system.
     if telemetry and telemetry.getSensor then
-        val = tonumber((telemetry.getSensor(cache.source)))
+        local sensorUnit, sensorMin, sensorMax, sensorThresholds
+        val, _, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
+        val = tonumber(val)
+        if box.unit == nil and sensorUnit ~= nil then unit = sensorUnit end
+        if sensorMin ~= nil then minValue = sensorMin end
+        if sensorMax ~= nil then maxValue = sensorMax end
+        if sensorThresholds ~= nil then thresholds = sensorThresholds end
+    end
+
+    local decimals = box.decimals or 0
+    cache.unit = unit
+    -- Rebuild the range label only when its presented form changes.
+    if cache.rangeMin ~= minValue or cache.rangeMax ~= maxValue or cache.rangeDecimals ~= decimals or cache.rangeUnit ~= unit then
+        cache.rangeText = "RANGE " .. formatGaugeValue(minValue, decimals) .. "–" .. formatGaugeValue(maxValue, decimals) .. unit
+        cache.rangeMin = minValue
+        cache.rangeMax = maxValue
+        cache.rangeDecimals = decimals
+        cache.rangeUnit = unit
     end
     if val == nil then
         if cache.hasValue then
@@ -276,6 +297,7 @@ local function wakeAesGauge(box, telemetry)
             cache.color = box.accentcolor or colorMode.fillcolor
             if box.arcmax then
                 cache.maxKey = false
+                cache.maxUnit = nil
                 cache.maxText = ""
             end
         end
@@ -284,7 +306,6 @@ local function wakeAesGauge(box, telemetry)
     cache.hasValue = true
     cache.value = val
 
-    local decimals = box.decimals or 0
     local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
     local valueKey = floor(val * multiplier + 0.5)
     if cache.valueKey ~= valueKey then
@@ -295,23 +316,22 @@ local function wakeAesGauge(box, telemetry)
     if box.arcmax then
         if val > cache.maxVal then cache.maxVal = val end
         local maxKey = floor(cache.maxVal * multiplier + 0.5)
-        if cache.maxKey ~= maxKey then
-            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. (box.unit or "")
+        if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
+            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. unit
             cache.maxKey = maxKey
+            cache.maxUnit = unit
         end
     end
 
     local activeColor = box.accentcolor or colorMode.fillcolor
-    if box.thresholds then
-        for _, threshold in ipairs(box.thresholds) do
+    if thresholds then
+        for _, threshold in ipairs(thresholds) do
             activeColor = threshold.fillcolor or activeColor
             if val <= threshold.value then break end
         end
     end
     cache.color = activeColor
 
-    local minValue = box.min or 0
-    local maxValue = box.max or 100
     local span = maxValue - minValue
     local pct = span > 0 and ((val - minValue) / span) or 0
     cache.pct = max(0, min(1, pct))
@@ -411,7 +431,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
         local valueY = floor(cy - valueH * 0.55)
         lcd.drawText(floor(cx - valueW / 2), valueY, cache.valText)
 
-        local unit = box.unit
+        local unit = cache.unit
         if unit and unit ~= "" then
             local unitFont = utils.resolveFont(box.unitfont or "FONT_XS", nil)
             if type(unitFont) == "number" then
@@ -622,7 +642,7 @@ local function buildBoxes(W)
             col = 1, row = 2, colspan = 3, rowspan = 8,
             type = "func", subtype = "func", wakeup = wakeAesGauge, paint = paintAesGauge,
             bgcolor = "transparent",
-            source = "temp_esc", arcmax = true, unit = "°C", accentcolor = rc.cyan, glowcolor = rc.cyanDim,
+            source = "temp_esc", arcmax = true, accentcolor = rc.cyan, glowcolor = rc.cyanDim,
             title = "ESC TEMP", titlepos = "bottom", titlefont = arcTitleFont,
             min = 0, max = getThemeValue("esctemp_max"), thickness = math.max(3, math.floor(opts.thickness * 0.4)),
             font = "FONT_XL", maxfont = arcMaxFont,
