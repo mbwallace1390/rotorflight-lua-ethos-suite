@@ -250,7 +250,6 @@ local function wakeAesGauge(box, telemetry)
             valText = "--",
             maxText = "",
             rangeText = "",
-            maxVal = -9999,
             color = box.accentcolor or colorMode.fillcolor,
             pct = 0,
             activeTicks = 0,
@@ -314,10 +313,12 @@ local function wakeAesGauge(box, telemetry)
     end
 
     if box.arcmax then
-        if val > cache.maxVal then cache.maxVal = val end
-        local maxKey = floor(cache.maxVal * multiplier + 0.5)
+        -- Dashboard stats reset per flight and already follow the temperature unit preference.
+        local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(cache.source)
+        local maxVal = tonumber(stats and stats.max) or val
+        local maxKey = floor(maxVal * multiplier + 0.5)
         if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
-            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. unit
+            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. unit
             cache.maxKey = maxKey
             cache.maxUnit = unit
         end
