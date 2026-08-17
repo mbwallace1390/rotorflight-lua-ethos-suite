@@ -73,39 +73,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -353,25 +386,27 @@ local function flightTimeText()
 end
 
 local function inflightWakeup(box, telemetry)
-    local c = box._cache or {maxRpm = 0}
+    local c = box._cache or {}
     box._cache = c
     c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm") or 0
-    c.maxRpm = max(c.maxRpm or 0, c.rpm)
+    c.maxRpm = stat(telemetry, "rpm", "max", "headspeed", "erpm") or c.rpm
     c.throttle = sensor(telemetry, "throttle_percent", "throttle") or 0
-    c.esc = sensor(telemetry, "temp_esc", "esc_temp")
+    local escUnit
+    c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
+    c.escUnit = temperatureUnitLabel(escUnit)
     c.fuel = sensor(telemetry, "smartfuel")
     c.current = sensor(telemetry, "current")
     c.watts = sensor(telemetry, "watts")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
-    c.link = sensor(telemetry, "link", "vfr")
+    c.link = sensor(telemetry, "vfr")
     c.consumed = sensor(telemetry, "smartconsumption", "consumption")
     c.flightState, c.flightColor = getFlightState(telemetry)
     c.timer = flightTimeText()
 
     -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
     -- calling getThemeValue() from paint(), which runs on every invalidate.
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.fuelWarn = getThemeValue("fuel_warn")
     c.rpmMax = getThemeValue("rpm_max")
     c.currentWarn = getThemeValue("current_warn")
@@ -383,7 +418,7 @@ local function inflightWakeup(box, telemetry)
     return c
 end
 
-local function drawEmberColumn(x, y, w, h, value, maximum, color)
+local function drawEmberColumn(x, y, w, h, value, maximum, unit, color)
     drawPanel(x, y, w, h, color, "EMBER COLUMN")
     local pct = maximum > 0 and clamp((value or 0) / maximum, 0, 1) or 0
     local baseY = y + h - 27
@@ -392,7 +427,7 @@ local function drawEmberColumn(x, y, w, h, value, maximum, color)
         local cy = baseY - i * 20
         drawDiamond(x + 34, cy, 8, i < active and color or C.line2, i < active and C.gold or nil)
     end
-    drawTextAligned(x + 62, y + 46, w - 74, fmt(value,0,"C"), "FONT_L", C.white, "left")
+    drawTextAligned(x + 62, y + 46, w - 74, fmt(value,0,unit), "FONT_L", C.white, "left")
 end
 
 local function drawThrustRibbon(x, y, w, h, throttle)
@@ -449,8 +484,9 @@ local function inflightPaint(x, y, w, h, box, c)
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
     c.rpmMax = c.rpmMax or getThemeValue("rpm_max")
     c.currentWarn = c.currentWarn or getThemeValue("current_warn")
@@ -474,7 +510,7 @@ local function inflightPaint(x, y, w, h, box, c)
     local halfH = floor((bodyH - 10) / 2)
 
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.emerald)) or C.muted
-    drawEmberColumn(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor)
+    drawEmberColumn(leftX, bodyY, sideW, halfH, c.esc, c.escMax, c.escUnit, escColor)
     drawThrustRibbon(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle)
 
     drawPanel(centerX, bodyY, centerW, bodyH, C.gold, nil)
@@ -483,7 +519,7 @@ local function inflightPaint(x, y, w, h, box, c)
     local rpmMax = c.rpmMax
     local rpmColor = (c.rpm or 0) > rpmMax and C.red or C.violet
     local fuel = c.fuel or 0
-    local fuelColor = fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)
+    local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)) or C.muted
     drawPlumeGauge(cx, cy, radius, c.rpm, rpmMax, rpmColor)
     drawDiamond(cx, cy, radius * 0.42, C.gold, C.fuchsia)
     drawDiamond(cx, cy, radius * 0.27, c.flightColor or C.turquoise, C.white)
@@ -496,8 +532,8 @@ local function inflightPaint(x, y, w, h, box, c)
     drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, "MAX " .. fmt(c.maxRpm,0," RPM"), "FONT_XXS", C.gold, "left")
     drawTextAligned(centerX + 18, bodyY + bodyH - 30, centerW - 36, "FUEL " .. fmt(c.fuel,0,"%"), "FONT_XXS", fuelColor, "right")
 
-    local currentColor = c.current and c.current >= c.currentWarn and C.red or C.fuchsia
-    local wattsColor = c.watts and c.watts >= c.wattsWarn and C.red or C.violet
+    local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.fuchsia) or C.muted
+    local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.violet) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.turquoise)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.turquoise) or C.muted
     local nodeH = floor((bodyH - 30) / 4)
