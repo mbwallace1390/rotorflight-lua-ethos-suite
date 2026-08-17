@@ -33,6 +33,7 @@ local THEME_DIRS = {
   singularity = "widgets/dashboard/themes/singularity",
   ["srb-rc"] = "widgets/dashboard/themes/srb-rc",
   timer = "widgets/dashboard/themes/timer",
+  zafira = "widgets/dashboard/themes/zafira",
 }
 
 local DEFAULT_DASHBOARD_SETTINGS = {
