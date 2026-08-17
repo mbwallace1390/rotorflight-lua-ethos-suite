@@ -107,6 +107,7 @@ local DASHBOARD_THEMES = {
   rfstatus = true,
   ["rt-rc-n"] = true,
   ["rt-rc"] = true,
+  singularity = true,
   ["srb-rc"] = true,
   timer = true,
 }
