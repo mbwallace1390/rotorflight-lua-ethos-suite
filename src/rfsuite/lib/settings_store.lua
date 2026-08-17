@@ -100,6 +100,7 @@ local DASHBOARD_THEMES = {
   gismo = true,
   helihud = true,
   kevd = true,
+  mwrc = true,
   rfstatus = true,
   ["rt-rc-n"] = true,
   ["rt-rc"] = true,

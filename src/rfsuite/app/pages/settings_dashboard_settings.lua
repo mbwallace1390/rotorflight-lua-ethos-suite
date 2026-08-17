@@ -22,6 +22,7 @@ local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_default)@", folder = "default"},
   {label = "@i18n(app.modules.settings.dashboard_theme_gismo)@", folder = "gismo"},
   {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", folder = "kevd", minResolution = {x = 784, y = 294}},
+  {label = "MWRC", folder = "mwrc", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", folder = "rfstatus"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", folder = "rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", folder = "rt-rc-n"},

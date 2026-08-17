@@ -23,6 +23,7 @@ local THEME_DIRS = {
   gismo = "widgets/dashboard/themes/gismo",
   helihud = "widgets/dashboard/themes/helihud",
   kevd = "widgets/dashboard/themes/kevd",
+  mwrc = "widgets/dashboard/themes/mwrc",
   rfstatus = "widgets/dashboard/themes/rfstatus",
   ["rt-rc-n"] = "widgets/dashboard/themes/rt-rc-n",
   ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
@@ -1108,7 +1109,7 @@ end
 
 local function setDashboardPreferences(widget, theme)
   ensureDashboardSettings(widget)
-  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
+  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme), "system/" .. theme)
 end
 
 local function prepareDashboard(widget)
