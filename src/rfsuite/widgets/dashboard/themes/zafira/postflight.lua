@@ -150,6 +150,12 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -397,9 +403,10 @@ end
 
 local function updateCard(card, value, decimals, suffix, color, pct)
     -- Reformat only when a reported value or its presentation unit changes.
-    if card._value ~= value or card._suffix ~= suffix or card[2] == nil then
+    local key = roundedKey(value, decimals)
+    if card._key ~= key or card._suffix ~= suffix or card[2] == nil then
         card[2] = fmt(value, decimals, suffix)
-        card._value = value
+        card._key = key
         card._suffix = suffix
     end
     card[3] = color
@@ -422,7 +429,11 @@ local function postflightWakeup(box, telemetry)
     c.voltage = stat(telemetry, "voltage", "min")
     local session = rfsuite and rfsuite.session
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    c.time = format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
+    seconds = floor(max(0, seconds))
+    if c._timerSecond ~= seconds or c.time == nil then
+        c._timerSecond = seconds
+        c.time = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
 
     -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
     -- calling getThemeValue() from paint(), which runs on every invalidate.
@@ -489,7 +500,7 @@ end
 
 local function drawReportCard(x, y, w, h, title, value, accent, pct)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 14, y + 30, w - 28, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 14, y + 30, w - 28, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     drawGemLine(x + 16, y + h - 22, w - 32, 8, clamp((pct or 0) * 100, 0, 100), accent, C.line)
 end
 
