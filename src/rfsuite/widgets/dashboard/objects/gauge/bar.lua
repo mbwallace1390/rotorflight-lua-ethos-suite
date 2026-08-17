@@ -272,9 +272,16 @@ local function prepareGeometry(x, y, w, h, box, c)
     return g
 end
 
+local STAT_SOURCE_ALIASES = {
+    headspeed = "rpm",
+    smartconsumption = "consumption",
+    fuel = "smartfuel"
+}
+
 local function getStatsValue(telemetry, source, statType)
     if source == nil then return nil end
-    local stats = telemetry and telemetry.sensorStats and telemetry.sensorStats[source]
+    local allStats = telemetry and telemetry.sensorStats
+    local stats = allStats and (allStats[source] or allStats[STAT_SOURCE_ALIASES[source]])
     if stats and stats[statType] ~= nil then
         local value = stats[statType]
         local sensorDef = telemetry and telemetry.sensorTable and telemetry.sensorTable[source]
