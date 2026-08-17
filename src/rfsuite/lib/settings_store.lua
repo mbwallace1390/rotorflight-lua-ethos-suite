@@ -103,6 +103,7 @@ local DASHBOARD_THEMES = {
   helihud = true,
   kevd = true,
   libertyops250 = true,
+  mwrc = true,
   rfstatus = true,
   ["rt-rc-n"] = true,
   ["rt-rc"] = true,

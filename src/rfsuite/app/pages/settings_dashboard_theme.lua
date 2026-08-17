@@ -30,6 +30,7 @@ local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_helihud)@", path = "system/helihud"},
   {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", path = "system/kevd", minResolution = {x = 784, y = 294}},
   {label = "Liberty Ops 250", path = "system/libertyops250", minResolution = {x = 784, y = 294}},
+  {label = "MWRC", path = "system/mwrc", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", path = "system/rfstatus"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", path = "system/rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", path = "system/rt-rc-n"},

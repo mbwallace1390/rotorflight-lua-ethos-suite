@@ -26,6 +26,7 @@ local THEME_DIRS = {
   helihud = "widgets/dashboard/themes/helihud",
   kevd = "widgets/dashboard/themes/kevd",
   libertyops250 = "widgets/dashboard/themes/libertyops250",
+  mwrc = "widgets/dashboard/themes/mwrc",
   rfstatus = "widgets/dashboard/themes/rfstatus",
   ["rt-rc-n"] = "widgets/dashboard/themes/rt-rc-n",
   ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
