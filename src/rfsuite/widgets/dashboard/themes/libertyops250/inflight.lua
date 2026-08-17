@@ -63,7 +63,7 @@ local colorMode = {
 
 local theme_section = "system/libertyops250"
 
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 6.5, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 110, esctemp_max = 150}
+local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 3.0, bec_warn = 6.0, bec_max = 13.0, esctemp_warn = 90, esctemp_max = 140}
 
 local function getStrobeColor(baseColor, isCritical)
     if isCritical then
@@ -138,11 +138,11 @@ local function wakeSegmentedFuel(box, telemetry)
 
     local raw = nil
     if telemetry and telemetry.getSensor then
-        raw = telemetry.getSensor(cache.source)
+        raw = tonumber((telemetry.getSensor(cache.source)))
     end
 
     if raw ~= nil then
-        local value = max(0, min(100, tonumber(raw) or 0))
+        local value = max(0, min(100, raw))
         local valueKey = floor(value + 0.5)
 
         if cache.valueKey ~= valueKey then
@@ -155,7 +155,10 @@ local function wakeSegmentedFuel(box, telemetry)
             cache.color = getFuelSegmentColor(valueKey)
         end
         cache.hasValue = true
-    elseif not cache.hasValue then
+    elseif cache.hasValue then
+        cache.hasValue = false
+        cache.value = 0
+        cache.valueKey = false
         cache.valueText = "--%"
         cache.activeSegments = 0
         cache.color = rc.dim
@@ -165,7 +168,6 @@ local function wakeSegmentedFuel(box, telemetry)
 end
 
 local function paintSegmentedFuel(x, y, w, h, box, cache)
-    x, y = utils.applyOffset(x, y, box)
     cache = cache or box._cache
     if not cache then return end
 
@@ -242,36 +244,69 @@ local function wakeAesGauge(box, telemetry)
         cache = {
             _mode = "neon_arc",
             source = box.source,
-            value = 0,
+            value = nil,
             valueKey = false,
             maxKey = false,
-            valText = "0",
+            valText = "--",
             maxText = "",
             rangeText = "",
-            maxVal = -9999,
             color = box.accentcolor or colorMode.fillcolor,
             pct = 0,
-            activeTicks = 0
+            activeTicks = 0,
+            hasValue = false,
+            unit = box.unit or ""
         }
-        local unit = box.unit or ""
-        cache.rangeText = "RANGE " .. formatGaugeValue(box.min or 0, box.decimals or 0) .. "–" .. formatGaugeValue(box.max or 100, box.decimals or 0) .. unit
         box._cache = cache
     end
 
-    local val = cache.value or 0
+    local val = nil
+    local unit = box.unit or ""
+    local minValue = box.min or 0
+    local maxValue = box.max or 100
+    local thresholds = box.thresholds
+    -- Present the value, range, unit, and thresholds in one unit system.
     if telemetry and telemetry.getSensor then
-        local raw = telemetry.getSensor(cache.source)
-        if raw ~= nil then
-            if raw == 0 and (cache.value or 0) > 5 and box.holdzero ~= false then
-                val = cache.value
-            else
-                val = raw
-            end
-        end
+        local sensorUnit, sensorMin, sensorMax, sensorThresholds
+        val, _, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
+        val = tonumber(val)
+        if box.unit == nil and sensorUnit ~= nil then unit = sensorUnit end
+        if sensorMin ~= nil then minValue = sensorMin end
+        if sensorMax ~= nil then maxValue = sensorMax end
+        if sensorThresholds ~= nil then thresholds = sensorThresholds end
     end
-    cache.value = val
 
     local decimals = box.decimals or 0
+    cache.unit = unit
+    -- Rebuild the range label only when its presented form changes.
+    if cache.rangeMin ~= minValue or cache.rangeMax ~= maxValue or cache.rangeDecimals ~= decimals or cache.rangeUnit ~= unit then
+        cache.rangeText = "RANGE " .. formatGaugeValue(minValue, decimals) .. "–" .. formatGaugeValue(maxValue, decimals) .. unit
+        cache.rangeMin = minValue
+        cache.rangeMax = maxValue
+        cache.rangeDecimals = decimals
+        cache.rangeUnit = unit
+    end
+
+    if val == nil then
+        if cache.hasValue then
+            cache.hasValue = false
+            cache.value = nil
+            cache.valueKey = false
+            cache.valText = "--"
+            cache.pct = 0
+            cache.activeTicks = 0
+            cache.color = box.accentcolor or colorMode.fillcolor
+            if box.arcmax then
+                cache.maxKey = false
+                cache.maxUnit = nil
+                cache.maxText = ""
+            end
+        end
+        return cache
+    end
+
+    cache.hasValue = true
+    cache.value = val
+
     local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
     local valueKey = floor(val * multiplier + 0.5)
     if cache.valueKey ~= valueKey then
@@ -280,25 +315,26 @@ local function wakeAesGauge(box, telemetry)
     end
 
     if box.arcmax then
-        if val > cache.maxVal then cache.maxVal = val end
-        local maxKey = floor(cache.maxVal * multiplier + 0.5)
-        if cache.maxKey ~= maxKey then
-            cache.maxText = "MAX " .. formatGaugeValue(cache.maxVal, decimals) .. (box.unit or "")
+        -- Dashboard stats reset per flight and already follow the temperature unit preference.
+        local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(cache.source)
+        local maxVal = tonumber(stats and stats.max) or val
+        local maxKey = floor(maxVal * multiplier + 0.5)
+        if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
+            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. unit
             cache.maxKey = maxKey
+            cache.maxUnit = unit
         end
     end
 
     local activeColor = box.accentcolor or colorMode.fillcolor
-    if box.thresholds then
-        for _, threshold in ipairs(box.thresholds) do
+    if thresholds then
+        for _, threshold in ipairs(thresholds) do
             activeColor = threshold.fillcolor or activeColor
             if val <= threshold.value then break end
         end
     end
     cache.color = activeColor
 
-    local minValue = box.min or 0
-    local maxValue = box.max or 100
     local span = maxValue - minValue
     local pct = span > 0 and ((val - minValue) / span) or 0
     cache.pct = max(0, min(1, pct))
@@ -310,7 +346,6 @@ end
 -- Multi-layer neon arc with glow rail, active ticks and a bright sweep marker.
 local function paintAesGauge(x, y, w, h, box, cache)
     if not cache or cache._mode ~= "neon_arc" then return end
-    x, y = utils.applyOffset(x, y, box)
 
     local radius = floor(min(w * 0.44, h * 0.39))
     if radius < 12 then return end
@@ -399,7 +434,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
         local valueY = floor(cy - valueH * 0.55)
         lcd.drawText(floor(cx - valueW / 2), valueY, cache.valText)
 
-        local unit = box.unit
+        local unit = cache.unit
         if unit and unit ~= "" then
             local unitFont = utils.resolveFont(box.unitfont or "FONT_XS", nil)
             if type(unitFont) == "number" then
@@ -534,7 +569,7 @@ local function header_boxes()
         local headerBgColor = "transparent"
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
-            box.offsety = (box.offsety or 0) + topbarShiftY
+            box.yoffset = (box.yoffset or 0) + topbarShiftY
 
             if box.type == "image" then
                 box.type = "func"
@@ -571,7 +606,7 @@ local function buildBoxes(W)
 
     return {
         {
-            col = 1, row = 1, colspan = 9, rowspan = 10, offsetx = 0,
+            col = 1, row = 1, colspan = 9, rowspan = 10, xoffset = 0,
             type = "func", subtype = "func",
             bgcolor = "transparent",
             wakeup = function(box, telemetry)
@@ -596,7 +631,7 @@ local function buildBoxes(W)
             col = 1, row = 2, colspan = 3, rowspan = 8,
             type = "func", subtype = "func", wakeup = wakeAesGauge, paint = paintAesGauge,
             bgcolor = "transparent",
-            source = "temp_esc", arcmax = true, unit = "°C", accentcolor = rc.cyan, glowcolor = rc.cyanDim,
+            source = "temp_esc", arcmax = true, accentcolor = rc.cyan, glowcolor = rc.cyanDim,
             title = "ESC TEMP", titlepos = "bottom", titlefont = arcTitleFont,
             min = 0, max = getThemeValue("esctemp_max"), thickness = math.max(3, math.floor(opts.thickness * 0.4)),
             font = "FONT_XL", maxfont = arcMaxFont,

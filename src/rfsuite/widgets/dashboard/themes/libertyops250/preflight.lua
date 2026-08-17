@@ -54,12 +54,16 @@ local colorMode = {
 
 local THEME_SECTION = "system/libertyops250"
 local DEFAULTS = {
+    rpm_min = 0,
     rpm_max = 3000,
-    bec_min = 6.5,
-    bec_warn = 7.0,
-    esctemp_warn = 100,
+    bec_min = 3.0,
+    bec_warn = 6.0,
+    bec_max = 13.0,
+    esctemp_warn = 90,
     esctemp_max = 140
 }
+local suiteVersion = rfsuite and rfsuite.config and rfsuite.config.version or {}
+local SUITE_VERSION = format("RF%d.%d.%d", tonumber(suiteVersion.major) or 0, tonumber(suiteVersion.minor) or 0, tonumber(suiteVersion.revision) or 0)
 
 local function getThemeValue(key)
     local session = rfsuite and rfsuite.session
@@ -73,6 +77,16 @@ local function fmt(value, decimals, suffix, missing)
     if decimals == 1 then return format("%.1f", value) .. (suffix or "") end
     if decimals == 2 then return format("%.2f", value) .. (suffix or "") end
     return tostring(floor(value + 0.5)) .. (suffix or "")
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix, missing)
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    local key = value == nil and false or floor(value * multiplier + 0.5)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix, missing)
+    end
+    return key
 end
 
 local fontCache = {}
@@ -125,7 +139,7 @@ local function header_boxes()
                     local cw = lcd.getTextSize(c)
 
                     local watermarkFont = font("FONT_XS")
-                    local watermark = "MWRC"
+                    local watermark = "LIBERTY"
                     local watermarkW, watermarkH = 0, 0
                     if type(watermarkFont) == "number" then
                         lcd.font(watermarkFont)
@@ -270,7 +284,7 @@ local function wakeup(box, telemetry)
     c.consumed = getSensor and getSensor("smartconsumption") or nil
     c.bec = getSensor and getSensor("bec_voltage") or nil
     c.esc = getSensor and getSensor("temp_esc") or nil
-    c.link = getSensor and getSensor("link") or nil
+    c.link = getSensor and getSensor("vfr") or nil
 
     local govRaw = getSensor and getSensor("governor")
     if govRaw == nil then
@@ -285,6 +299,23 @@ local function wakeup(box, telemetry)
     c.escColor = c.esc and (c.esc >= getThemeValue("esctemp_max") and C.red or (c.esc >= getThemeValue("esctemp_warn") and C.amber or C.green)) or C.muted
     c.linkColor = c.link and (c.link < 50 and C.amber or C.green) or C.muted
     c.controllerConnected = isFblConnected()
+
+    updateFormatted(c, "_rpmTextKey", "rpmText", c.rpm, 0, "", "--")
+    updateFormatted(c, "_throttleTextKey", "throttleText", c.throttle, 0, "", "--")
+    local rateKey = updateFormatted(c, "_rateTextKey", "rateText", c.rate, 0, "", "-")
+    local pidKey = updateFormatted(c, "_pidTextKey", "pidText", c.pid, 0, "", "-")
+    updateFormatted(c, "_voltageTextKey", "voltageText", c.voltage, 1, " V", "--")
+    updateFormatted(c, "_fuelTextKey", "fuelText", c.fuel, 0, "%", "--")
+    updateFormatted(c, "_consumedTextKey", "consumedText", c.consumed, 0, " mAh", "--")
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V", "--")
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, " C", "--")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%", "--")
+    if c._modeRateKey ~= rateKey or c._modePidKey ~= pidKey then
+        c._modeRateKey = rateKey
+        c._modePidKey = pidKey
+        c.modeText = "R" .. c.rateText .. " / P" .. c.pidText
+    end
+
     refreshNavigationAvailability(c.controllerConnected)
     return c
 end
@@ -293,7 +324,7 @@ local function drawBadgePanel(x, y, w, h)
     drawPanel(x, y, w, h, nil, C.blue)
     drawHeliIcon(floor(x + 42), floor(y + 30), 18, C.white)
     drawText(x + 70, y + 10, w - 82, "ROTORFLIGHT", "FONT_S", C.white, "left")
-    drawText(x + 70, y + 33, w - 82, "RF2.3.0", "FONT_XS", C.muted, "left")
+    drawText(x + 70, y + 33, w - 82, SUITE_VERSION, "FONT_XS", C.muted, "left")
     drawText(x + 10, y + 78, w - 20, "AMERICA", "FONT_STD", C.white, "center")
     drawText(x + 10, y + 108, w - 20, "250", "FONT_XXL", C.white, "center")
 
@@ -413,7 +444,6 @@ local function drawNavButton(x, y, w, h, label, kind, accent, enabled)
 end
 
 local function paint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
@@ -444,30 +474,30 @@ local function paint(x, y, w, h, box, c)
 
     drawPanel(govX, contentY, governorW, upperH, "GOVERNOR", c.govColor or C.muted)
     drawText(govX + 12, contentY + 45, governorW - 24, "RPM", "FONT_XS", C.muted, "center")
-    drawText(govX + 10, contentY + 72, governorW - 20, fmt(c.rpm, 0, "", "--"), "FONT_XXL", C.white, "center")
+    drawText(govX + 10, contentY + 72, governorW - 20, c.rpmText or "--", "FONT_XXL", C.white, "center")
     lcd.color(C.lineDim)
     lcd.drawLine(floor(govX + 14), floor(contentY + upperH * 0.60), floor(govX + governorW - 14), floor(contentY + upperH * 0.60))
     drawText(govX + 12, contentY + upperH * 0.65, governorW - 24, "THR %", "FONT_XS", C.muted, "center")
-    drawText(govX + 12, contentY + upperH * 0.76, governorW - 24, fmt(c.throttle, 0, "", "--"), "FONT_XL", C.white, "center")
+    drawText(govX + 12, contentY + upperH * 0.76, governorW - 24, c.throttleText or "--", "FONT_XL", C.white, "center")
     drawMiniBar(govX + 14, contentY + upperH - 18, governorW - 28, 6, (c.throttle or 0) / 100, C.green)
 
     drawPanel(modeX, contentY, modeW, upperH, "FLIGHT MODE", C.blue)
-    drawText(modeX + 10, contentY + 48, modeW - 20, "R" .. fmt(c.rate, 0, "", "-") .. " / P" .. fmt(c.pid, 0, "", "-"), "FONT_L", C.white, "center")
+    drawText(modeX + 10, contentY + 48, modeW - 20, c.modeText or "R- / P-", "FONT_L", C.white, "center")
     lcd.color(C.lineDim)
     lcd.drawLine(floor(modeX + 12), floor(contentY + upperH * 0.48), floor(modeX + modeW - 12), floor(contentY + upperH * 0.48))
     drawText(modeX + 10, contentY + upperH * 0.55, modeW - 20, "GOVERNOR", "FONT_XS", C.muted, "center")
     drawText(modeX + 10, contentY + upperH * 0.68, modeW - 20, c.governor or "WAITING", "FONT_STD", c.govColor or C.muted, "center")
 
     drawPanel(powerX, contentY, rightW, floor(upperH * 0.42), "VOLTAGE", C.green)
-    drawText(powerX + 12, contentY + 44, rightW - 24, fmt(c.voltage, 1, " V", "--"), "FONT_XL", C.white, "center")
+    drawText(powerX + 12, contentY + 44, rightW - 24, c.voltageText or "--", "FONT_XL", C.white, "center")
     drawMiniBar(powerX + 14, contentY + floor(upperH * 0.42) - 17, rightW - 28, 6, c.voltage and min(1, c.voltage / 60) or 0, C.green)
 
     local fuelY = contentY + floor(upperH * 0.42) + gap
     local fuelH = contentH - floor(upperH * 0.42) - gap
     drawPanel(powerX, fuelY, rightW, fuelH, "SMART FUEL", c.fuelColor or C.muted)
-    drawText(powerX + 12, fuelY + 35, rightW - 24, fmt(c.fuel, 0, "%", "--"), "FONT_XL", c.fuelColor or C.muted, "center")
+    drawText(powerX + 12, fuelY + 35, rightW - 24, c.fuelText or "--", "FONT_XL", c.fuelColor or C.muted, "center")
     drawText(powerX + 12, fuelY + 79, rightW - 24, "USED", "FONT_XS", C.muted, "center")
-    drawText(powerX + 12, fuelY + 99, rightW - 24, fmt(c.consumed, 0, " mAh", "--"), "FONT_STD", C.white, "center")
+    drawText(powerX + 12, fuelY + 99, rightW - 24, c.consumedText or "--", "FONT_STD", C.white, "center")
     drawMiniBar(powerX + 14, fuelY + fuelH - 18, rightW - 28, 6, c.fuel and c.fuel / 100 or 0, c.fuelColor or C.muted)
 
     local tilesY = contentY + upperH + tileGap
@@ -477,13 +507,13 @@ local function paint(x, y, w, h, box, c)
     local tx3 = tx2 + tileW + tileGap
     local tx4 = tx3 + tileW + tileGap
     drawPanel(tx1, tilesY, tileW, tileH, "BEC", c.becColor)
-    drawText(tx1 + 12, tilesY + 20, tileW - 24, fmt(c.bec, 1, " V", "--"), "FONT_STD", C.white, "right")
+    drawText(tx1 + 12, tilesY + 20, tileW - 24, c.becText or "--", "FONT_STD", C.white, "right")
     drawPanel(tx2, tilesY, tileW, tileH, "ESC TEMP", c.escColor)
-    drawText(tx2 + 12, tilesY + 20, tileW - 24, fmt(c.esc, 0, " C", "--"), "FONT_STD", C.white, "right")
+    drawText(tx2 + 12, tilesY + 20, tileW - 24, c.escText or "--", "FONT_STD", C.white, "right")
     drawPanel(tx3, tilesY, tileW, tileH, "LINK", c.linkColor)
-    drawText(tx3 + 12, tilesY + 20, tileW - 24, fmt(c.link, 0, "%", "--"), "FONT_STD", C.white, "right")
+    drawText(tx3 + 12, tilesY + 20, tileW - 24, c.linkText or "--", "FONT_STD", C.white, "right")
     drawPanel(tx4, tilesY, tileW, tileH, "PACK", C.blueBright)
-    drawText(tx4 + 12, tilesY + 20, tileW - 24, fmt(c.voltage, 1, " V", "--"), "FONT_STD", C.white, "right")
+    drawText(tx4 + 12, tilesY + 20, tileW - 24, c.voltageText or "--", "FONT_STD", C.white, "right")
 
     -- Five cockpit-style RF Suite shortcuts. They are dimmed and have no
     -- onpress callback until the FBL has completed its connection handshake.

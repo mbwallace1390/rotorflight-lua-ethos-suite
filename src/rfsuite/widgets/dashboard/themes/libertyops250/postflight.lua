@@ -103,7 +103,7 @@ loadMetricBitmaps()
 
 local theme_section = "system/libertyops250"
 
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 6.5, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 110, esctemp_max = 150}
+local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 3.0, bec_warn = 6.0, bec_max = 13.0, esctemp_warn = 90, esctemp_max = 140}
 
 local function getThemeValue(key)
     if key == "tx_min" or key == "tx_warn" or key == "tx_max" then
@@ -185,7 +185,7 @@ local function header_boxes()
         local headerBgColor = "transparent"
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
-            box.offsety = (box.offsety or 0) + topbarShiftY
+            box.yoffset = (box.yoffset or 0) + topbarShiftY
 
             if box.type == "image" then
                 box.type = "func"
@@ -346,6 +346,17 @@ local function drawTemperatureIcon(x, y, size, color)
     lcd.drawLine(tx, y + floor(size * 0.72), x + size - 2, y + floor(size * 0.72))
 end
 
+local function paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, name, col, row, fallback, color, extra)
+    local ix = floor(x + (col - 1) * cellW + pad)
+    local iy = floor(y + (row - 1) * cellH - 7 + floor((tileH - size) / 2) + 2)
+    local bitmap = ICON_BITMAPS[name]
+    if bitmap then
+        lcd.drawBitmap(ix, iy, bitmap, size, size)
+    else
+        fallback(ix, iy, size, color, extra)
+    end
+end
+
 local function paintAllMetricIcons(x, y, w, h, box, cache)
     loadMetricBitmaps()
 
@@ -354,34 +365,15 @@ local function paintAllMetricIcons(x, y, w, h, box, cache)
     local cellW = w / 12
     local cellH = h / 12
     local tileH = cellH * 3
-    local offsetY = -7
-    local iconOffsetY = 2
-
-    local function iconPosition(col, row)
-        local ix = x + (col - 1) * cellW + pad
-        local iy = y + (row - 1) * cellH + offsetY + floor((tileH - size) / 2) + iconOffsetY
-        return floor(ix), floor(iy)
-    end
-
-    local function paintIcon(name, col, row, fallback, color, extra)
-        local ix, iy = iconPosition(col, row)
-        local bitmap = ICON_BITMAPS[name]
-        if bitmap then
-            lcd.drawBitmap(ix, iy, bitmap, size, size)
-        else
-            fallback(ix, iy, size, color, extra)
-        end
-    end
-
-    paintIcon("altitude", 1, 10, drawMountainIcon, rc.cyan)
-    paintIcon("rpm", 1, 4, drawRotorIcon, rc.magenta)
-    paintIcon("fuel", 5, 4, drawBatteryIcon, rc.green, false)
-    paintIcon("current", 5, 7, drawLightningIcon, rc.cyan)
-    paintIcon("watts", 5, 10, drawWaveIcon, rc.green)
-    paintIcon("consumed", 9, 4, drawFuelCanIcon, rc.amber)
-    paintIcon("link", 1, 7, drawSignalIcon, rc.cyan)
-    paintIcon("voltage", 9, 10, drawBatteryIcon, rc.cyan, true)
-    paintIcon("temperature", 9, 7, drawTemperatureIcon, rc.orange)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "altitude", 1, 10, drawMountainIcon, rc.cyan)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "rpm", 1, 4, drawRotorIcon, rc.magenta)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "fuel", 5, 4, drawBatteryIcon, rc.green, false)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "current", 5, 7, drawLightningIcon, rc.cyan)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "watts", 5, 10, drawWaveIcon, rc.green)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "consumed", 9, 4, drawFuelCanIcon, rc.amber)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "link", 1, 7, drawSignalIcon, rc.cyan)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "voltage", 9, 10, drawBatteryIcon, rc.cyan, true)
+    paintMetricIcon(x, y, cellW, cellH, tileH, size, pad, "temperature", 9, 7, drawTemperatureIcon, rc.orange)
 end
 
 local function buildBoxes(W)
@@ -406,17 +398,6 @@ local function buildBoxes(W)
 
 
     return {
-
-        -- Text Overlays for the Gauges
-        {col = 1, row = 10, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "altitude", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = cyanTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 5, row = 10, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "watts", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = greenTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 5, row = 7, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "current", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = cyanTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 1, row = 4, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "rpm", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = magentaTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 1, row = 7, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "link", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = cyanTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 9, row = 4, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "smartconsumption", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = amberTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 5, row = 4, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "smartfuel", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = greenTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 9, row = 10, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "voltage", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = cyanTileBg, titlecolor = "transparent", textcolor = "transparent"},
-        {col = 9, row = 7, colspan = 4, rowspan = 3, offsety = -7, type = "text", subtype = "telemetry", source = "temp_esc", font = "FONT_XXS", valuealign = "left", valuepaddingleft = -200, unit = "", bgcolor = orangeTileBg, titlecolor = "transparent", textcolor = "transparent"},
 
         -- Flight Timers
         {
@@ -446,49 +427,49 @@ local function buildBoxes(W)
 
         -- Stat Gauges
         {
-            col = 1, row = 10, colspan = 4, rowspan = 3, offsety = -7,
-            type = "gauge", subtype = "bar", source = "altitude", stattype = "max", title = "Max Altitude", unit = "ft",
+            col = 1, row = 10, colspan = 4, rowspan = 3, yoffset = -7,
+            type = "gauge", subtype = "bar", source = "altitude", stattype = "max", title = "Max Altitude", unit = "m",
             min = 0, max = 450, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan, transform = "floor"
+            bgcolor = cyanTileBg, fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan, transform = "floor"
         },
         {
-            col = 5, row = 10, colspan = 4, rowspan = 3, offsety = -7,
+            col = 5, row = 10, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "watts", stattype = "max", title = "Max Watts", unit = "W",
             min = 0, max = 10000, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.green, textcolor = rc.white, titlecolor = rc.green, transform = "floor"
+            bgcolor = greenTileBg, fillcolor = rc.green, textcolor = rc.white, titlecolor = rc.green, transform = "floor"
         },
         {
-            col = 5, row = 7, colspan = 4, rowspan = 3, offsety = -7,
+            col = 5, row = 7, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "current", stattype = "max", title = "Max Amps", unit = "A",
             min = 0, max = 300, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan, transform = "floor"
+            bgcolor = cyanTileBg, fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan, transform = "floor"
         },
         {
-            col = 1, row = 4, colspan = 4, rowspan = 3, offsety = -7,
+            col = 1, row = 4, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "rpm", stattype = "max", title = "Max Rpm", unit = "rpm",
             min = 0, max = 5500, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.magenta, textcolor = rc.white, titlecolor = rc.magenta, transform = "floor"
+            bgcolor = magentaTileBg, fillcolor = rc.magenta, textcolor = rc.white, titlecolor = rc.magenta, transform = "floor"
         },
         {
-            col = 1, row = 7, colspan = 4, rowspan = 3, offsety = -7,
-            type = "gauge", subtype = "bar", source = "link", stattype = "min", title = "Vfr Min", unit = "%",
+            col = 1, row = 7, colspan = 4, rowspan = 3, yoffset = -7,
+            type = "gauge", subtype = "bar", source = "vfr", stattype = "min", title = "Vfr Min", unit = "%",
             min = 0, max = 100, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan,
+            bgcolor = cyanTileBg, fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan,
             thresholds = {
                 {value = 45, fillcolor = rc.red},
                 {value = 75, fillcolor = rc.amber},
@@ -497,27 +478,28 @@ local function buildBoxes(W)
             transform = "floor"
         },
         {
-            col = 9, row = 4, colspan = 4, rowspan = 3, offsety = -7,
+            col = 9, row = 4, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "smartconsumption", stattype = "max", title = "Consumed mAh", unit = "mAh",
             min = 0, max = 5000, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.amber, textcolor = rc.white, titlecolor = rc.amber,
+            bgcolor = amberTileBg, fillcolor = rc.amber, textcolor = rc.white, titlecolor = rc.amber,
             thresholds = {
                 {value = 2250, fillcolor = rc.amber},
-                {value = 4000, fillcolor = rc.red}
+                {value = 4000, fillcolor = rc.red},
+                {value = math.huge, fillcolor = rc.red}
             },
             transform = "floor"
         },
         {
-            col = 5, row = 4, colspan = 4, rowspan = 3, offsety = -7,
+            col = 5, row = 4, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "smartfuel", stattype = "min", title = "Battery Remaining", unit = "%",
             min = 0, max = 100, titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.green, textcolor = rc.white, titlecolor = rc.green,
+            bgcolor = greenTileBg, fillcolor = rc.green, textcolor = rc.white, titlecolor = rc.green,
             thresholds = {
                 {value = 25, fillcolor = rc.red},
                 {value = 50, fillcolor = rc.amber},
@@ -526,13 +508,13 @@ local function buildBoxes(W)
             transform = "floor"
         },
         {
-            col = 9, row = 10, colspan = 4, rowspan = 3, offsety = -7,
+            col = 9, row = 10, colspan = 4, rowspan = 3, yoffset = -7,
             type = "gauge", subtype = "bar", source = "voltage", stattype = "min", title = "Volts per cell", unit = "V",
             min = 3.2, max = 4.35, gaugevalue = "display", titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan,
+            bgcolor = cyanTileBg, fillcolor = rc.cyan, textcolor = rc.white, titlecolor = rc.cyan,
             thresholds = {
                 {value = 3.70, fillcolor = rc.red},
                 {value = 3.85, fillcolor = rc.amber},
@@ -542,16 +524,17 @@ local function buildBoxes(W)
             decimals = 2
         },
         {
-            col = 9, row = 7, colspan = 4, rowspan = 3, offsety = -7,
-            type = "gauge", subtype = "bar", source = "temp_esc", stattype = "max", title = "ESC Max Temp", unit = "°C",
+            col = 9, row = 7, colspan = 4, rowspan = 3, yoffset = -7,
+            type = "gauge", subtype = "bar", source = "temp_esc", stattype = "max", title = "ESC Max Temp",
             min = 0, max = getThemeValue("esctemp_max"), titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             valuepaddingleft = opts.iconvalueshift,
             thickness = math.max(4, opts.thickness - 4), gaugepadding = 12, gaugepaddingtop = opts.gaugepaddingtop, gaugepaddingbottom = opts.gaugepaddingbottom, gaugepaddingleft = 13, gaugepaddingright = 13,
-            bgcolor = "transparent", fillcolor = rc.orange, textcolor = rc.white, titlecolor = rc.orange,
+            bgcolor = orangeTileBg, fillcolor = rc.orange, textcolor = rc.white, titlecolor = rc.orange,
             thresholds = {
-                {value = getThemeValue("esctemp_warn"), fillcolor = rc.amber},
-                {value = getThemeValue("esctemp_max"), fillcolor = rc.red}
+                {value = getThemeValue("esctemp_warn"), fillcolor = rc.orange},
+                {value = getThemeValue("esctemp_max"), fillcolor = rc.amber},
+                {value = math.huge, fillcolor = rc.red}
             },
             transform = "floor"
         },
