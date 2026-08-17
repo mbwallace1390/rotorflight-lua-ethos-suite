@@ -21,9 +21,6 @@ local header_boxes_cache = nil
 local last_txbatt_type = nil
 local C
 
--- Mission Debrief resolves the dashboard-level inflight cache during wakeup.
--- This avoids capturing nil when ETHOS preloads postflight before inflight.
-
 local function header_boxes()
     local txbatt_type = 0
     if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
@@ -427,33 +424,85 @@ local function stat(telemetry, source, statType, alias1, alias2)
     return nil
 end
 
+local function temperatureStat(telemetry, warning, maximum)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats("temp_esc")
+    local value = stats and tonumber(stats.max) or nil
+    local unit = "°C"
+    local displayWarning = warning
+    local displayMaximum = maximum
+
+    if telemetry and telemetry.getSensor then
+        local _, _, localizedUnit, localizedWarning, localizedMaximum = telemetry.getSensor("temp_esc", warning, maximum)
+        unit = localizedUnit or unit
+        displayWarning = tonumber(localizedWarning) or displayWarning
+        displayMaximum = tonumber(localizedMaximum) or displayMaximum
+    end
+
+    return value, unit, displayWarning, displayMaximum
+end
+
+local function ensureCards(c)
+    if c.cards then return c.cards end
+    c.cards = {
+        {"MAX HEADSPEED", "--", C.muted, 0, "FONT_STD"},
+        {"MAX ESC TEMP", "--", C.muted, 0, "FONT_STD"},
+        {"PEAK CURRENT", "--", C.muted, 0, "FONT_STD"},
+        {"MIN BEC", "--", C.muted, 0, "FONT_STD"},
+        {"MIN LINK", "--", C.muted, 0, "FONT_STD"},
+        {"FUEL REMAINING", "--", C.muted, 0, "FONT_STD"},
+        {"CONSUMED", "--", C.muted, 0, "FONT_STD"},
+        {"PEAK POWER", "--", C.muted, 0, "FONT_STD"},
+        {"MIN PACK / ALT", "--  /  --", C.muted, 0, "FONT_S"}
+    }
+    return c.cards
+end
+
+local function updateCard(card, value, decimals, suffix, color, percent)
+    if card._value ~= value or card._suffix ~= suffix then
+        card._value = value
+        card._suffix = suffix
+        card[2] = fmt(value, decimals, suffix)
+    end
+    card[3] = color
+    card[4] = percent or 0
+end
+
+local function updatePackAltitudeCard(card, voltage, altitude, color, percent)
+    if card._voltage ~= voltage or card._altitude ~= altitude then
+        card._voltage = voltage
+        card._altitude = altitude
+        card[2] = fmt(voltage, 1, " V") .. "  /  " .. fmt(altitude, 0, " m")
+    end
+    card[3] = color
+    card[4] = percent or 0
+end
+
 local function postflightWakeup(box, telemetry)
     local c = box._cache or {}
     box._cache = c
 
-    local rpmStat = stat(telemetry, "rpm", "max", "headspeed", "erpm")
-    c.esc = stat(telemetry, "temp_esc", "max", "esc_temp")
+    c.rpmMax = getThemeValue("rpm_max")
+    local escWarnC = getThemeValue("esc_warn")
+    local escMaxC = getThemeValue("esc_max")
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.linkWarn = getThemeValue("link_warn")
+
+    c.rpm = stat(telemetry, "rpm", "max", "headspeed", "erpm")
+    if c.rpm and c.rpm <= 0 then c.rpm = nil end
+    c.esc, c.escUnit, c.escWarn, c.escMax = temperatureStat(telemetry, escWarnC, escMaxC)
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
     c.bec = stat(telemetry, "bec_voltage", "min", "bec")
-    c.link = stat(telemetry, "link", "min", "vfr")
+    c.link = stat(telemetry, "vfr", "min")
     c.fuel = stat(telemetry, "smartfuel", "min")
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
     c.altitude = stat(telemetry, "altitude", "max")
 
     local session = rfsuite and rfsuite.session
-
-    -- Some telemetry configurations create an RPM sensorStats entry whose
-    -- recorded maximum is 0. Select the greatest value from ETHOS statistics,
-    -- the session cache, and the dashboard-level inflight peak cache.
-    local flightStats = session and session.america250FlightStats
-    local sessionPeak = type(flightStats) == "table" and tonumber(flightStats.maxRpm) or 0
-    local dashboardState = rfsuite.widgets and rfsuite.widgets.dashboard
-    local sharedFlightStats = dashboardState and dashboardState._america250FlightStats
-    local sharedPeak = type(sharedFlightStats) == "table" and tonumber(sharedFlightStats.maxRpm) or 0
-    c.rpm = max(tonumber(rpmStat) or 0, sessionPeak or 0, sharedPeak or 0)
-    if c.rpm <= 0 then c.rpm = nil end
 
     -- The standard Rotorflight watts widget derives max power from the maximum
     -- recorded voltage and current when a dedicated watts statistic is absent.
@@ -462,17 +511,11 @@ local function postflightWakeup(box, telemetry)
         if maxVoltage ~= nil then c.watts = maxVoltage * c.current end
     end
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    c.time = format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
-
-    -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
-    -- calling getThemeValue() from paint(), which runs on every invalidate.
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
-    c.becMin = getThemeValue("bec_min")
-    c.becWarn = getThemeValue("bec_warn")
-    c.fuelWarn = getThemeValue("fuel_warn")
-    c.linkWarn = getThemeValue("link_warn")
-    c.rpmMax = getThemeValue("rpm_max")
+    seconds = floor(max(0, seconds))
+    if c._timeSecond ~= seconds then
+        c._timeSecond = seconds
+        c.time = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
 
     local faults = 0
     local cautions = 0
@@ -493,7 +536,23 @@ local function postflightWakeup(box, telemetry)
     if c.link and c.link < c.linkWarn then cautions = cautions + 1 end
     if c.rpm and c.rpm > c.rpmMax * 1.05 then cautions = cautions + 1 end
 
-    if faults > 0 then
+    local available = 0
+    if c.rpm ~= nil then available = available + 1 end
+    if c.esc ~= nil then available = available + 1 end
+    if c.current ~= nil then available = available + 1 end
+    if c.watts ~= nil then available = available + 1 end
+    if c.bec ~= nil then available = available + 1 end
+    if c.link ~= nil then available = available + 1 end
+    if c.fuel ~= nil then available = available + 1 end
+    if c.consumed ~= nil then available = available + 1 end
+    if c.voltage ~= nil then available = available + 1 end
+    if c.altitude ~= nil then available = available + 1 end
+
+    if available == 0 then
+        c.grade = "NO DATA"
+        c.gradeColor = C.muted
+        c.gradeSub = "NO FLIGHT TELEMETRY"
+    elseif faults > 0 then
         c.grade = "SYSTEM INSPECTION"
         c.gradeColor = C.red
         c.gradeSub = "CRITICAL LIMIT EXCEEDED"
@@ -507,25 +566,26 @@ local function postflightWakeup(box, telemetry)
         c.gradeSub = "FLIGHT DATA WITHIN LIMITS"
     end
 
-    -- Build the report-card grid once per wakeup cycle instead of rebuilding
-    -- it (with string.format/fmt calls) on every paint() invalidate.
-    local rpmColor = c.rpm and c.rpm > c.rpmMax * 1.05 and C.amber or C.cyan
+    local rpmColor = c.rpm == nil and C.muted or (c.rpm > c.rpmMax * 1.05 and C.amber or C.cyan)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.cyan)) or C.muted
-    local fuelColor = c.fuel and c.fuel <= c.fuelWarn and C.amber or C.green
-    local linkColor = c.link and c.link < c.linkWarn and C.amber or C.cyan
+    local fuelColor = c.fuel == nil and C.muted or (c.fuel <= c.fuelWarn and C.amber or C.green)
+    local linkColor = c.link == nil and C.muted or (c.link < c.linkWarn and C.amber or C.cyan)
+    local currentColor = c.current ~= nil and C.violet or C.muted
+    local consumedColor = c.consumed ~= nil and C.amber or C.muted
+    local wattsColor = c.watts ~= nil and C.violet or C.muted
+    local packAltitudeColor = (c.voltage ~= nil or c.altitude ~= nil) and C.cyan or C.muted
 
-    c.cards = {
-        {"MAX HEADSPEED", fmt(c.rpm, 0, " RPM"), rpmColor, c.rpm and c.rpm / c.rpmMax or 0, "FONT_STD"},
-        {"MAX ESC TEMP", fmt(c.esc, 0, "°C"), escColor, c.esc and c.esc / c.escMax or 0, "FONT_STD"},
-        {"PEAK CURRENT", fmt(c.current, 1, " A"), C.violet, c.current and c.current / 150 or 0, "FONT_STD"},
-        {"MIN BEC", fmt(c.bec, 2, " V"), becColor, c.bec and c.bec / 15 or 0, "FONT_STD"},
-        {"MIN LINK", fmt(c.link, 0, "%"), linkColor, c.link and c.link / 100 or 0, "FONT_STD"},
-        {"FUEL REMAINING", fmt(c.fuel, 0, "%"), fuelColor, c.fuel and c.fuel / 100 or 0, "FONT_STD"},
-        {"CONSUMED", fmt(c.consumed, 0, " mAh"), C.amber, c.consumed and c.consumed / 5000 or 0, "FONT_STD"},
-        {"PEAK POWER", fmt(c.watts, 0, " W"), C.violet, c.watts and c.watts / 5000 or 0, "FONT_STD"},
-        {"MIN PACK / ALT", fmt(c.voltage, 1, " V") .. "  /  " .. fmt(c.altitude, 0, " ft"), C.cyan, c.voltage and c.voltage / 60 or 0, "FONT_S"}
-    }
+    local cards = ensureCards(c)
+    updateCard(cards[1], c.rpm, 0, " RPM", rpmColor, c.rpm and c.rpm / c.rpmMax or 0)
+    updateCard(cards[2], c.esc, 0, c.escUnit, escColor, c.esc and c.esc / c.escMax or 0)
+    updateCard(cards[3], c.current, 1, " A", currentColor, c.current and c.current / 150 or 0)
+    updateCard(cards[4], c.bec, 2, " V", becColor, c.bec and c.bec / 15 or 0)
+    updateCard(cards[5], c.link, 0, "%", linkColor, c.link and c.link / 100 or 0)
+    updateCard(cards[6], c.fuel, 0, "%", fuelColor, c.fuel and c.fuel / 100 or 0)
+    updateCard(cards[7], c.consumed, 0, " mAh", consumedColor, c.consumed and c.consumed / 5000 or 0)
+    updateCard(cards[8], c.watts, 0, " W", wattsColor, c.watts and c.watts / 5000 or 0)
+    updatePackAltitudeCard(cards[9], c.voltage, c.altitude, packAltitudeColor, c.voltage and c.voltage / 60 or 0)
 
     return c
 end
@@ -533,20 +593,26 @@ end
 local function drawReportCard(x, y, w, h, title, value, accent, percent, valueFont)
     drawPanel(x, y, w, h, accent, title)
 
-    local valueColor = (accent == C.red or accent == C.amber) and accent or C.white
+    local valueColor = accent == C.muted and C.muted or ((accent == C.red or accent == C.amber) and accent or C.white)
     drawTextAligned(x + 13, y + 17, w - 26, value, valueFont or "FONT_STD", valueColor, "left")
     drawProgress(x + 13, y + h - 8, w - 26, 5, percent, accent)
 end
 
-local function postflightPaint(x, y, w, h, box, c)
+local EMPTY_CARDS = {}
+
+local function postflightPaint(x, y, w, h, box, c, telemetry)
     x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    if c.escMax == nil or c.escWarn == nil then
+        local escWarnC = getThemeValue("esc_warn")
+        local escMaxC = getThemeValue("esc_max")
+        local _, unit, displayWarn, displayMax = temperatureStat(telemetry, escWarnC, escMaxC)
+        c.escUnit, c.escWarn, c.escMax = unit, displayWarn, displayMax
+    end
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
@@ -568,15 +634,15 @@ local function postflightPaint(x, y, w, h, box, c)
     local summaryH = 68
     local summaryX = x + pad
     local summaryW = w - pad * 2
-    local gradeColor = c.gradeColor or C.green
+    local gradeColor = c.gradeColor or C.muted
 
     drawPanel(summaryX, summaryY, summaryW, summaryH, gradeColor, nil)
 
     local leftX = summaryX + 18
     local leftW = floor(summaryW * 0.35)
     drawTextAligned(leftX, summaryY + 11, leftW, "FLIGHT RESULT", "FONT_XXS", C.muted, "left")
-    drawTextAligned(leftX, summaryY + 25, leftW, c.grade or "MISSION COMPLETE", "FONT_STD", gradeColor, "left")
-    drawTextAligned(leftX, summaryY + 48, leftW, c.gradeSub or "FLIGHT DATA WITHIN LIMITS", "FONT_XXS", C.white, "left")
+    drawTextAligned(leftX, summaryY + 25, leftW, c.grade or "NO DATA", "FONT_STD", gradeColor, "left")
+    drawTextAligned(leftX, summaryY + 48, leftW, c.gradeSub or "NO FLIGHT TELEMETRY", "FONT_XXS", C.white, "left")
 
     local centerX = summaryX + summaryW * 0.51
     local centerY = summaryY + summaryH * 0.50
@@ -599,7 +665,7 @@ local function postflightPaint(x, y, w, h, box, c)
     local cardW = floor((w - pad * 2 - gap * (cols - 1)) / cols)
     local cardH = floor((gridH - gap * (rows - 1)) / rows)
 
-    local cards = c.cards or {}
+    local cards = c.cards or EMPTY_CARDS
 
     for i = 1, #cards do
         local row = floor((i - 1) / cols)
