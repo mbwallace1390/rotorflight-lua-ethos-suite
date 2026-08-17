@@ -650,7 +650,7 @@ local function buildBoxes(W)
             bgcolor = "transparent", titlecolor = colorMode.titlecolor,
             thresholds = {
                 {value = "DISARMED", textcolor = rc.green}, {value = "OFF", textcolor = rc.amber}, {value = "IDLE", textcolor = rc.amber}, {value = "SPOOLUP", textcolor = rc.red}, {value = "RECOVERY", textcolor = rc.amber}, {value = "ACTIVE", textcolor = rc.red},
-                {value = "@i18n(widgets.governor.THR-OFF)@", textcolor = rc.green}
+                {value = "@i18n(widgets.governor.THROFF)@", textcolor = rc.green}
             }
         }
     }
