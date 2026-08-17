@@ -452,17 +452,18 @@ function render.wakeup(box)
     elseif source == "watts" and telemetry then
         dynamicUnit = "W"
 
-        local statType = cfg.stattype or "current"
-        local vStat = getStatsValue(telemetry, "voltage", statType)
-        local iStat = getStatsValue(telemetry, "current", statType)
-
-        if statType == "min" or statType == "max" or statType == "avg" then
-            if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
-        end
-
-        -- Live watts bars can fall back to their component sensors. A stat bar
-        -- must wait for stats from the current flight instead.
-        if value == nil and not cfg.stattype then
+        if cfg.stattype then
+            -- Prefer the sampled watts statistic; independent voltage/current
+            -- peaks may occur at different times and their product is not a
+            -- true maximum. Older telemetry providers can use the component
+            -- statistics as a compatibility fallback.
+            value = getStatsValue(telemetry, "watts", cfg.stattype)
+            if value == nil then
+                local vStat = getStatsValue(telemetry, "voltage", cfg.stattype)
+                local iStat = getStatsValue(telemetry, "current", cfg.stattype)
+                if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
+            end
+        else
             local volts = readLiveSensor(telemetry, "voltage")
             local amps = readLiveSensor(telemetry, "current")
             if volts ~= nil and amps ~= nil then value = volts * amps end
