@@ -37,6 +37,22 @@ local function setPref(key, value)
     rfsuite.widgets.dashboard.savePreference(key, value)
 end
 
+-- Preferences stay in canonical Celsius; the form converts at its boundary.
+local function temperatureUnit()
+    local general = rfsuite.preferences and rfsuite.preferences.general
+    return tonumber(general and general.temperature_unit) == 1 and 1 or 0
+end
+
+local function displayTemperature(value)
+    if temperatureUnit() == 1 then return value * 1.8 + 32 end
+    return value
+end
+
+local function storeTemperature(value)
+    if temperatureUnit() == 1 then return (value - 32) / 1.8 end
+    return value
+end
+
 local function loadPreferences()
     for key, default in pairs(THEME_DEFAULTS) do
         config[key] = tonumber(getPref(key)) or default
@@ -63,6 +79,10 @@ end
 
 local function configure()
     loadPreferences()
+    local tempUnit = temperatureUnit()
+    local tempSuffix = tempUnit == 1 and "°F" or "°C"
+    local tempMinimum = tempUnit == 1 and 32 or 0
+    local tempMaximum = tempUnit == 1 and 392 or 200
 
     local rpmPanel = form.addExpansionPanel("Headspeed")
     rpmPanel:open(false)
@@ -140,26 +160,28 @@ local function configure()
 
     addNumberField(
         escPanel:addLine("Warning"),
-        0,
-        200,
-        function() return config.esctemp_warn end,
+        tempMinimum,
+        tempMaximum,
+        function() return floor(displayTemperature(config.esctemp_warn) + 0.5) end,
         function(value)
-            config.esctemp_warn = clamp(tonumber(value) or THEME_DEFAULTS.esctemp_warn, 0, config.esctemp_max - 1)
+            local displayedValue = tonumber(value) or displayTemperature(THEME_DEFAULTS.esctemp_warn)
+            config.esctemp_warn = clamp(storeTemperature(displayedValue), 0, config.esctemp_max - 1)
         end,
         1,
-        "°C"
+        tempSuffix
     )
 
     addNumberField(
         escPanel:addLine("Max"),
-        1,
-        200,
-        function() return config.esctemp_max end,
+        tempMinimum,
+        tempMaximum,
+        function() return floor(displayTemperature(config.esctemp_max) + 0.5) end,
         function(value)
-            config.esctemp_max = clamp(tonumber(value) or THEME_DEFAULTS.esctemp_max, config.esctemp_warn + 1, 200)
+            local displayedValue = tonumber(value) or displayTemperature(THEME_DEFAULTS.esctemp_max)
+            config.esctemp_max = clamp(storeTemperature(displayedValue), config.esctemp_warn + 1, 200)
         end,
         1,
-        "°C"
+        tempSuffix
     )
 end
 
