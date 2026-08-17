@@ -105,7 +105,7 @@ end
 
 local function readStat(telemetry, source, statType)
     local data
-    if telemetry.getSensorStats then
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
         data = telemetry.getSensorStats(source)
     else
         local stats = telemetry.sensorStats
@@ -437,7 +437,12 @@ local function preflightWakeup(box, telemetry)
     c.bec = sensor(telemetry, "bec_voltage", "bec")
     local escUnit
     c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
-    c.escUnit = temperatureUnitLabel(escUnit)
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
     c.link = sensor(telemetry, "vfr")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
@@ -510,7 +515,6 @@ local function preflightWakeup(box, telemetry)
 end
 
 local function preflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
@@ -520,6 +524,7 @@ local function preflightPaint(x, y, w, h, box, c)
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
     c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
     c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
     c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.linkWarn = c.linkWarn or getThemeValue("link_warn")
@@ -562,7 +567,7 @@ local function preflightPaint(x, y, w, h, box, c)
 
     drawNode(leftX, topY, nodeW, nodeH, "POWER CORE", fmt(c.bec,1," V"), becColor, "BEC STABILITY")
     drawNode(leftX, lowY, nodeW, nodeH, "SIGNAL CONSTELLATION", fmt(c.link,0,"%"), linkColor, "LINK LOCK")
-    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", fmt(c.esc,0," " .. c.escUnit), escColor, "ESC TEMPERATURE")
+    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", fmt(c.esc,0,c.escSuffix), escColor, "ESC TEMPERATURE")
     drawNode(rightX, lowY, nodeW, nodeH, "FLIGHT MATRIX", "R" .. fmt(c.rate,0,"") .. "  P" .. fmt(c.pid,0,""), C.violet, "PACK " .. fmt(c.voltage,1," V"))
 
     drawOrbitalMarker(cx, cy, coreR * 1.85, coreR * 0.72, 205, becColor, 7)

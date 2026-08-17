@@ -105,7 +105,7 @@ end
 
 local function readStat(telemetry, source, statType)
     local data
-    if telemetry.getSensorStats then
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
         data = telemetry.getSensorStats(source)
     else
         local stats = telemetry.sensorStats
@@ -438,7 +438,12 @@ local function inflightWakeup(box, telemetry)
     c.throttle = sensor(telemetry, "throttle_percent", "throttle") or 0
     local escUnit
     c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
-    c.escUnit = temperatureUnitLabel(escUnit)
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
     c.fuel = sensor(telemetry, "smartfuel")
     c.current = sensor(telemetry, "current")
     c.watts = sensor(telemetry, "watts")
@@ -463,7 +468,7 @@ local function inflightWakeup(box, telemetry)
     return c
 end
 
-local function drawThermalPlume(x, y, w, h, value, maximum, color, unit)
+local function drawThermalPlume(x, y, w, h, value, maximum, color, suffix)
     drawPanel(x, y, w, h, color, "THERMAL PLUME")
     local pct = maximum > 0 and clamp((value or 0) / maximum, 0, 1) or 0
     local baseY = y + h - 28
@@ -475,7 +480,7 @@ local function drawThermalPlume(x, y, w, h, value, maximum, color, unit)
         lcd.color(i < 3 and C.cyanDim or color)
         lcd.drawFilledRectangle(bx, floor(baseY - bh), bw, bh)
     end
-    drawTextAligned(x + 10, y + 30, w - 20, fmt(value,0," " .. unit), "FONT_L", C.white, "center")
+    drawTextAligned(x + 10, y + 30, w - 20, fmt(value,0,suffix), "FONT_L", C.white, "center")
 end
 
 local function drawThrustArray(x, y, w, h, throttle)
@@ -495,13 +500,13 @@ local function drawThrustArray(x, y, w, h, throttle)
 end
 
 local function inflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
     c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
     c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
     c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.rpmMax = c.rpmMax or getThemeValue("rpm_max")
@@ -530,7 +535,7 @@ local function inflightPaint(x, y, w, h, box, c)
 
     local halfH = floor((bodyH - 10) / 2)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
-    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor, c.escUnit)
+    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor, c.escSuffix)
     drawThrustArray(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle)
 
     drawPanel(centerX, bodyY, centerW, bodyH, C.violet, nil)

@@ -105,7 +105,7 @@ end
 
 local function readStat(telemetry, source, statType)
     local data
-    if telemetry.getSensorStats then
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
         data = telemetry.getSensorStats(source)
     else
         local stats = telemetry.sensorStats
@@ -435,7 +435,12 @@ local function postflightWakeup(box, telemetry)
     c.rpm = stat(telemetry, "rpm", "max", "headspeed", "erpm")
     local escUnit
     c.esc, escUnit = stat(telemetry, "temp_esc", "max", "esc_temp")
-    c.escUnit = temperatureUnitLabel(escUnit)
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
     c.bec = stat(telemetry, "bec_voltage", "min", "bec")
@@ -503,13 +508,13 @@ local function postflightWakeup(box, telemetry)
 end
 
 local function postflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
     c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
     c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
     c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.becMin = c.becMin or getThemeValue("bec_min")
@@ -560,7 +565,7 @@ local function postflightPaint(x, y, w, h, box, c)
     drawNode(leftX, y2, nw, nh, "PEAK CURRENT", fmt(c.current,1," A"), currentColor, "REACTOR LOAD")
     drawNode(leftX, y3, nw, nh, "MIN BEC", fmt(c.bec,2," V"), becColor, "POWER CORE")
 
-    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", fmt(c.esc,0," " .. c.escUnit), escColor, "THERMAL PLUME")
+    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", fmt(c.esc,0,c.escSuffix), escColor, "THERMAL PLUME")
     drawNode(rightX, y2, nw, nh, "PEAK POWER", fmt(c.watts,0," W"), wattsColor, "ENERGY RELEASE")
     drawNode(rightX, y3, nw, nh, "MIN LINK", fmt(c.link,0,"%"), linkColor, "SIGNAL CONSTELLATION")
 
