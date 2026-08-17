@@ -73,39 +73,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -345,15 +378,45 @@ end
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
 
+local function ensureCards(c)
+    if not c.cards then
+        c.cards = {
+            {"PLUME RPM"},
+            {"EMBER PEAK"},
+            {"RUBY CURRENT"},
+            {"SAPPHIRE BEC"},
+            {"TURQUOISE LINK"},
+            {"EMERALD FUEL"},
+            {"GOLD CONSUMED"},
+            {"VIOLET POWER"},
+            {"PACK MINIMUM"}
+        }
+    end
+    return c.cards
+end
+
+local function updateCard(card, value, decimals, suffix, color, pct)
+    -- Reformat only when a reported value or its presentation unit changes.
+    if card._value ~= value or card._suffix ~= suffix or card[2] == nil then
+        card[2] = fmt(value, decimals, suffix)
+        card._value = value
+        card._suffix = suffix
+    end
+    card[3] = color
+    card[4] = pct
+end
+
 local function postflightWakeup(box, telemetry)
     local c = box._cache or {}
     box._cache = c
     c.rpm = stat(telemetry, "rpm", "max", "headspeed", "erpm")
-    c.esc = stat(telemetry, "temp_esc", "max", "esc_temp")
+    local escUnit
+    c.esc, escUnit = stat(telemetry, "temp_esc", "max", "esc_temp")
+    c.escUnit = temperatureUnitLabel(escUnit)
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
     c.bec = stat(telemetry, "bec_voltage", "min", "bec")
-    c.link = stat(telemetry, "link", "min", "vfr")
+    c.link = stat(telemetry, "vfr", "min")
     c.fuel = stat(telemetry, "smartfuel", "min")
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
@@ -361,23 +424,10 @@ local function postflightWakeup(box, telemetry)
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
     c.time = format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
 
-    local faults, cautions = 0, 0
-    if c.esc and c.esc >= getThemeValue("esc_max") then faults = faults + 1
-    elseif c.esc and c.esc >= getThemeValue("esc_warn") then cautions = cautions + 1 end
-    if c.bec and c.bec < getThemeValue("bec_min") then faults = faults + 1
-    elseif c.bec and c.bec < getThemeValue("bec_warn") then cautions = cautions + 1 end
-    if c.fuel and c.fuel <= getThemeValue("fuel_warn") then cautions = cautions + 1 end
-    if c.link and c.link < getThemeValue("link_warn") then cautions = cautions + 1 end
-    if c.rpm and c.rpm > getThemeValue("rpm_max") * 1.05 then cautions = cautions + 1 end
-
-    if faults > 0 then c.grade, c.gradeSub, c.gradeColor = "JEWEL FRACTURE", "SYSTEM INSPECTION REQUIRED", C.red
-    elseif cautions > 0 then c.grade, c.gradeSub, c.gradeColor = "FLIGHT REVIEW", tostring(cautions) .. " ITEM" .. (cautions == 1 and "" or "S") .. " FLAGGED", C.amber
-    else c.grade, c.gradeSub, c.gradeColor = "FLAWLESS FLIGHT", "ALL VALUES WITHIN LIMITS", C.emerald end
-
     -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
     -- calling getThemeValue() from paint(), which runs on every invalidate.
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.becMin = getThemeValue("bec_min")
     c.becWarn = getThemeValue("bec_warn")
     c.fuelWarn = getThemeValue("fuel_warn")
@@ -386,26 +436,53 @@ local function postflightWakeup(box, telemetry)
     c.currentWarn = getThemeValue("current_warn")
     c.wattsWarn = getThemeValue("watts_warn")
 
-    -- Build the report-card grid here too, so paint() only reads c.cards
-    -- instead of reconstructing the table (with string.format calls) every
-    -- invalidate.
-    local rpmColor = c.rpm and c.rpm > c.rpmMax * 1.05 and C.amber or C.violet
+    local available = 0
+    if c.rpm ~= nil then available = available + 1 end
+    if c.esc ~= nil then available = available + 1 end
+    if c.current ~= nil then available = available + 1 end
+    if c.watts ~= nil then available = available + 1 end
+    if c.bec ~= nil then available = available + 1 end
+    if c.link ~= nil then available = available + 1 end
+    if c.fuel ~= nil then available = available + 1 end
+    if c.consumed ~= nil then available = available + 1 end
+    if c.voltage ~= nil then available = available + 1 end
+
+    local faults, cautions = 0, 0
+    if c.esc and c.esc >= c.escMax then faults = faults + 1
+    elseif c.esc and c.esc >= c.escWarn then cautions = cautions + 1 end
+    if c.bec and c.bec < c.becMin then faults = faults + 1
+    elseif c.bec and c.bec < c.becWarn then cautions = cautions + 1 end
+    if c.fuel and c.fuel <= c.fuelWarn then cautions = cautions + 1 end
+    if c.link and c.link < c.linkWarn then cautions = cautions + 1 end
+    if c.rpm and c.rpm > c.rpmMax * 1.05 then cautions = cautions + 1 end
+    if c.current and c.current >= c.currentWarn then cautions = cautions + 1 end
+    if c.watts and c.watts >= c.wattsWarn then cautions = cautions + 1 end
+
+    if available == 0 then c.grade, c.gradeSub, c.gradeColor = "NO FLIGHT DATA", "RESET STATS OR CONNECT TELEMETRY", C.muted
+    elseif faults > 0 then c.grade, c.gradeSub, c.gradeColor = "JEWEL FRACTURE", "SYSTEM INSPECTION REQUIRED", C.red
+    elseif cautions > 0 then c.grade, c.gradeSub, c.gradeColor = "FLIGHT REVIEW", tostring(cautions) .. " ITEM" .. (cautions == 1 and "" or "S") .. " FLAGGED", C.amber
+    else c.grade, c.gradeSub, c.gradeColor = "FLAWLESS FLIGHT", "ALL VALUES WITHIN LIMITS", C.emerald end
+
+    local rpmColor = c.rpm and (c.rpm > c.rpmMax * 1.05 and C.amber or C.violet) or C.muted
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.emerald)) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.turquoise)) or C.muted
-    local fuelColor = c.fuel and c.fuel <= c.fuelWarn and C.amber or C.emerald
-    local linkColor = c.link and c.link < c.linkWarn and C.amber or C.turquoise
+    local fuelColor = c.fuel and (c.fuel <= c.fuelWarn and C.amber or C.emerald) or C.muted
+    local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.turquoise) or C.muted
+    local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.fuchsia) or C.muted
+    local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.violet) or C.muted
+    local consumedColor = c.consumed and C.gold or C.muted
+    local voltageColor = c.voltage and C.turquoise or C.muted
 
-    c.cards = {
-        {"PLUME RPM", fmt(c.rpm,0," RPM"), rpmColor, c.rpm and c.rpm / c.rpmMax or 0},
-        {"EMBER PEAK", fmt(c.esc,0,"C"), escColor, c.esc and c.esc / c.escMax or 0},
-        {"RUBY CURRENT", fmt(c.current,1," A"), C.fuchsia, c.current and c.current / c.currentWarn or 0},
-        {"SAPPHIRE BEC", fmt(c.bec,2," V"), becColor, c.bec and c.bec / 15 or 0},
-        {"TURQUOISE LINK", fmt(c.link,0,"%"), linkColor, c.link and c.link / 100 or 0},
-        {"EMERALD FUEL", fmt(c.fuel,0,"%"), fuelColor, c.fuel and c.fuel / 100 or 0},
-        {"GOLD CONSUMED", fmt(c.consumed,0," mAh"), C.gold, c.consumed and c.consumed / 5000 or 0},
-        {"VIOLET POWER", fmt(c.watts,0," W"), C.violet, c.watts and c.watts / c.wattsWarn or 0},
-        {"PACK MINIMUM", fmt(c.voltage,1," V"), C.turquoise, c.voltage and c.voltage / 60 or 0}
-    }
+    local cards = ensureCards(c)
+    updateCard(cards[1], c.rpm, 0, " RPM", rpmColor, c.rpm and c.rpm / c.rpmMax or 0)
+    updateCard(cards[2], c.esc, 0, c.escUnit, escColor, c.esc and c.esc / c.escMax or 0)
+    updateCard(cards[3], c.current, 1, " A", currentColor, c.current and c.current / c.currentWarn or 0)
+    updateCard(cards[4], c.bec, 2, " V", becColor, c.bec and c.bec / 15 or 0)
+    updateCard(cards[5], c.link, 0, "%", linkColor, c.link and c.link / 100 or 0)
+    updateCard(cards[6], c.fuel, 0, "%", fuelColor, c.fuel and c.fuel / 100 or 0)
+    updateCard(cards[7], c.consumed, 0, " mAh", consumedColor, c.consumed and c.consumed / 5000 or 0)
+    updateCard(cards[8], c.watts, 0, " W", wattsColor, c.watts and c.watts / c.wattsWarn or 0)
+    updateCard(cards[9], c.voltage, 1, " V", voltageColor, c.voltage and c.voltage / 60 or 0)
 
     return c
 end
@@ -417,14 +494,14 @@ local function drawReportCard(x, y, w, h, title, value, accent, pct)
 end
 
 local function postflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
@@ -437,14 +514,14 @@ local function postflightPaint(x, y, w, h, box, c)
     drawLattice(x, y, w, h)
 
     drawTextAligned(x + 14, y + 7, w * 0.50, "ZAFIRA // FLIGHT CHRONICLE", "FONT_STD", C.gold, "left")
-    drawTextAligned(x + w - 300, y + 8, 286, c.grade or "FLIGHT REVIEW", "FONT_STD", c.gradeColor or C.muted, "right")
+    drawTextAligned(x + w - 300, y + 8, 286, c.grade or "NO FLIGHT DATA", "FONT_STD", c.gradeColor or C.muted, "right")
 
     local summaryY, summaryH = y + 43, 82
-    drawPanel(x + 12, summaryY, w - 24, summaryH, c.gradeColor or C.gold, nil)
+    drawPanel(x + 12, summaryY, w - 24, summaryH, c.gradeColor or C.muted, nil)
     local cx, cy = x + 76, summaryY + summaryH * 0.5
     for i = 0, 5 do drawPetal(cx, cy, 31, 8, i * 60, i % 2 == 0 and C.fuchsia or C.turquoise) end
     drawDiamond(cx, cy, 20, c.gradeColor or C.gold, C.white)
-    drawTextAligned(x + 124, summaryY + 15, w * 0.55, c.gradeSub or "FLIGHT DATA READY", "FONT_S", C.white, "left")
+    drawTextAligned(x + 124, summaryY + 15, w * 0.55, c.gradeSub or "RESET STATS OR CONNECT TELEMETRY", "FONT_S", C.white, "left")
     drawTextAligned(x + w - 230, summaryY + 10, 198, c.time or "00:00", "FONT_XL", C.white, "right")
     drawTextAligned(x + w - 230, summaryY + 49, 198, "FLIGHT TIME", "FONT_XXS", C.muted, "right")
 

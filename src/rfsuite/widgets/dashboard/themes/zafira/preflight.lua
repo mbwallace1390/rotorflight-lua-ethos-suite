@@ -73,39 +73,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -350,32 +383,42 @@ local function preflightWakeup(box, telemetry)
     box._cache = c
     c.fuel = sensor(telemetry, "smartfuel")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
-    c.esc = sensor(telemetry, "temp_esc", "esc_temp")
-    c.link = sensor(telemetry, "link", "vfr")
+    local escUnit
+    c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
+    c.escUnit = temperatureUnitLabel(escUnit)
+    c.link = sensor(telemetry, "vfr")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
     c.voltage = sensor(telemetry, "voltage")
     c.flightState, c.flightColor = getFlightState(telemetry)
 
+    -- Settings are stored in Celsius; compare against the sensor's presented unit.
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
+    c.linkWarn = getThemeValue("link_warn")
+
     local available, faults, warnings = 0, 0, 0
     local issue = nil
     if c.fuel ~= nil then
         available = available + 1
-        if c.fuel <= getThemeValue("fuel_warn") then faults = faults + 1; issue = issue or ("FUEL " .. fmt(c.fuel,0,"%") .. " AT RESERVE") end
+        if c.fuel <= c.fuelWarn then faults = faults + 1; issue = issue or ("FUEL " .. fmt(c.fuel,0,"%") .. " AT RESERVE") end
     end
     if c.bec ~= nil then
         available = available + 1
-        if c.bec < getThemeValue("bec_min") then faults = faults + 1; issue = issue or ("BEC " .. fmt(c.bec,1,"V") .. " CRITICAL")
-        elseif c.bec < getThemeValue("bec_warn") then warnings = warnings + 1; issue = issue or ("BEC " .. fmt(c.bec,1,"V") .. " LOW") end
+        if c.bec < c.becMin then faults = faults + 1; issue = issue or ("BEC " .. fmt(c.bec,1,"V") .. " CRITICAL")
+        elseif c.bec < c.becWarn then warnings = warnings + 1; issue = issue or ("BEC " .. fmt(c.bec,1,"V") .. " LOW") end
     end
     if c.esc ~= nil then
         available = available + 1
-        if c.esc >= getThemeValue("esc_max") then faults = faults + 1; issue = issue or ("ESC " .. fmt(c.esc,0,"C") .. " AT LIMIT")
-        elseif c.esc >= getThemeValue("esc_warn") then warnings = warnings + 1; issue = issue or ("ESC " .. fmt(c.esc,0,"C") .. " HOT") end
+        if c.esc >= c.escMax then faults = faults + 1; issue = issue or ("ESC " .. fmt(c.esc,0,c.escUnit) .. " AT LIMIT")
+        elseif c.esc >= c.escWarn then warnings = warnings + 1; issue = issue or ("ESC " .. fmt(c.esc,0,c.escUnit) .. " HOT") end
     end
     if c.link ~= nil then
         available = available + 1
-        if c.link < getThemeValue("link_warn") then warnings = warnings + 1; issue = issue or ("LINK " .. fmt(c.link,0,"%") .. " LOW") end
+        if c.link < c.linkWarn then warnings = warnings + 1; issue = issue or ("LINK " .. fmt(c.link,0,"%") .. " LOW") end
     end
 
     c.issue = issue
@@ -384,20 +427,10 @@ local function preflightWakeup(box, telemetry)
     elseif warnings > 0 then c.status, c.statusSub, c.statusColor = "PAUSE & REVIEW", issue or "CHECK SYSTEMS", C.amber
     else c.status, c.statusSub, c.statusColor = "READY TO BLOOM", "ALL SYSTEMS NOMINAL", C.emerald end
 
-    -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
-    -- calling getThemeValue() from paint(), which runs on every invalidate.
-    c.fuelWarn = getThemeValue("fuel_warn")
-    c.becMin = getThemeValue("bec_min")
-    c.becWarn = getThemeValue("bec_warn")
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
-    c.linkWarn = getThemeValue("link_warn")
-
     return c
 end
 
 local function preflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
@@ -406,8 +439,9 @@ local function preflightPaint(x, y, w, h, box, c)
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.linkWarn = c.linkWarn or getThemeValue("link_warn")
 
     lcd.color(C.bg); lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
@@ -427,7 +461,7 @@ local function preflightPaint(x, y, w, h, box, c)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.emerald)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.turquoise) or C.muted
     local fuel = c.fuel or 0
-    local fuelColor = fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)
+    local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.emerald)) or C.muted
 
     drawMetric(leftX, bodyY, sideW, cardH, "SAPPHIRE BEC", fmt(c.bec,1," V"), becColor, "regulated power")
     drawProgress(leftX + 14, bodyY + cardH - 36, sideW - 28, 9, c.bec and c.bec / 15 or 0, becColor)
@@ -446,12 +480,12 @@ local function preflightPaint(x, y, w, h, box, c)
 
     local gemY = bodyY + bodyH - 82
     drawTextAligned(centerX + 18, gemY - 27, centerW - 36, "SMART FUEL JEWELS", "FONT_XXS", C.muted, "left")
-    drawTextAligned(centerX + 18, gemY - 28, centerW - 36, fmt(c.fuel,0,"%"), "FONT_S", C.white, "right")
+    drawTextAligned(centerX + 18, gemY - 28, centerW - 36, fmt(c.fuel,0,"%"), "FONT_S", c.fuel and C.white or C.muted, "right")
     drawGemLine(centerX + 20, gemY, centerW - 40, 12, fuel, fuelColor, C.line2)
     drawPanel(centerX + 48, gemY + 20, centerW - 96, 29, c.flightColor or C.turquoise, nil)
     drawTextAligned(centerX + 58, gemY + 25, centerW - 116, c.flightState or "STATE --", "FONT_XXS", c.flightColor or C.muted, "center")
 
-    drawMetric(rightX, bodyY, sideW, cardH, "EMBER ESC", fmt(c.esc,0,"C"), escColor, "thermal balance")
+    drawMetric(rightX, bodyY, sideW, cardH, "EMBER ESC", fmt(c.esc,0,c.escUnit), escColor, "thermal balance")
     drawProgress(rightX + 14, bodyY + cardH - 36, sideW - 28, 9, c.esc and c.esc / c.escMax or 0, escColor)
     drawPanel(rightX, bodyY + cardH + 10, sideW, cardH, C.violet, "FLIGHT TALISMAN")
     drawTextAligned(rightX + 16, bodyY + cardH + 50, sideW - 32, "RATES  " .. fmt(c.rate,0,""), "FONT_XS", C.white, "left")

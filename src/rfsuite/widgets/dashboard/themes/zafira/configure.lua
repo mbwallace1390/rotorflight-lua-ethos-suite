@@ -24,6 +24,18 @@ local function clamp(v, lo, hi)
 end
 local function getPref(key) return rfsuite.widgets.dashboard.getPreference(key) end
 local function setPref(key, value) rfsuite.widgets.dashboard.savePreference(key, value) end
+local function temperatureUnit()
+    local general = rfsuite.preferences and rfsuite.preferences.general
+    return tonumber(general and general.temperature_unit) == 1 and 1 or 0
+end
+local function displayTemperature(value)
+    if temperatureUnit() == 1 then return value * 1.8 + 32 end
+    return value
+end
+local function storeTemperature(value)
+    if temperatureUnit() == 1 then return (value - 32) / 1.8 end
+    return value
+end
 local function loadConfig()
     for key, default in pairs(DEFAULTS) do config[key] = tonumber(getPref(key)) or default end
     config.rpm_max = clamp(config.rpm_max, 100, 20000)
@@ -37,13 +49,18 @@ local function loadConfig()
     config.watts_warn = clamp(config.watts_warn, 100, 15000)
 end
 local function addField(line, lo, hi, getter, setter, step, suffix, decimals)
-    local field = form.addNumberField(line, nil, lo, hi, getter, setter, step)
+    local field = form.addNumberField(line, nil, lo, hi, getter, setter)
+    if step then field:step(step) end
     if decimals then field:decimals(decimals) end
     if suffix then field:suffix(suffix) end
     return field
 end
 local function configure()
     loadConfig()
+    local tempUnit = temperatureUnit()
+    local tempSuffix = tempUnit == 1 and "°F" or "°C"
+    local tempMinimum = tempUnit == 1 and 32 or 0
+    local tempMaximum = tempUnit == 1 and 392 or 200
 
     local plume = form.addExpansionPanel("Plume instrument")
     plume:open(true)
@@ -73,14 +90,20 @@ local function configure()
 
     local thermal = form.addExpansionPanel("Ember limits")
     thermal:open(false)
-    addField(thermal:addLine("ESC warning"), 0, 199,
-        function() return config.esc_warn end,
-        function(v) config.esc_warn = clamp(tonumber(v) or DEFAULTS.esc_warn, 0, config.esc_max - 1) end,
-        1, "C")
-    addField(thermal:addLine("ESC maximum"), 1, 200,
-        function() return config.esc_max end,
-        function(v) config.esc_max = clamp(tonumber(v) or DEFAULTS.esc_max, config.esc_warn + 1, 200) end,
-        1, "C")
+    addField(thermal:addLine("ESC warning"), tempMinimum, tempMaximum,
+        function() return floor(displayTemperature(config.esc_warn) + 0.5) end,
+        function(v)
+            local value = tonumber(v) or displayTemperature(DEFAULTS.esc_warn)
+            config.esc_warn = clamp(storeTemperature(value), 0, config.esc_max - 1)
+        end,
+        1, tempSuffix)
+    addField(thermal:addLine("ESC maximum"), tempMinimum, tempMaximum,
+        function() return floor(displayTemperature(config.esc_max) + 0.5) end,
+        function(v)
+            local value = tonumber(v) or displayTemperature(DEFAULTS.esc_max)
+            config.esc_max = clamp(storeTemperature(value), config.esc_warn + 1, 200)
+        end,
+        1, tempSuffix)
 
     local reserve = form.addExpansionPanel("Reserve and link")
     reserve:open(false)
