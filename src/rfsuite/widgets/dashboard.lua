@@ -26,6 +26,7 @@ local THEME_DIRS = {
   rfstatus = "widgets/dashboard/themes/rfstatus",
   ["rt-rc-n"] = "widgets/dashboard/themes/rt-rc-n",
   ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
+  singularity = "widgets/dashboard/themes/singularity",
   ["srb-rc"] = "widgets/dashboard/themes/srb-rc",
   timer = "widgets/dashboard/themes/timer",
 }
@@ -1108,7 +1109,7 @@ end
 
 local function setDashboardPreferences(widget, theme)
   ensureDashboardSettings(widget)
-  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
+  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme), "system/" .. theme)
 end
 
 local function prepareDashboard(widget)
