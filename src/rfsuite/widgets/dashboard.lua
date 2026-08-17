@@ -18,6 +18,7 @@ local THEME_DIRS = {
   aegis = "widgets/dashboard/themes/aegis",
   ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
   aerc = "widgets/dashboard/themes/aerc",
+  america250 = "widgets/dashboard/themes/america250",
   claude = "widgets/dashboard/themes/claude",
   danielrc = "widgets/dashboard/themes/danielrc",
   default = "widgets/dashboard/themes/default",

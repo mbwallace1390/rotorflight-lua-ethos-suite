@@ -95,6 +95,7 @@ local DASHBOARD_THEMES = {
   aegis = true,
   ["aerc-n"] = true,
   aerc = true,
+  america250 = true,
   claude = true,
   danielrc = true,
   default = true,
