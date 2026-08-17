@@ -37,7 +37,8 @@ local function loadConfig()
     config.watts_warn = clamp(config.watts_warn, 100, 15000)
 end
 local function addField(line, lo, hi, getter, setter, step, suffix, decimals)
-    local field = form.addNumberField(line, nil, lo, hi, getter, setter, step)
+    local field = form.addNumberField(line, nil, lo, hi, getter, setter)
+    if step then field:step(step) end
     if decimals then field:decimals(decimals) end
     if suffix then field:suffix(suffix) end
     return field
