@@ -138,11 +138,11 @@ local function wakeSegmentedFuel(box, telemetry)
 
     local raw = nil
     if telemetry and telemetry.getSensor then
-        raw = telemetry.getSensor(cache.source)
+        raw = tonumber((telemetry.getSensor(cache.source)))
     end
 
     if raw ~= nil then
-        local value = max(0, min(100, tonumber(raw) or 0))
+        local value = max(0, min(100, raw))
         local valueKey = floor(value + 0.5)
 
         if cache.valueKey ~= valueKey then
@@ -155,7 +155,10 @@ local function wakeSegmentedFuel(box, telemetry)
             cache.color = getFuelSegmentColor(valueKey)
         end
         cache.hasValue = true
-    elseif not cache.hasValue then
+    elseif cache.hasValue then
+        cache.hasValue = false
+        cache.value = 0
+        cache.valueKey = false
         cache.valueText = "--%"
         cache.activeSegments = 0
         cache.color = rc.dim
@@ -165,7 +168,6 @@ local function wakeSegmentedFuel(box, telemetry)
 end
 
 local function paintSegmentedFuel(x, y, w, h, box, cache)
-    x, y = utils.applyOffset(x, y, box)
     cache = cache or box._cache
     if not cache then return end
 
@@ -242,33 +244,44 @@ local function wakeAesGauge(box, telemetry)
         cache = {
             _mode = "neon_arc",
             source = box.source,
-            value = 0,
+            value = nil,
             valueKey = false,
             maxKey = false,
-            valText = "0",
+            valText = "--",
             maxText = "",
             rangeText = "",
             maxVal = -9999,
             color = box.accentcolor or colorMode.fillcolor,
             pct = 0,
-            activeTicks = 0
+            activeTicks = 0,
+            hasValue = false
         }
         local unit = box.unit or ""
         cache.rangeText = "RANGE " .. formatGaugeValue(box.min or 0, box.decimals or 0) .. "–" .. formatGaugeValue(box.max or 100, box.decimals or 0) .. unit
         box._cache = cache
     end
 
-    local val = cache.value or 0
+    local val = nil
     if telemetry and telemetry.getSensor then
-        local raw = telemetry.getSensor(cache.source)
-        if raw ~= nil then
-            if raw == 0 and (cache.value or 0) > 5 and box.holdzero ~= false then
-                val = cache.value
-            else
-                val = raw
+        val = tonumber((telemetry.getSensor(cache.source)))
+    end
+    if val == nil then
+        if cache.hasValue then
+            cache.hasValue = false
+            cache.value = nil
+            cache.valueKey = false
+            cache.valText = "--"
+            cache.pct = 0
+            cache.activeTicks = 0
+            cache.color = box.accentcolor or colorMode.fillcolor
+            if box.arcmax then
+                cache.maxKey = false
+                cache.maxText = ""
             end
         end
+        return cache
     end
+    cache.hasValue = true
     cache.value = val
 
     local decimals = box.decimals or 0
@@ -310,7 +323,6 @@ end
 -- Multi-layer neon arc with glow rail, active ticks and a bright sweep marker.
 local function paintAesGauge(x, y, w, h, box, cache)
     if not cache or cache._mode ~= "neon_arc" then return end
-    x, y = utils.applyOffset(x, y, box)
 
     local radius = floor(min(w * 0.44, h * 0.39))
     if radius < 12 then return end
@@ -548,7 +560,7 @@ local function header_boxes()
         local headerBgColor = "transparent"
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
-            box.offsety = (box.offsety or 0) + topbarShiftY
+            box.yoffset = (box.yoffset or 0) + topbarShiftY
 
             if box.type == "image" then
                 box.type = "func"
@@ -585,7 +597,7 @@ local function buildBoxes(W)
 
     return {
         {
-            col = 1, row = 1, colspan = 9, rowspan = 10, offsetx = 0,
+            col = 1, row = 1, colspan = 9, rowspan = 10, xoffset = 0,
             type = "func", subtype = "func",
             bgcolor = "transparent",
             wakeup = function(box, telemetry)

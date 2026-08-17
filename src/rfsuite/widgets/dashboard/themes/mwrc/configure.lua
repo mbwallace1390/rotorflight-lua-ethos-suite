@@ -54,7 +54,8 @@ local function loadPreferences()
 end
 
 local function addNumberField(line, minimum, maximum, getter, setter, step, suffix, decimals)
-    local field = form.addNumberField(line, nil, minimum, maximum, getter, setter, step)
+    local field = form.addNumberField(line, nil, minimum, maximum, getter, setter)
+    if step then field:step(step) end
     if decimals then field:decimals(decimals) end
     if suffix then field:suffix(suffix) end
     return field
