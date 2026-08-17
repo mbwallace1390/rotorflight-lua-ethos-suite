@@ -105,6 +105,7 @@ local DASHBOARD_THEMES = {
   ["rt-rc"] = true,
   ["srb-rc"] = true,
   timer = true,
+  zafira = true,
 }
 
 local function normalizeDashboardTheme(value, allowDisabled, default)

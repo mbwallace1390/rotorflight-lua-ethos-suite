@@ -31,6 +31,7 @@ local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", path = "system/rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", path = "system/rt-rc-n"},
   {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", path = "system/srb-rc"},
+  {label = "Zafira", path = "system/zafira", minResolution = {x = 784, y = 294}},
 }
 
 local function coerceBool(value, default)

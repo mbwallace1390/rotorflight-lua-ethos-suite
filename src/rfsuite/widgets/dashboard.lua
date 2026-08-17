@@ -28,6 +28,7 @@ local THEME_DIRS = {
   ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
   ["srb-rc"] = "widgets/dashboard/themes/srb-rc",
   timer = "widgets/dashboard/themes/timer",
+  zafira = "widgets/dashboard/themes/zafira",
 }
 
 local DEFAULT_DASHBOARD_SETTINGS = {
@@ -1108,7 +1109,7 @@ end
 
 local function setDashboardPreferences(widget, theme)
   ensureDashboardSettings(widget)
-  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
+  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme), "system/" .. theme)
 end
 
 local function prepareDashboard(widget)
