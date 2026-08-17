@@ -453,8 +453,9 @@ function render.wakeup(box)
             if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
         end
 
-        -- Fallback to live watts if stats are unavailable.
-        if value == nil then
+        -- Live watts bars can fall back to their component sensors. A stat bar
+        -- must wait for stats from the current flight instead.
+        if value == nil and not cfg.stattype then
             local volts = readLiveSensor(telemetry, "voltage")
             local amps = readLiveSensor(telemetry, "current")
             if volts ~= nil and amps ~= nil then value = volts * amps end
@@ -477,11 +478,6 @@ function render.wakeup(box)
 
             dynamicUnit = dynamicUnit or getSensorUnit(telemetry, source)
 
-            -- If the requested stat is not ready yet, fall back to the live sensor so
-            -- the bar still populates instead of showing loading dots forever.
-            if value == nil then
-                value, dynamicUnit = readLiveSensor(telemetry, source)
-            end
         else
             value, dynamicUnit = readLiveSensor(telemetry, source)
         end
@@ -532,6 +528,13 @@ function render.wakeup(box)
         c._lastValidDisplayValue = displayValue
         c._lastValidUnit = unit
     else
+        -- Stats are cleared in place at the start of a flight. Do not let the
+        -- box-level cache resurrect a value from the previous flight.
+        if cfg.stattype then
+            c._lastValidValue = nil
+            c._lastValidDisplayValue = nil
+            c._lastValidUnit = nil
+        end
         if c._lastValidValue ~= nil then
             value = c._lastValidValue
             displayValue = c._lastValidDisplayValue
