@@ -299,6 +299,20 @@ local function getSensorUnit(telemetry, source)
     return sensorDef and sensorDef.unit_string or nil
 end
 
+local function getSensorPresentation(telemetry, source, minValue, maxValue, thresholds)
+    local sensorDef = source and telemetry and telemetry.sensorTable and telemetry.sensorTable[source]
+    local localize = sensorDef and sensorDef.localizations
+    if type(localize) ~= "function" then
+        return nil, minValue, maxValue, thresholds
+    end
+
+    local _, _, unit, presentedMin, presentedMax, presentedThresholds = localize(nil, minValue, maxValue, thresholds)
+    if presentedMin == nil then presentedMin = minValue end
+    if presentedMax == nil then presentedMax = maxValue end
+    if presentedThresholds == nil then presentedThresholds = thresholds end
+    return unit, presentedMin, presentedMax, presentedThresholds
+end
+
 local function getAliasStatsValue(telemetry, statType, sourceA, sourceB, sourceC, sourceD)
     local value = getStatsValue(telemetry, sourceA, statType)
     if value ~= nil then return value, getSensorUnit(telemetry, sourceA) end
@@ -481,11 +495,25 @@ function render.wakeup(box)
     local consumed = getSensor and getSensor("smartconsumption") or 0
     local perCellVoltage = (cellCount > 0) and (voltage / cellCount) or 0
 
+    local minCfg, maxCfg
+    if source == "txbatt" then
+        minCfg = getParam(box, "min") or 7.2
+        maxCfg = getParam(box, "max") or 8.4
+    else
+        minCfg = getParam(box, "min") or 0
+        maxCfg = getParam(box, "max") or 100
+    end
+
+    local thresholdsCfg = getParam(box, "thresholds")
+    local localizedUnit, vmin, vmax, presentedThresholds = getSensorPresentation(telemetry, source, minCfg, maxCfg, thresholdsCfg)
+
     local manualUnit = cfg.manualUnit
     local unit
 
     if manualUnit ~= nil then
         unit = manualUnit
+    elseif localizedUnit ~= nil then
+        unit = localizedUnit
     elseif dynamicUnit ~= nil then
         unit = dynamicUnit
     elseif source and telemetry and telemetry.sensorTable[source] then
@@ -514,15 +542,6 @@ function render.wakeup(box)
             displayValue = LOADING_DOTS[c._dotCount + 1]
             unit = nil
         end
-    end
-
-    local vmin, vmax
-    if source == "txbatt" then
-        vmin = getParam(box, "min") or 7.2
-        vmax = getParam(box, "max") or 8.4
-    else
-        vmin = getParam(box, "min") or 0
-        vmax = getParam(box, "max") or 100
     end
 
     local percent = 0
@@ -588,8 +607,8 @@ function render.wakeup(box)
     local thresholdValue = displayValue
     if type(thresholdValue) ~= "number" then thresholdValue = value end
 
-    c.textcolor = resolveThresholdColor(thresholdValue, box, "textcolor", "textcolor")
-    c.fillcolor = resolveThresholdColor(thresholdValue, box, "fillcolor", "fillcolor")
+    c.textcolor = resolveThresholdColor(thresholdValue, box, "textcolor", "textcolor", presentedThresholds)
+    c.fillcolor = resolveThresholdColor(thresholdValue, box, "fillcolor", "fillcolor", presentedThresholds)
     c.fillbgcolor = cfg.fillbgcolor
     c.bgcolor = cfg.bgcolor
     c.titlecolor = cfg.titlecolor
