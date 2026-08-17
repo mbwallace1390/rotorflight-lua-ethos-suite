@@ -157,6 +157,21 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix)
+    local key = roundedKey(value, decimals)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix)
+    end
+    return key
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -200,7 +215,7 @@ end
 
 local function drawNode(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     if subtitle then drawTextAligned(x + 11, y + h - 22, w - 22, subtitle, "FONT_XXS", C.muted, "left") end
 end
 
@@ -377,11 +392,14 @@ local function header_boxes()
     return header_boxes_cache
 end
 
-local function flightTimeText()
+local function updateFlightTime(cache)
     local session = rfsuite and rfsuite.session
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    seconds = max(0, seconds)
-    return format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
+    seconds = floor(max(0, seconds))
+    if cache._timerSecond ~= seconds or cache.timer == nil then
+        cache._timerSecond = seconds
+        cache.timer = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
 end
 
 local STATE_LABELS = {
@@ -431,11 +449,11 @@ local RPM_RING_UNIT = getRingUnit(36, 145, 250)
 local FUEL_RING_UNIT = getRingUnit(30, 0, 360)
 
 local function inflightWakeup(box, telemetry)
-    local c = box._cache or {maxRpm = 0}
+    local c = box._cache or {}
     box._cache = c
-    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm") or 0
+    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm")
     c.maxRpm = stat(telemetry, "rpm", "max", "headspeed", "erpm") or c.rpm
-    c.throttle = sensor(telemetry, "throttle_percent", "throttle") or 0
+    c.throttle = sensor(telemetry, "throttle_percent", "throttle")
     local escUnit
     c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
     local resolvedEscUnit = temperatureUnitLabel(escUnit)
@@ -443,6 +461,7 @@ local function inflightWakeup(box, telemetry)
     if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
         c.escUnit = resolvedEscUnit
         c.escSuffix = " " .. resolvedEscUnit
+        c._escTextKey = nil
     end
     c.fuel = sensor(telemetry, "smartfuel")
     c.current = sensor(telemetry, "current")
@@ -451,7 +470,27 @@ local function inflightWakeup(box, telemetry)
     c.link = sensor(telemetry, "vfr")
     c.consumed = sensor(telemetry, "smartconsumption", "consumption")
     c.reactorState, c.reactorColor = getReactorState(telemetry)
-    c.timer = flightTimeText()
+    updateFlightTime(c)
+
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escSuffix)
+    updateFormatted(c, "_throttleTextKey", "throttleText", c.throttle, 0, "%")
+    updateFormatted(c, "_rpmTextKey", "rpmText", c.rpm, 0, "")
+    updateFormatted(c, "_currentTextKey", "currentText", c.current, 1, " A")
+    updateFormatted(c, "_wattsTextKey", "wattsText", c.watts, 0, " W")
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 1, " V")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%")
+    updateFormatted(c, "_consumedTextKey", "consumedText", c.consumed, 0, " mAh")
+
+    local maxRpmKey = roundedKey(c.maxRpm, 0)
+    if c._maxRpmTextKey ~= maxRpmKey or c.maxRpmText == nil then
+        c._maxRpmTextKey = maxRpmKey
+        c.maxRpmText = "MAX " .. fmt(c.maxRpm, 0, " RPM")
+    end
+    local fuelKey = roundedKey(c.fuel, 0)
+    if c._energyTextKey ~= fuelKey or c.energyText == nil then
+        c._energyTextKey = fuelKey
+        c.energyText = "ENERGY " .. fmt(c.fuel, 0, "%")
+    end
 
     -- Cache theme-configured thresholds here (wakeup runs on a rate-limited
     -- cycle) instead of calling getThemeValue() from paint(), which runs on
@@ -468,7 +507,7 @@ local function inflightWakeup(box, telemetry)
     return c
 end
 
-local function drawThermalPlume(x, y, w, h, value, maximum, color, suffix)
+local function drawThermalPlume(x, y, w, h, value, maximum, color, valueText)
     drawPanel(x, y, w, h, color, "THERMAL PLUME")
     local pct = maximum > 0 and clamp((value or 0) / maximum, 0, 1) or 0
     local baseY = y + h - 28
@@ -480,11 +519,11 @@ local function drawThermalPlume(x, y, w, h, value, maximum, color, suffix)
         lcd.color(i < 3 and C.cyanDim or color)
         lcd.drawFilledRectangle(bx, floor(baseY - bh), bw, bh)
     end
-    drawTextAligned(x + 10, y + 30, w - 20, fmt(value,0,suffix), "FONT_L", C.white, "center")
+    drawTextAligned(x + 10, y + 30, w - 20, valueText, "FONT_L", value and C.white or C.muted, "center")
 end
 
-local function drawThrustArray(x, y, w, h, throttle)
-    drawPanel(x, y, w, h, C.cyan, "THRUST ARRAY")
+local function drawThrustArray(x, y, w, h, throttle, valueText, color)
+    drawPanel(x, y, w, h, color, "THRUST ARRAY")
     local pct = clamp((throttle or 0) / 100, 0, 1)
     local bars = 10
     local gap = 4
@@ -493,10 +532,10 @@ local function drawThrustArray(x, y, w, h, throttle)
         local bh = 14 + i * 5
         local bx = x + 12 + i * (bw + gap)
         local by = y + h - 20 - bh
-        lcd.color(i < floor(pct * bars + 0.999) and C.cyan or C.line)
+        lcd.color(i < floor(pct * bars + 0.999) and color or C.line)
         lcd.drawFilledRectangle(floor(bx), floor(by), bw, bh)
     end
-    drawTextAligned(x + 10, y + 30, w - 20, fmt(throttle,0,"%"), "FONT_L", C.white, "center")
+    drawTextAligned(x + 10, y + 30, w - 20, valueText, "FONT_L", throttle and C.white or C.muted, "center")
 end
 
 local function inflightPaint(x, y, w, h, box, c)
@@ -535,8 +574,9 @@ local function inflightPaint(x, y, w, h, box, c)
 
     local halfH = floor((bodyH - 10) / 2)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
-    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor, c.escSuffix)
-    drawThrustArray(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle)
+    local throttleColor = c.throttle and C.cyan or C.muted
+    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor, c.escText or "--")
+    drawThrustArray(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle, c.throttleText or "--", throttleColor)
 
     drawPanel(centerX, bodyY, centerW, bodyH, C.violet, nil)
     local cx = centerX + centerW * 0.5
@@ -546,7 +586,7 @@ local function inflightPaint(x, y, w, h, box, c)
     local rpmPct = rpmMax > 0 and clamp((c.rpm or 0) / rpmMax * 100, 0, 100) or 0
     local fuel = c.fuel or 0
     local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green)) or C.muted
-    local rpmColor = (c.rpm or 0) > rpmMax and C.red or C.violet
+    local rpmColor = c.rpm and (c.rpm > rpmMax and C.red or C.violet) or C.muted
 
     drawOrbit(cx, cy, radius * 1.12, radius * 0.54, C.line, 64, ORBIT_UNIT_64)
     drawOrbit(cx, cy, radius * 0.78, radius * 1.10, C.line, 64, ORBIT_UNIT_64)
@@ -556,23 +596,24 @@ local function inflightPaint(x, y, w, h, box, c)
     drawHex(cx, cy, radius * 0.44, c.reactorColor or C.muted)
     drawHex(cx, cy, radius * 0.26, C.violet)
 
-    drawTextAligned(cx - radius, cy - 58, radius * 2, fmt(c.rpm,0,""), "FONT_XXL", C.white, "center")
+    drawTextAligned(cx - radius, cy - 58, radius * 2, c.rpmText or "--", "FONT_XXL", c.rpm and C.white or C.muted, "center")
     drawTextAligned(cx - radius, cy - 2, radius * 2, "HEADSPEED", "FONT_XS", C.muted, "center")
     drawTextAligned(cx - radius, cy + 24, radius * 2, c.reactorState or "STATE --", "FONT_S", c.reactorColor or C.muted, "center")
     drawTextAligned(cx - radius, cy + 52, radius * 2, "EVENT HORIZON", "FONT_XXS", C.violet, "center")
-    drawTextAligned(centerX + 18, bodyY + bodyH - 34, centerW - 36, "MAX " .. fmt(c.maxRpm,0," RPM"), "FONT_XS", C.amber, "left")
-    drawTextAligned(centerX + 18, bodyY + bodyH - 34, centerW - 36, "ENERGY " .. fmt(c.fuel,0,"%"), "FONT_XS", fuelColor, "right")
+    drawTextAligned(centerX + 18, bodyY + bodyH - 34, centerW - 36, c.maxRpmText or "MAX --", "FONT_XS", c.maxRpm and C.amber or C.muted, "left")
+    drawTextAligned(centerX + 18, bodyY + bodyH - 34, centerW - 36, c.energyText or "ENERGY --", "FONT_XS", fuelColor, "right")
 
-    local currentColor = c.current and c.current >= c.currentWarn and C.red or C.cyan
-    local wattsColor = c.watts and c.watts >= c.wattsWarn and C.red or C.violet
+    local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.cyan) or C.muted
+    local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.violet) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.cyan)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.cyan) or C.muted
+    local consumedColor = c.consumed and C.amber or C.muted
 
     local nodeH = floor((bodyH - 30) / 4)
-    drawNode(rightX, bodyY, sideW, nodeH, "REACTOR LOAD", fmt(c.current,1," A"), currentColor, fmt(c.watts,0," W"))
-    drawNode(rightX, bodyY + nodeH + 10, sideW, nodeH, "POWER CORE", fmt(c.bec,1," V"), becColor, "BEC STABILITY")
-    drawNode(rightX, bodyY + (nodeH + 10) * 2, sideW, nodeH, "SIGNAL CONSTELLATION", fmt(c.link,0,"%"), linkColor, "LINK LOCK")
-    drawNode(rightX, bodyY + (nodeH + 10) * 3, sideW, nodeH, "MATTER CONSUMED", fmt(c.consumed,0," mAh"), wattsColor, "FLIGHT ENERGY")
+    drawNode(rightX, bodyY, sideW, nodeH, "REACTOR LOAD", c.currentText or "--", currentColor, c.wattsText or "--")
+    drawNode(rightX, bodyY + nodeH + 10, sideW, nodeH, "POWER CORE", c.becText or "--", becColor, "BEC STABILITY")
+    drawNode(rightX, bodyY + (nodeH + 10) * 2, sideW, nodeH, "SIGNAL CONSTELLATION", c.linkText or "--", linkColor, "LINK LOCK")
+    drawNode(rightX, bodyY + (nodeH + 10) * 3, sideW, nodeH, "MATTER CONSUMED", c.consumedText or "--", consumedColor, "FLIGHT ENERGY")
 end
 
 local boxes_cache

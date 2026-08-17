@@ -157,6 +157,21 @@ local function fmt(value, decimals, suffix, missing)
     return text .. (suffix or "")
 end
 
+local function roundedKey(value, decimals)
+    if value == nil then return false end
+    local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    return floor(value * multiplier + 0.5)
+end
+
+local function updateFormatted(cache, keyField, textField, value, decimals, suffix)
+    local key = roundedKey(value, decimals)
+    if cache[keyField] ~= key or cache[textField] == nil then
+        cache[keyField] = key
+        cache[textField] = fmt(value, decimals, suffix)
+    end
+    return key
+end
+
 local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
@@ -200,7 +215,7 @@ end
 
 local function drawNode(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", C.white, "left")
+    drawTextAligned(x + 11, y + 28, w - 22, value, "FONT_L", value == "--" and C.muted or C.white, "left")
     if subtitle then drawTextAligned(x + 11, y + h - 22, w - 22, subtitle, "FONT_XXS", C.muted, "left") end
 end
 
@@ -377,11 +392,15 @@ local function header_boxes()
     return header_boxes_cache
 end
 
-local function flightTimeText()
+local function updateFlightTime(cache)
     local session = rfsuite and rfsuite.session
     local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    seconds = max(0, seconds)
-    return format("%02d:%02d", floor(seconds / 60), floor(seconds % 60))
+    seconds = floor(max(0, seconds))
+    if cache._timerSecond ~= seconds or cache.flightTimeText == nil then
+        cache._timerSecond = seconds
+        cache.time = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+        cache.flightTimeText = "FLIGHT TIME " .. cache.time
+    end
 end
 
 local STATE_LABELS = {
@@ -440,6 +459,7 @@ local function postflightWakeup(box, telemetry)
     if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
         c.escUnit = resolvedEscUnit
         c.escSuffix = " " .. resolvedEscUnit
+        c._escTextKey = nil
     end
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
@@ -449,7 +469,28 @@ local function postflightWakeup(box, telemetry)
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
     c.altitude = stat(telemetry, "altitude", "max")
-    c.time = flightTimeText()
+    updateFlightTime(c)
+
+    updateFormatted(c, "_rpmTextKey", "rpmText", c.rpm, 0, " RPM")
+    updateFormatted(c, "_currentTextKey", "currentText", c.current, 1, " A")
+    updateFormatted(c, "_becTextKey", "becText", c.bec, 2, " V")
+    updateFormatted(c, "_escTextKey", "escText", c.esc, 0, c.escSuffix)
+    updateFormatted(c, "_wattsTextKey", "wattsText", c.watts, 0, " W")
+    updateFormatted(c, "_linkTextKey", "linkText", c.link, 0, "%")
+
+    local fuelKey = roundedKey(c.fuel, 0)
+    local consumedKey = roundedKey(c.consumed, 0)
+    local voltageKey = roundedKey(c.voltage, 1)
+    local altitudeKey = roundedKey(c.altitude, 0)
+    if c._summaryFuelKey ~= fuelKey or c._summaryConsumedKey ~= consumedKey or
+        c._summaryVoltageKey ~= voltageKey or c._summaryAltitudeKey ~= altitudeKey or c.summaryText == nil then
+        c._summaryFuelKey = fuelKey
+        c._summaryConsumedKey = consumedKey
+        c._summaryVoltageKey = voltageKey
+        c._summaryAltitudeKey = altitudeKey
+        c.summaryText = "ENERGY " .. fmt(c.fuel, 0, "%") .. "    CONSUMED " .. fmt(c.consumed, 0, " mAh") ..
+            "    PACK " .. fmt(c.voltage, 1, " V") .. "    ALT " .. fmt(c.altitude, 0, " m")
+    end
 
     c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
     c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
@@ -504,6 +545,8 @@ local function postflightWakeup(box, telemetry)
         c.missionSub = "ALL SYSTEMS WITHIN LIMITS"
     end
 
+    updateFormatted(c, "_integrityTextKey", "integrityText", c.integrity, 0, "%")
+
     return c
 end
 
@@ -540,10 +583,10 @@ local function postflightPaint(x, y, w, h, box, c)
     drawRingSegments(cx, cy, radius * 1.02, 32, c.integrity or 0, c.missionColor or C.muted, C.line, 11, 0, 360, INTEGRITY_RING_UNIT)
     drawHex(cx, cy, radius * 0.72, C.line2)
     drawHex(cx, cy, radius * 0.48, c.missionColor or C.muted)
-    drawTextAligned(cx - radius, cy - 45, radius * 2, fmt(c.integrity,0,"%"), "FONT_XXL", C.white, "center")
+    drawTextAligned(cx - radius, cy - 45, radius * 2, c.integrityText or "--", "FONT_XXL", c.integrity and C.white or C.muted, "center")
     drawTextAligned(cx - radius, cy + 12, radius * 2, "SYSTEM INTEGRITY", "FONT_XS", C.muted, "center")
     drawTextAligned(cx - radius, cy + 42, radius * 2, c.missionSub or "NO RECORDED TELEMETRY", "FONT_XXS", c.missionColor or C.muted, "center")
-    drawTextAligned(cx - radius, cy + radius * 1.28, radius * 2, "FLIGHT TIME " .. (c.time or "00:00"), "FONT_S", C.cyan, "center")
+    drawTextAligned(cx - radius, cy + radius * 1.28, radius * 2, c.flightTimeText or "FLIGHT TIME 00:00", "FONT_S", C.cyan, "center")
 
     local nw = floor(w * 0.19)
     local nh = floor(h * 0.16)
@@ -561,15 +604,15 @@ local function postflightPaint(x, y, w, h, box, c)
     local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.cyan) or C.muted
     local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.magenta) or C.muted
 
-    drawNode(leftX, y1, nw, nh, "MAX HEADSPEED", fmt(c.rpm,0," RPM"), rpmColor, "ORBITAL VELOCITY")
-    drawNode(leftX, y2, nw, nh, "PEAK CURRENT", fmt(c.current,1," A"), currentColor, "REACTOR LOAD")
-    drawNode(leftX, y3, nw, nh, "MIN BEC", fmt(c.bec,2," V"), becColor, "POWER CORE")
+    drawNode(leftX, y1, nw, nh, "MAX HEADSPEED", c.rpmText or "--", rpmColor, "ORBITAL VELOCITY")
+    drawNode(leftX, y2, nw, nh, "PEAK CURRENT", c.currentText or "--", currentColor, "REACTOR LOAD")
+    drawNode(leftX, y3, nw, nh, "MIN BEC", c.becText or "--", becColor, "POWER CORE")
 
-    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", fmt(c.esc,0,c.escSuffix), escColor, "THERMAL PLUME")
-    drawNode(rightX, y2, nw, nh, "PEAK POWER", fmt(c.watts,0," W"), wattsColor, "ENERGY RELEASE")
-    drawNode(rightX, y3, nw, nh, "MIN LINK", fmt(c.link,0,"%"), linkColor, "SIGNAL CONSTELLATION")
+    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", c.escText or "--", escColor, "THERMAL PLUME")
+    drawNode(rightX, y2, nw, nh, "PEAK POWER", c.wattsText or "--", wattsColor, "ENERGY RELEASE")
+    drawNode(rightX, y3, nw, nh, "MIN LINK", c.linkText or "--", linkColor, "SIGNAL CONSTELLATION")
 
-    drawTextAligned(cx - radius * 2.1, y + h - 46, radius * 4.2, "ENERGY " .. fmt(c.fuel,0,"%") .. "    CONSUMED " .. fmt(c.consumed,0," mAh") .. "    PACK " .. fmt(c.voltage,1," V") .. "    ALT " .. fmt(c.altitude,0," m"), "FONT_XS", fuelColor, "center")
+    drawTextAligned(cx - radius * 2.1, y + h - 46, radius * 4.2, c.summaryText or "ENERGY --    CONSUMED --    PACK --    ALT --", "FONT_XS", fuelColor, "center")
 end
 
 local boxes_cache
