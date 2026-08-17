@@ -80,39 +80,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -172,48 +205,53 @@ local function drawNode(x, y, w, h, title, value, accent, subtitle)
 end
 
 local HEX_UNIT = {}
-for i = 0, 6 do
-    local a = rad(30 + (i % 6) * 60)
+for i = 0, 5 do
+    local a = rad(30 + i * 60)
     HEX_UNIT[i + 1] = {cos(a), sin(a)}
 end
 
 local function drawHex(cx, cy, radius, color)
-    local px, py = nil, nil
-    local firstx, firsty = nil, nil
+    local first = HEX_UNIT[1]
+    local firstx = floor(cx + first[1] * radius)
+    local firsty = floor(cy + first[2] * radius)
+    local px, py = firstx, firsty
     lcd.color(color)
-    for i = 0, 6 do
-        local u = HEX_UNIT[i + 1]
+    for i = 2, #HEX_UNIT do
+        local u = HEX_UNIT[i]
         local x = floor(cx + u[1] * radius)
         local y = floor(cy + u[2] * radius)
-        if i == 0 then firstx, firsty = x, y else lcd.drawLine(px, py, x, y) end
+        lcd.drawLine(px, py, x, y)
         px, py = x, y
     end
-    if px and firstx then lcd.drawLine(px, py, firstx, firsty) end
+    lcd.drawLine(px, py, firstx, firsty)
 end
 
 local RING_UNIT_CACHE = {}
 local function getRingUnit(count, startAngle, sweep)
-    local key = count .. ":" .. startAngle .. ":" .. sweep
-    local unit = RING_UNIT_CACHE[key]
+    local byCount = RING_UNIT_CACHE[count]
+    if not byCount then byCount = {}; RING_UNIT_CACHE[count] = byCount end
+    local byStart = byCount[startAngle]
+    if not byStart then byStart = {}; byCount[startAngle] = byStart end
+    local unit = byStart[sweep]
     if not unit then
         unit = {}
         for i = 0, count - 1 do
             local a = rad(startAngle + sweep * i / count)
             unit[i + 1] = {cos(a), sin(a)}
         end
-        RING_UNIT_CACHE[key] = unit
+        byStart[sweep] = unit
     end
     return unit
 end
 
-local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep)
+local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep, unit)
     count = count or 24
     percent = clamp(percent or 0, 0, 100)
     thickness = thickness or 8
     startAngle = startAngle or 0
     sweep = sweep or 360
     local active = percent > 0 and max(1, min(count, floor(percent * count / 100 + 0.999))) or 0
-    local unit = getRingUnit(count, startAngle, sweep)
+    unit = unit or getRingUnit(count, startAngle, sweep)
     for i = 0, count - 1 do
         local u = unit[i + 1]
         local r1 = radius - thickness
@@ -227,14 +265,29 @@ local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dim
     end
 end
 
-local function drawOrbit(cx, cy, rx, ry, color, segments)
+local ORBIT_UNIT_CACHE = {}
+local function getOrbitUnit(segments)
+    local unit = ORBIT_UNIT_CACHE[segments]
+    if not unit then
+        unit = {}
+        for i = 0, segments do
+            local a = rad(360 * i / segments)
+            unit[i + 1] = {cos(a), sin(a)}
+        end
+        ORBIT_UNIT_CACHE[segments] = unit
+    end
+    return unit
+end
+
+local function drawOrbit(cx, cy, rx, ry, color, segments, unit)
     segments = segments or 48
     local lastx, lasty
+    unit = unit or getOrbitUnit(segments)
     lcd.color(color)
-    for i = 0, segments do
-        local a = rad(360 * i / segments)
-        local x = floor(cx + cos(a) * rx)
-        local y = floor(cy + sin(a) * ry)
+    for i = 1, #unit do
+        local u = unit[i]
+        local x = floor(cx + u[1] * rx)
+        local y = floor(cy + u[2] * ry)
         if lastx then lcd.drawLine(lastx, lasty, x, y) end
         lastx, lasty = x, y
     end
@@ -373,31 +426,68 @@ end
 
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
+local ORBIT_UNIT_64 = getOrbitUnit(64)
+local INTEGRITY_RING_UNIT = getRingUnit(32, 0, 360)
 
 local function postflightWakeup(box, telemetry)
     local c = box._cache or {}
     box._cache = c
     c.rpm = stat(telemetry, "rpm", "max", "headspeed", "erpm")
-    c.esc = stat(telemetry, "temp_esc", "max", "esc_temp")
+    local escUnit
+    c.esc, escUnit = stat(telemetry, "temp_esc", "max", "esc_temp")
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
     c.bec = stat(telemetry, "bec_voltage", "min", "bec")
-    c.link = stat(telemetry, "link", "min", "vfr")
+    c.link = stat(telemetry, "vfr", "min")
     c.fuel = stat(telemetry, "smartfuel", "min")
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
     c.altitude = stat(telemetry, "altitude", "max")
     c.time = flightTimeText()
 
-    local faults, cautions = 0, 0
-    if c.esc and c.esc >= getThemeValue("esc_max") then faults = faults + 1 elseif c.esc and c.esc >= getThemeValue("esc_warn") then cautions = cautions + 1 end
-    if c.bec and c.bec < getThemeValue("bec_min") then faults = faults + 1 elseif c.bec and c.bec < getThemeValue("bec_warn") then cautions = cautions + 1 end
-    if c.fuel and c.fuel <= getThemeValue("fuel_warn") then cautions = cautions + 1 end
-    if c.link and c.link < getThemeValue("link_warn") then cautions = cautions + 1 end
-    if c.current and c.current >= getThemeValue("current_warn") then cautions = cautions + 1 end
-    if c.watts and c.watts >= getThemeValue("watts_warn") then cautions = cautions + 1 end
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.linkWarn = getThemeValue("link_warn")
+    c.currentWarn = getThemeValue("current_warn")
+    c.wattsWarn = getThemeValue("watts_warn")
+    c.rpmMax = getThemeValue("rpm_max")
 
-    if faults > 0 then
+    local available = 0
+    if c.rpm ~= nil then available = available + 1 end
+    if c.esc ~= nil then available = available + 1 end
+    if c.current ~= nil then available = available + 1 end
+    if c.watts ~= nil then available = available + 1 end
+    if c.bec ~= nil then available = available + 1 end
+    if c.link ~= nil then available = available + 1 end
+    if c.fuel ~= nil then available = available + 1 end
+    if c.consumed ~= nil then available = available + 1 end
+    if c.voltage ~= nil then available = available + 1 end
+    if c.altitude ~= nil then available = available + 1 end
+
+    local faults, cautions = 0, 0
+    if c.esc and c.esc >= c.escMax then faults = faults + 1 elseif c.esc and c.esc >= c.escWarn then cautions = cautions + 1 end
+    if c.bec and c.bec < c.becMin then faults = faults + 1 elseif c.bec and c.bec < c.becWarn then cautions = cautions + 1 end
+    if c.fuel and c.fuel <= c.fuelWarn then cautions = cautions + 1 end
+    if c.link and c.link < c.linkWarn then cautions = cautions + 1 end
+    if c.current and c.current >= c.currentWarn then cautions = cautions + 1 end
+    if c.watts and c.watts >= c.wattsWarn then cautions = cautions + 1 end
+    if c.rpm and c.rpm > c.rpmMax * 1.05 then cautions = cautions + 1 end
+
+    if available == 0 then
+        c.mission = "NO FLIGHT DATA"
+        c.missionColor = C.muted
+        c.integrity = nil
+        c.missionSub = "NO RECORDED TELEMETRY"
+    elseif faults > 0 then
         c.mission = "SYSTEM INSPECTION"
         c.missionColor = C.red
         c.integrity = max(15, 55 - faults * 20 - cautions * 8)
@@ -406,7 +496,7 @@ local function postflightWakeup(box, telemetry)
         c.mission = "MISSION REVIEW"
         c.missionColor = C.amber
         c.integrity = max(55, 100 - cautions * 10)
-        c.missionSub = tostring(cautions) .. " ANOMALY" .. (cautions == 1 and "" or "IES")
+        c.missionSub = cautions == 1 and "1 ANOMALY" or (tostring(cautions) .. " ANOMALIES")
     else
         c.mission = "MISSION NOMINAL"
         c.missionColor = C.green
@@ -414,54 +504,45 @@ local function postflightWakeup(box, telemetry)
         c.missionSub = "ALL SYSTEMS WITHIN LIMITS"
     end
 
-    -- Cache theme-configured thresholds here (wakeup runs on a rate-limited
-    -- cycle) instead of calling getThemeValue() from paint(), which runs on
-    -- every invalidate.
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
-    c.becMin = getThemeValue("bec_min")
-    c.becWarn = getThemeValue("bec_warn")
-    c.fuelWarn = getThemeValue("fuel_warn")
-    c.linkWarn = getThemeValue("link_warn")
-    c.currentWarn = getThemeValue("current_warn")
-    c.wattsWarn = getThemeValue("watts_warn")
     return c
 end
 
 local function postflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
     c.linkWarn = c.linkWarn or getThemeValue("link_warn")
     c.currentWarn = c.currentWarn or getThemeValue("current_warn")
     c.wattsWarn = c.wattsWarn or getThemeValue("watts_warn")
+    c.rpmMax = c.rpmMax or getThemeValue("rpm_max")
 
     lcd.color(C.space)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
     drawStars(x, y, w, h)
 
     drawTextAligned(x + 14, y + 8, w * 0.45, "SINGULARITY // MISSION DEBRIEF", "FONT_STD", C.violet, "left")
-    drawTextAligned(x + w - 280, y + 8, 266, c.mission or "MISSION NOMINAL", "FONT_STD", c.missionColor or C.green, "right")
+    drawTextAligned(x + w - 280, y + 8, 266, c.mission or "NO FLIGHT DATA", "FONT_STD", c.missionColor or C.muted, "right")
 
     local cx = x + w * 0.5
     local cy = y + h * 0.48
     local radius = min(w, h) * 0.19
-    drawOrbit(cx, cy, radius * 1.65, radius * 0.70, C.line, 64)
-    drawOrbit(cx, cy, radius * 1.10, radius * 1.20, C.line, 64)
-    drawRingSegments(cx, cy, radius * 1.02, 32, c.integrity or 0, c.missionColor or C.green, C.line, 11, 0, 360)
+    drawOrbit(cx, cy, radius * 1.65, radius * 0.70, C.line, 64, ORBIT_UNIT_64)
+    drawOrbit(cx, cy, radius * 1.10, radius * 1.20, C.line, 64, ORBIT_UNIT_64)
+    drawRingSegments(cx, cy, radius * 1.02, 32, c.integrity or 0, c.missionColor or C.muted, C.line, 11, 0, 360, INTEGRITY_RING_UNIT)
     drawHex(cx, cy, radius * 0.72, C.line2)
-    drawHex(cx, cy, radius * 0.48, c.missionColor or C.green)
+    drawHex(cx, cy, radius * 0.48, c.missionColor or C.muted)
     drawTextAligned(cx - radius, cy - 45, radius * 2, fmt(c.integrity,0,"%"), "FONT_XXL", C.white, "center")
     drawTextAligned(cx - radius, cy + 12, radius * 2, "SYSTEM INTEGRITY", "FONT_XS", C.muted, "center")
-    drawTextAligned(cx - radius, cy + 42, radius * 2, c.missionSub or "ALL SYSTEMS WITHIN LIMITS", "FONT_XXS", c.missionColor or C.green, "center")
+    drawTextAligned(cx - radius, cy + 42, radius * 2, c.missionSub or "NO RECORDED TELEMETRY", "FONT_XXS", c.missionColor or C.muted, "center")
     drawTextAligned(cx - radius, cy + radius * 1.28, radius * 2, "FLIGHT TIME " .. (c.time or "00:00"), "FONT_S", C.cyan, "center")
 
     local nw = floor(w * 0.19)
@@ -475,17 +556,20 @@ local function postflightPaint(x, y, w, h, box, c)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
     local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.cyan)) or C.muted
     local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.cyan) or C.muted
-    local fuelColor = c.fuel and c.fuel <= c.fuelWarn and C.amber or C.green
+    local fuelColor = c.fuel and (c.fuel <= c.fuelWarn and C.amber or C.green) or C.muted
+    local rpmColor = c.rpm and (c.rpm > c.rpmMax * 1.05 and C.amber or C.violet) or C.muted
+    local currentColor = c.current and (c.current >= c.currentWarn and C.red or C.cyan) or C.muted
+    local wattsColor = c.watts and (c.watts >= c.wattsWarn and C.red or C.magenta) or C.muted
 
-    drawNode(leftX, y1, nw, nh, "MAX HEADSPEED", fmt(c.rpm,0," RPM"), C.violet, "ORBITAL VELOCITY")
-    drawNode(leftX, y2, nw, nh, "PEAK CURRENT", fmt(c.current,1," A"), C.cyan, "REACTOR LOAD")
+    drawNode(leftX, y1, nw, nh, "MAX HEADSPEED", fmt(c.rpm,0," RPM"), rpmColor, "ORBITAL VELOCITY")
+    drawNode(leftX, y2, nw, nh, "PEAK CURRENT", fmt(c.current,1," A"), currentColor, "REACTOR LOAD")
     drawNode(leftX, y3, nw, nh, "MIN BEC", fmt(c.bec,2," V"), becColor, "POWER CORE")
 
-    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", fmt(c.esc,0," C"), escColor, "THERMAL PLUME")
-    drawNode(rightX, y2, nw, nh, "PEAK POWER", fmt(c.watts,0," W"), C.magenta, "ENERGY RELEASE")
+    drawNode(rightX, y1, nw, nh, "MAX ESC TEMP", fmt(c.esc,0,c.escSuffix), escColor, "THERMAL PLUME")
+    drawNode(rightX, y2, nw, nh, "PEAK POWER", fmt(c.watts,0," W"), wattsColor, "ENERGY RELEASE")
     drawNode(rightX, y3, nw, nh, "MIN LINK", fmt(c.link,0,"%"), linkColor, "SIGNAL CONSTELLATION")
 
-    drawTextAligned(cx - radius * 2.1, y + h - 46, radius * 4.2, "ENERGY " .. fmt(c.fuel,0,"%") .. "    CONSUMED " .. fmt(c.consumed,0," mAh") .. "    PACK " .. fmt(c.voltage,1," V") .. "    ALT " .. fmt(c.altitude,0," ft"), "FONT_XS", fuelColor, "center")
+    drawTextAligned(cx - radius * 2.1, y + h - 46, radius * 4.2, "ENERGY " .. fmt(c.fuel,0,"%") .. "    CONSUMED " .. fmt(c.consumed,0," mAh") .. "    PACK " .. fmt(c.voltage,1," V") .. "    ALT " .. fmt(c.altitude,0," m"), "FONT_XS", fuelColor, "center")
 end
 
 local boxes_cache

@@ -80,39 +80,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -172,48 +205,53 @@ local function drawNode(x, y, w, h, title, value, accent, subtitle)
 end
 
 local HEX_UNIT = {}
-for i = 0, 6 do
-    local a = rad(30 + (i % 6) * 60)
+for i = 0, 5 do
+    local a = rad(30 + i * 60)
     HEX_UNIT[i + 1] = {cos(a), sin(a)}
 end
 
 local function drawHex(cx, cy, radius, color)
-    local px, py = nil, nil
-    local firstx, firsty = nil, nil
+    local first = HEX_UNIT[1]
+    local firstx = floor(cx + first[1] * radius)
+    local firsty = floor(cy + first[2] * radius)
+    local px, py = firstx, firsty
     lcd.color(color)
-    for i = 0, 6 do
-        local u = HEX_UNIT[i + 1]
+    for i = 2, #HEX_UNIT do
+        local u = HEX_UNIT[i]
         local x = floor(cx + u[1] * radius)
         local y = floor(cy + u[2] * radius)
-        if i == 0 then firstx, firsty = x, y else lcd.drawLine(px, py, x, y) end
+        lcd.drawLine(px, py, x, y)
         px, py = x, y
     end
-    if px and firstx then lcd.drawLine(px, py, firstx, firsty) end
+    lcd.drawLine(px, py, firstx, firsty)
 end
 
 local RING_UNIT_CACHE = {}
 local function getRingUnit(count, startAngle, sweep)
-    local key = count .. ":" .. startAngle .. ":" .. sweep
-    local unit = RING_UNIT_CACHE[key]
+    local byCount = RING_UNIT_CACHE[count]
+    if not byCount then byCount = {}; RING_UNIT_CACHE[count] = byCount end
+    local byStart = byCount[startAngle]
+    if not byStart then byStart = {}; byCount[startAngle] = byStart end
+    local unit = byStart[sweep]
     if not unit then
         unit = {}
         for i = 0, count - 1 do
             local a = rad(startAngle + sweep * i / count)
             unit[i + 1] = {cos(a), sin(a)}
         end
-        RING_UNIT_CACHE[key] = unit
+        byStart[sweep] = unit
     end
     return unit
 end
 
-local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep)
+local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep, unit)
     count = count or 24
     percent = clamp(percent or 0, 0, 100)
     thickness = thickness or 8
     startAngle = startAngle or 0
     sweep = sweep or 360
     local active = percent > 0 and max(1, min(count, floor(percent * count / 100 + 0.999))) or 0
-    local unit = getRingUnit(count, startAngle, sweep)
+    unit = unit or getRingUnit(count, startAngle, sweep)
     for i = 0, count - 1 do
         local u = unit[i + 1]
         local r1 = radius - thickness
@@ -227,14 +265,29 @@ local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dim
     end
 end
 
-local function drawOrbit(cx, cy, rx, ry, color, segments)
+local ORBIT_UNIT_CACHE = {}
+local function getOrbitUnit(segments)
+    local unit = ORBIT_UNIT_CACHE[segments]
+    if not unit then
+        unit = {}
+        for i = 0, segments do
+            local a = rad(360 * i / segments)
+            unit[i + 1] = {cos(a), sin(a)}
+        end
+        ORBIT_UNIT_CACHE[segments] = unit
+    end
+    return unit
+end
+
+local function drawOrbit(cx, cy, rx, ry, color, segments, unit)
     segments = segments or 48
     local lastx, lasty
+    unit = unit or getOrbitUnit(segments)
     lcd.color(color)
-    for i = 0, segments do
-        local a = rad(360 * i / segments)
-        local x = floor(cx + cos(a) * rx)
-        local y = floor(cy + sin(a) * ry)
+    for i = 1, #unit do
+        local u = unit[i]
+        local x = floor(cx + u[1] * rx)
+        local y = floor(cy + u[2] * ry)
         if lastx then lcd.drawLine(lastx, lasty, x, y) end
         lastx, lasty = x, y
     end
@@ -373,19 +426,29 @@ end
 
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
+local ORBIT_UNIT_64 = getOrbitUnit(64)
+local RPM_RING_UNIT = getRingUnit(36, 145, 250)
+local FUEL_RING_UNIT = getRingUnit(30, 0, 360)
 
 local function inflightWakeup(box, telemetry)
     local c = box._cache or {maxRpm = 0}
     box._cache = c
     c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm") or 0
-    c.maxRpm = max(c.maxRpm or 0, c.rpm)
+    c.maxRpm = stat(telemetry, "rpm", "max", "headspeed", "erpm") or c.rpm
     c.throttle = sensor(telemetry, "throttle_percent", "throttle") or 0
-    c.esc = sensor(telemetry, "temp_esc", "esc_temp")
+    local escUnit
+    c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
     c.fuel = sensor(telemetry, "smartfuel")
     c.current = sensor(telemetry, "current")
     c.watts = sensor(telemetry, "watts")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
-    c.link = sensor(telemetry, "link", "vfr")
+    c.link = sensor(telemetry, "vfr")
     c.consumed = sensor(telemetry, "smartconsumption", "consumption")
     c.reactorState, c.reactorColor = getReactorState(telemetry)
     c.timer = flightTimeText()
@@ -393,8 +456,8 @@ local function inflightWakeup(box, telemetry)
     -- Cache theme-configured thresholds here (wakeup runs on a rate-limited
     -- cycle) instead of calling getThemeValue() from paint(), which runs on
     -- every invalidate.
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.rpmMax = getThemeValue("rpm_max")
     c.fuelWarn = getThemeValue("fuel_warn")
     c.currentWarn = getThemeValue("current_warn")
@@ -405,7 +468,7 @@ local function inflightWakeup(box, telemetry)
     return c
 end
 
-local function drawThermalPlume(x, y, w, h, value, maximum, color)
+local function drawThermalPlume(x, y, w, h, value, maximum, color, suffix)
     drawPanel(x, y, w, h, color, "THERMAL PLUME")
     local pct = maximum > 0 and clamp((value or 0) / maximum, 0, 1) or 0
     local baseY = y + h - 28
@@ -417,7 +480,7 @@ local function drawThermalPlume(x, y, w, h, value, maximum, color)
         lcd.color(i < 3 and C.cyanDim or color)
         lcd.drawFilledRectangle(bx, floor(baseY - bh), bw, bh)
     end
-    drawTextAligned(x + 10, y + 30, w - 20, fmt(value,0," C"), "FONT_L", C.white, "center")
+    drawTextAligned(x + 10, y + 30, w - 20, fmt(value,0,suffix), "FONT_L", C.white, "center")
 end
 
 local function drawThrustArray(x, y, w, h, throttle)
@@ -437,14 +500,15 @@ local function drawThrustArray(x, y, w, h, throttle)
 end
 
 local function inflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
     -- lookup so we never compare a number against a nil threshold.
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.rpmMax = c.rpmMax or getThemeValue("rpm_max")
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
     c.currentWarn = c.currentWarn or getThemeValue("current_warn")
@@ -471,7 +535,7 @@ local function inflightPaint(x, y, w, h, box, c)
 
     local halfH = floor((bodyH - 10) / 2)
     local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
-    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor)
+    drawThermalPlume(leftX, bodyY, sideW, halfH, c.esc, c.escMax, escColor, c.escSuffix)
     drawThrustArray(leftX, bodyY + halfH + 10, sideW, halfH, c.throttle)
 
     drawPanel(centerX, bodyY, centerW, bodyH, C.violet, nil)
@@ -481,13 +545,13 @@ local function inflightPaint(x, y, w, h, box, c)
     local rpmMax = c.rpmMax
     local rpmPct = rpmMax > 0 and clamp((c.rpm or 0) / rpmMax * 100, 0, 100) or 0
     local fuel = c.fuel or 0
-    local fuelColor = fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green)
+    local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green)) or C.muted
     local rpmColor = (c.rpm or 0) > rpmMax and C.red or C.violet
 
-    drawOrbit(cx, cy, radius * 1.12, radius * 0.54, C.line, 64)
-    drawOrbit(cx, cy, radius * 0.78, radius * 1.10, C.line, 64)
-    drawRingSegments(cx, cy, radius * 1.05, 36, rpmPct, rpmColor, C.line, 13, 145, 250)
-    drawRingSegments(cx, cy, radius * 0.86, 30, fuel, fuelColor, C.line, 10, 0, 360)
+    drawOrbit(cx, cy, radius * 1.12, radius * 0.54, C.line, 64, ORBIT_UNIT_64)
+    drawOrbit(cx, cy, radius * 0.78, radius * 1.10, C.line, 64, ORBIT_UNIT_64)
+    drawRingSegments(cx, cy, radius * 1.05, 36, rpmPct, rpmColor, C.line, 13, 145, 250, RPM_RING_UNIT)
+    drawRingSegments(cx, cy, radius * 0.86, 30, fuel, fuelColor, C.line, 10, 0, 360, FUEL_RING_UNIT)
     drawHex(cx, cy, radius * 0.62, C.line2)
     drawHex(cx, cy, radius * 0.44, c.reactorColor or C.muted)
     drawHex(cx, cy, radius * 0.26, C.violet)

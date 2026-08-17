@@ -80,39 +80,72 @@ local function getThemeValue(key)
     return value or DEFAULTS[key]
 end
 
+local function readSensor(telemetry, name)
+    local value, _, unit = telemetry.getSensor(name)
+    value = tonumber(value)
+    if value ~= nil then return value, unit end
+    return nil, nil
+end
+
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value, unit = readSensor(telemetry, name)
+    if value ~= nil then return value, unit end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias1)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value, unit = readSensor(telemetry, alias2)
+        if value ~= nil then return value, unit end
     end
     return nil
 end
 
+local function readStat(telemetry, source, statType)
+    local data
+    if (source == "temp_esc" or source == "temp_mcu") and telemetry.getSensorStats then
+        data = telemetry.getSensorStats(source)
+    else
+        local stats = telemetry.sensorStats
+        data = stats and stats[source]
+    end
+    local value = tonumber(data and data[statType])
+    if value ~= nil then return value, data and data.unit end
+    return nil, nil
+end
+
 local function stat(telemetry, source, statType, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
-    local stats = telemetry and telemetry.sensorStats
-    local data = stats and stats[source]
-    local value = data and data[statType]
-    if value ~= nil then return tonumber(value) end
+    if not telemetry then return nil end
+    local value, unit = readStat(telemetry, source, statType)
+    if value ~= nil then return value, unit end
     if alias1 then
-        data = stats and stats[alias1]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias1, statType)
+        if value ~= nil then return value, unit end
     end
     if alias2 then
-        data = stats and stats[alias2]
-        value = data and data[statType]
-        if value ~= nil then return tonumber(value) end
+        value, unit = readStat(telemetry, alias2, statType)
+        if value ~= nil then return value, unit end
     end
     return nil
+end
+
+local function temperatureUnitLabel(unit)
+    if unit == nil then
+        local general = rfsuite and rfsuite.preferences and rfsuite.preferences.general
+        unit = tonumber(general and general.temperature_unit)
+    end
+    if unit == 1 then return "°F" end
+    if unit == 0 then return "°C" end
+    if type(unit) == "string" and unit ~= "" then return unit end
+    return "°C"
+end
+
+local function temperatureThreshold(value, unit)
+    if unit == 1 or unit == "°F" or unit == "F" then return value * 1.8 + 32 end
+    return value
 end
 
 local function fmt(value, decimals, suffix, missing)
@@ -172,48 +205,53 @@ local function drawNode(x, y, w, h, title, value, accent, subtitle)
 end
 
 local HEX_UNIT = {}
-for i = 0, 6 do
-    local a = rad(30 + (i % 6) * 60)
+for i = 0, 5 do
+    local a = rad(30 + i * 60)
     HEX_UNIT[i + 1] = {cos(a), sin(a)}
 end
 
 local function drawHex(cx, cy, radius, color)
-    local px, py = nil, nil
-    local firstx, firsty = nil, nil
+    local first = HEX_UNIT[1]
+    local firstx = floor(cx + first[1] * radius)
+    local firsty = floor(cy + first[2] * radius)
+    local px, py = firstx, firsty
     lcd.color(color)
-    for i = 0, 6 do
-        local u = HEX_UNIT[i + 1]
+    for i = 2, #HEX_UNIT do
+        local u = HEX_UNIT[i]
         local x = floor(cx + u[1] * radius)
         local y = floor(cy + u[2] * radius)
-        if i == 0 then firstx, firsty = x, y else lcd.drawLine(px, py, x, y) end
+        lcd.drawLine(px, py, x, y)
         px, py = x, y
     end
-    if px and firstx then lcd.drawLine(px, py, firstx, firsty) end
+    lcd.drawLine(px, py, firstx, firsty)
 end
 
 local RING_UNIT_CACHE = {}
 local function getRingUnit(count, startAngle, sweep)
-    local key = count .. ":" .. startAngle .. ":" .. sweep
-    local unit = RING_UNIT_CACHE[key]
+    local byCount = RING_UNIT_CACHE[count]
+    if not byCount then byCount = {}; RING_UNIT_CACHE[count] = byCount end
+    local byStart = byCount[startAngle]
+    if not byStart then byStart = {}; byCount[startAngle] = byStart end
+    local unit = byStart[sweep]
     if not unit then
         unit = {}
         for i = 0, count - 1 do
             local a = rad(startAngle + sweep * i / count)
             unit[i + 1] = {cos(a), sin(a)}
         end
-        RING_UNIT_CACHE[key] = unit
+        byStart[sweep] = unit
     end
     return unit
 end
 
-local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep)
+local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dimColor, thickness, startAngle, sweep, unit)
     count = count or 24
     percent = clamp(percent or 0, 0, 100)
     thickness = thickness or 8
     startAngle = startAngle or 0
     sweep = sweep or 360
     local active = percent > 0 and max(1, min(count, floor(percent * count / 100 + 0.999))) or 0
-    local unit = getRingUnit(count, startAngle, sweep)
+    unit = unit or getRingUnit(count, startAngle, sweep)
     for i = 0, count - 1 do
         local u = unit[i + 1]
         local r1 = radius - thickness
@@ -227,14 +265,29 @@ local function drawRingSegments(cx, cy, radius, count, percent, activeColor, dim
     end
 end
 
-local function drawOrbit(cx, cy, rx, ry, color, segments)
+local ORBIT_UNIT_CACHE = {}
+local function getOrbitUnit(segments)
+    local unit = ORBIT_UNIT_CACHE[segments]
+    if not unit then
+        unit = {}
+        for i = 0, segments do
+            local a = rad(360 * i / segments)
+            unit[i + 1] = {cos(a), sin(a)}
+        end
+        ORBIT_UNIT_CACHE[segments] = unit
+    end
+    return unit
+end
+
+local function drawOrbit(cx, cy, rx, ry, color, segments, unit)
     segments = segments or 48
     local lastx, lasty
+    unit = unit or getOrbitUnit(segments)
     lcd.color(color)
-    for i = 0, segments do
-        local a = rad(360 * i / segments)
-        local x = floor(cx + cos(a) * rx)
-        local y = floor(cy + sin(a) * ry)
+    for i = 1, #unit do
+        local u = unit[i]
+        local x = floor(cx + u[1] * rx)
+        local y = floor(cy + u[2] * ry)
         if lastx then lcd.drawLine(lastx, lasty, x, y) end
         lastx, lasty = x, y
     end
@@ -373,6 +426,8 @@ end
 
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
+local ORBIT_UNIT_64 = getOrbitUnit(64)
+local FUEL_RING_UNIT = getRingUnit(30, 0, 360)
 
 local function preflightWakeup(box, telemetry)
     local c = box._cache or {}
@@ -380,47 +435,61 @@ local function preflightWakeup(box, telemetry)
 
     c.fuel = sensor(telemetry, "smartfuel")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
-    c.esc = sensor(telemetry, "temp_esc", "esc_temp")
-    c.link = sensor(telemetry, "link", "vfr")
+    local escUnit
+    c.esc, escUnit = sensor(telemetry, "temp_esc", "esc_temp")
+    local resolvedEscUnit = temperatureUnitLabel(escUnit)
+    -- Rebuild the display suffix only when the temperature unit changes.
+    if c.escUnit ~= resolvedEscUnit or c.escSuffix == nil then
+        c.escUnit = resolvedEscUnit
+        c.escSuffix = " " .. resolvedEscUnit
+    end
+    c.link = sensor(telemetry, "vfr")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
     c.voltage = sensor(telemetry, "voltage")
     c.reactorState, c.reactorColor = getReactorState(telemetry)
 
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.escMax = temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
+    c.linkWarn = getThemeValue("link_warn")
+
     local available, faults, warnings = 0, 0, 0
-    local issues = {}
+    local firstIssue
     if c.fuel ~= nil then
         available = available + 1
-        if c.fuel <= getThemeValue("fuel_warn") then
+        if c.fuel <= c.fuelWarn then
             faults = faults + 1
-            issues[#issues+1] = "ENERGY RESERVE " .. fmt(c.fuel,0,"%")
+            firstIssue = firstIssue or ("ENERGY RESERVE " .. fmt(c.fuel,0,"%"))
         end
     end
     if c.bec ~= nil then
         available = available + 1
-        if c.bec < getThemeValue("bec_min") then
+        if c.bec < c.becMin then
             faults = faults + 1
-            issues[#issues+1] = "BEC CORE " .. fmt(c.bec,1,"V")
-        elseif c.bec < getThemeValue("bec_warn") then
+            firstIssue = firstIssue or ("BEC CORE " .. fmt(c.bec,1,"V"))
+        elseif c.bec < c.becWarn then
             warnings = warnings + 1
-            issues[#issues+1] = "BEC LOW " .. fmt(c.bec,1,"V")
+            firstIssue = firstIssue or ("BEC LOW " .. fmt(c.bec,1,"V"))
         end
     end
     if c.esc ~= nil then
         available = available + 1
-        if c.esc >= getThemeValue("esc_max") then
+        if c.esc >= c.escMax then
             faults = faults + 1
-            issues[#issues+1] = "THERMAL LIMIT " .. fmt(c.esc,0,"C")
-        elseif c.esc >= getThemeValue("esc_warn") then
+            firstIssue = firstIssue or ("THERMAL LIMIT " .. fmt(c.esc,0,c.escUnit))
+        elseif c.esc >= c.escWarn then
             warnings = warnings + 1
-            issues[#issues+1] = "THERMAL CAUTION " .. fmt(c.esc,0,"C")
+            firstIssue = firstIssue or ("THERMAL CAUTION " .. fmt(c.esc,0,c.escUnit))
         end
     end
     if c.link ~= nil then
         available = available + 1
-        if c.link < getThemeValue("link_warn") then
+        if c.link < c.linkWarn then
             warnings = warnings + 1
-            issues[#issues+1] = "LINK LOCK " .. fmt(c.link,0,"%")
+            firstIssue = firstIssue or ("LINK LOCK " .. fmt(c.link,0,"%"))
         end
     end
 
@@ -431,31 +500,21 @@ local function preflightWakeup(box, telemetry)
     elseif faults > 0 then
         c.launch = "ABORT"
         c.launchColor = C.red
-        c.launchSub = issues[1] or "CRITICAL SYSTEM"
+        c.launchSub = firstIssue or "CRITICAL SYSTEM"
     elseif warnings > 0 then
         c.launch = "HOLD"
         c.launchColor = C.amber
-        c.launchSub = issues[1] or "SYSTEM REVIEW"
+        c.launchSub = firstIssue or "SYSTEM REVIEW"
     else
         c.launch = "CLEAR FOR LAUNCH"
         c.launchColor = C.green
         c.launchSub = "ALL SYSTEMS NOMINAL"
     end
 
-    -- Cache theme-configured thresholds here (wakeup runs on a rate-limited
-    -- cycle) instead of calling getThemeValue() from paint(), which runs on
-    -- every invalidate.
-    c.fuelWarn = getThemeValue("fuel_warn")
-    c.becMin = getThemeValue("bec_min")
-    c.becWarn = getThemeValue("bec_warn")
-    c.escMax = getThemeValue("esc_max")
-    c.escWarn = getThemeValue("esc_warn")
-    c.linkWarn = getThemeValue("link_warn")
     return c
 end
 
 local function preflightPaint(x, y, w, h, box, c)
-    x, y = utils.applyOffset(x, y, box)
     c = c or box._cache or {}
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
@@ -464,8 +523,10 @@ local function preflightPaint(x, y, w, h, box, c)
     c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
     c.becMin = c.becMin or getThemeValue("bec_min")
     c.becWarn = c.becWarn or getThemeValue("bec_warn")
-    c.escMax = c.escMax or getThemeValue("esc_max")
-    c.escWarn = c.escWarn or getThemeValue("esc_warn")
+    c.escUnit = c.escUnit or "°C"
+    c.escSuffix = c.escSuffix or " °C"
+    c.escMax = c.escMax or temperatureThreshold(getThemeValue("esc_max"), c.escUnit)
+    c.escWarn = c.escWarn or temperatureThreshold(getThemeValue("esc_warn"), c.escUnit)
     c.linkWarn = c.linkWarn or getThemeValue("link_warn")
 
     lcd.color(C.space)
@@ -479,11 +540,11 @@ local function preflightPaint(x, y, w, h, box, c)
     local cy = y + h * 0.49
     local coreR = min(w, h) * 0.18
     local fuel = c.fuel or 0
-    local fuelColor = fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green)
+    local fuelColor = c.fuel and (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green)) or C.muted
 
-    drawOrbit(cx, cy, coreR * 1.85, coreR * 0.72, C.line, 64)
-    drawOrbit(cx, cy, coreR * 1.35, coreR * 1.02, C.line2, 64)
-    drawRingSegments(cx, cy, coreR * 1.18, 30, fuel, fuelColor, C.line, 12, 0, 360)
+    drawOrbit(cx, cy, coreR * 1.85, coreR * 0.72, C.line, 64, ORBIT_UNIT_64)
+    drawOrbit(cx, cy, coreR * 1.35, coreR * 1.02, C.line2, 64, ORBIT_UNIT_64)
+    drawRingSegments(cx, cy, coreR * 1.18, 30, fuel, fuelColor, C.line, 12, 0, 360, FUEL_RING_UNIT)
     drawHex(cx, cy, coreR * 0.88, C.line2)
     drawHex(cx, cy, coreR * 0.70, c.launchColor or C.muted)
     drawHex(cx, cy, coreR * 0.48, c.reactorColor or C.muted)
@@ -506,7 +567,7 @@ local function preflightPaint(x, y, w, h, box, c)
 
     drawNode(leftX, topY, nodeW, nodeH, "POWER CORE", fmt(c.bec,1," V"), becColor, "BEC STABILITY")
     drawNode(leftX, lowY, nodeW, nodeH, "SIGNAL CONSTELLATION", fmt(c.link,0,"%"), linkColor, "LINK LOCK")
-    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", fmt(c.esc,0," C"), escColor, "ESC TEMPERATURE")
+    drawNode(rightX, topY, nodeW, nodeH, "THERMAL PLUME", fmt(c.esc,0,c.escSuffix), escColor, "ESC TEMPERATURE")
     drawNode(rightX, lowY, nodeW, nodeH, "FLIGHT MATRIX", "R" .. fmt(c.rate,0,"") .. "  P" .. fmt(c.pid,0,""), C.violet, "PACK " .. fmt(c.voltage,1," V"))
 
     drawOrbitalMarker(cx, cy, coreR * 1.85, coreR * 0.72, 205, becColor, 7)
