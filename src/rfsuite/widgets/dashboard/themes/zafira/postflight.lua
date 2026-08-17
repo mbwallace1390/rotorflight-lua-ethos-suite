@@ -383,6 +383,7 @@ end
 
 local layout = {cols = 12, rows = 12, padding = 0}
 local screenBorderStyle = {enabled = false}
+local EMPTY_CARDS = {}
 
 local function ensureCards(c)
     if not c.cards then
@@ -505,7 +506,14 @@ local function drawReportCard(x, y, w, h, title, value, accent, pct)
 end
 
 local function postflightPaint(x, y, w, h, box, c)
-    c = c or box._cache or {}
+    if not c then
+        c = box._cache
+        if not c then
+            -- Persist the pre-wakeup fallback so an early paint allocates once.
+            c = {}
+            box._cache = c
+        end
+    end
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
@@ -542,7 +550,7 @@ local function postflightPaint(x, y, w, h, box, c)
     local cardW = floor((w - 24 - gap * 2) / cols)
     local cardH = floor((gridH - gap * 2) / rows)
 
-    local cards = c.cards or {}
+    local cards = c.cards or EMPTY_CARDS
     for i = 1, #cards do
         local row = floor((i - 1) / cols)
         local col = (i - 1) % cols
