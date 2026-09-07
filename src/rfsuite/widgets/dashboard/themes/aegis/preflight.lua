@@ -8,14 +8,21 @@ local max = math.max
 local sin = math.sin
 local cos = math.cos
 local rad = math.rad
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local tostring = tostring
 local type = type
 local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
 local headeropts = utils.getHeaderOptions()
-local colorMode = utils.themeColors()
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
 local header_layout = utils.standardHeaderLayout(headeropts)
 local header_boxes_cache = nil
 local last_txbatt_type = nil
@@ -33,56 +40,48 @@ local function header_boxes()
         -- Replace the stock Rotorflight logo with the MWRC-style title while
         -- keeping the radio's native header surface and battery/RSSI widgets.
         for _, headerBox in ipairs(boxes) do
+            if headerBox.subtype == "craftname" then headerBox.font = "FONT_S" end
             if headerBox.type == "image" then
                 headerBox.type = "func"
                 headerBox.subtype = "func"
                 headerBox.bgcolor = "transparent"
                 headerBox.paint = function(x, y, w, h)
-                    local headerBg = colorMode.tbbgcolor or colorMode.bgcolor
-                    if type(headerBg) == "number" then
-                        lcd.color(headerBg)
-                        lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+                    -- Fit the title beside a discreet builder signature, then reuse the measurements.
+                    if headerBox._titleWidth ~= w then
+                        local titleFont = utils.resolveFont("FONT_S", nil)
+                        local markFont = utils.resolveFont("FONT_XXS", nil)
+                        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+                        lcd.font(markFont)
+                        local mw, mh = lcd.getTextSize("| MWRC")
+                        local available = w - 28 - mw
+                        lcd.font(titleFont)
+                        local tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        if tw > available then
+                            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw > available then
+                            titleFont = utils.resolveFont("FONT_XXS", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- The complete header reads Rotorflight // Ethos | MWRC.
+                        headerBox._titleWidth = w
+                        headerBox._titleFont = titleFont
+                        headerBox._titleHeight = th
+                        headerBox._titleTextWidth = tw
+                        headerBox._markFont = markFont
+                        headerBox._markHeight = mh
                     end
-
-                    local font = utils.resolveFont("FONT_L", nil)
-                    if type(font) ~= "number" then return end
-                    lcd.font(font)
-
-                    local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"
-                    local tw1, th = lcd.getTextSize(t1)
-                    local tw2 = lcd.getTextSize(t2)
-                    local tw3 = lcd.getTextSize(t3)
-
-                    local watermarkFont = utils.resolveFont("FONT_XS", nil)
-                    local watermarkText = "MWRC"
-                    local watermarkWidth, watermarkHeight = 0, 0
-                    if type(watermarkFont) == "number" then
-                        lcd.font(watermarkFont)
-                        watermarkWidth, watermarkHeight = lcd.getTextSize(watermarkText)
-                        lcd.font(font)
-                    end
-
-                    local titleW = tw1 + tw2 + tw3
-                    local dividerGap = watermarkWidth > 0 and 14 or 0
-                    local totalW = titleW + dividerGap + watermarkWidth
-                    local tx = floor(x + (w - totalW) / 2)
-                    local ty = floor(y + (h - th) / 2)
-
+                    lcd.font(headerBox._titleFont)
                     lcd.color(C.cyan)
-                    lcd.drawText(tx, ty, t1)
-                    lcd.color(C.amber)
-                    lcd.drawText(tx + tw1, ty, t2)
-                    lcd.color(C.white)
-                    lcd.drawText(tx + tw1 + tw2, ty, t3)
-
-                    if watermarkWidth > 0 then
-                        local dividerX = tx + titleW + 6
-                        lcd.color(C.line2)
-                        lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)
-                        lcd.font(watermarkFont)
-                        lcd.color(C.cyan)
-                        lcd.drawText(dividerX + 7, floor(y + (h - watermarkHeight) / 2), watermarkText)
-                    end
+                    lcd.drawText(floor(x + 10), floor(y + (h - headerBox._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(headerBox._markFont)
+                    lcd.color(C.muted)
+                    lcd.drawText(floor(x + 18 + headerBox._titleTextWidth), floor(y + (h - headerBox._markHeight) / 2), "| MWRC")
                 end
             end
         end
@@ -93,7 +92,6 @@ local function header_boxes()
     return header_boxes_cache
 end
 
-local THEME_SECTION = "system/aegis"
 local DEFAULTS = {
     rpm_max = 3000,
     bec_min = 6.5,
@@ -124,21 +122,20 @@ C = {
     violetDim = lcd.RGB(55, 41, 88)
 }
 
--- Use the radio's actual header surface for the dashboard and every panel.
--- This removes the separate near-black Aegis backdrop while preserving the
--- instrument borders, accents, and high-contrast telemetry.
-C.bg = colorMode.tbbgcolor or colorMode.bgcolor or C.bg
-C.panel = C.bg
-C.panel2 = C.bg
+-- Keep telemetry contrast stable when the transmitter uses a light system theme.
+colorMode.bgcolor = C.bg
+colorMode.tbbgcolor = C.panel
+colorMode.tbtextcolor = C.white
+colorMode.cntextcolor = C.white
+colorMode.rssitextcolor = C.white
+colorMode.rssifillcolor = C.cyan or C.turquoise
+colorMode.rssifillbgcolor = C.line
+colorMode.txbgfillcolor = C.line
+colorMode.txfillcolor = C.green or C.emerald
 
 local function getThemeValue(key)
-    local session = rfsuite and rfsuite.session
-    local prefs = session and session.modelPreferences and session.modelPreferences[THEME_SECTION]
-    local value = prefs and tonumber(prefs[key])
-
-    -- Migrate the v1/v1.2 BEC healthy threshold. 8.0 V marked normal
-    -- 7.2 V BEC systems as a caution, so the new baseline is 7.0 V.
-    if key == "bec_warn" and value == 8 then value = 7.0 end
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
 
     return value or DEFAULTS[key]
 end
@@ -146,15 +143,15 @@ end
 local function sensor(telemetry, name, alias1, alias2)
     telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
     if not (telemetry and telemetry.getSensor) then return nil end
-    local value = telemetry.getSensor(name)
-    if value ~= nil then return tonumber(value) end
+    local value = tonumber((telemetry.getSensor(name)))
+    if value ~= nil then return value end
     if alias1 then
-        value = telemetry.getSensor(alias1)
-        if value ~= nil then return tonumber(value) end
+        value = tonumber((telemetry.getSensor(alias1)))
+        if value ~= nil then return value end
     end
     if alias2 then
-        value = telemetry.getSensor(alias2)
-        if value ~= nil then return tonumber(value) end
+        value = tonumber((telemetry.getSensor(alias2)))
+        if value ~= nil then return value end
     end
     return nil
 end
@@ -244,6 +241,8 @@ end
 
 local function cacheText(c, textKey, valueKey, unitKey, value, decimals, suffix)
     suffix = suffix or ""
+    local scale = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    value = value and floor(value * scale + 0.5) / scale or nil
     if c[valueKey] ~= value or c[unitKey] ~= suffix or c[textKey] == nil then
         c[valueKey] = value
         c[unitKey] = suffix
@@ -255,12 +254,27 @@ local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
 
+local FONT_FALLBACK = {
+    FONT_XXL = "FONT_XL", FONT_XL = "FONT_L", FONT_L = "FONT_STD",
+    FONT_STD = "FONT_S", FONT_S = "FONT_XS", FONT_XS = "FONT_XXS"
+}
+
 local function drawTextAligned(x, y, w, text, fontName, color, align)
     local font = resolveFont(fontName)
     if type(font) ~= "number" then return 0, 0 end
     lcd.font(font)
     lcd.color(color)
     local tw, th = lcd.getTextSize(text)
+    -- Step down through native fonts when narrow cards cannot fit a reading.
+    local nextFont = FONT_FALLBACK[fontName]
+    while tw > w and nextFont do
+        local smaller = resolveFont(nextFont)
+        if type(smaller) == "number" then
+            lcd.font(smaller)
+            tw, th = lcd.getTextSize(text)
+        end
+        nextFont = FONT_FALLBACK[nextFont]
+    end
     local tx = x
     if align == "center" then
         tx = x + (w - tw) / 2
@@ -299,9 +313,12 @@ end
 
 local function drawMetric(x, y, w, h, title, valueText, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 12, y + 26, w - 24, valueText, "FONT_XL", C.white, "left")
-    if subtitle then
-        drawTextAligned(x + 12, y + h - 22, w - 24, subtitle, "FONT_XXS", C.muted, "left")
+    local compact = h < 110
+    local valueY = h < 64 and 22 or 28
+    local valueFont = h < 64 and "FONT_S" or (compact and "FONT_L" or "FONT_XL")
+    drawTextAligned(x + 13, y + valueY, w - 26, valueText, valueFont, valueText == "--" and C.muted or C.white, "left")
+    if subtitle and h >= 100 then
+        drawTextAligned(x + 13, y + h - 22, w - 26, subtitle, "FONT_XXS", C.muted, "left")
     end
 end
 
@@ -371,7 +388,7 @@ local function preflightWakeup(box, telemetry)
     c.fuel = sensor(telemetry, "smartfuel")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
     c.esc, c.escUnit, c.escWarn, c.escMax = temperatureSensor(telemetry, escWarnC, escMaxC)
-    c.link = sensor(telemetry, "vfr")
+    c.link = sensor(telemetry, "vfr", "rssi")
     c.rate = sensor(telemetry, "rate_profile")
     c.pid = sensor(telemetry, "pid_profile")
     c.voltage = sensor(telemetry, "voltage")
@@ -436,6 +453,12 @@ local function preflightWakeup(box, telemetry)
         c.status = "CAUTION"
         c.statusColor = C.amber
         c.statusSub = tostring(issueCount) .. " ITEM" .. (issueCount == 1 and "" or "S") .. " TO REVIEW"
+    elseif available < 4 then
+        -- Missing channels cannot establish that every monitored system is ready.
+        c.status = "PARTIAL DATA"
+        c.statusColor = C.amber
+        c.statusSub = "CHECK MISSING SENSORS"
+        c.issueText = nil
     else
         c.status = "READY"
         c.statusColor = C.green
@@ -463,6 +486,7 @@ end
 
 local function preflightPaint(x, y, w, h, box, c, telemetry)
     c = c or box._cache or {}
+    box._cache = c
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
@@ -509,16 +533,18 @@ local function preflightPaint(x, y, w, h, box, c, telemetry)
 
     drawPanel(centerX, bodyY, centerW, bodyH, c.statusColor or C.muted, nil)
     local cx = centerX + centerW / 2
-    local cy = bodyY + bodyH * 0.42
-    local radius = min(centerW * 0.33, bodyH * 0.32)
+    local cy = bodyY + bodyH * (bodyH < 260 and 0.27 or 0.36)
+    local radius = min(centerW * 0.33, bodyH * (bodyH < 260 and 0.18 or 0.27))
     drawHex(cx, cy, radius + 12, C.line2)
     drawHex(cx, cy, radius, c.statusColor or C.muted)
-    drawTextAligned(centerX, cy - 34, centerW, c.status or "WAITING", "FONT_XXL", C.white, "center")
+    lcd.color(C.panel)
+    lcd.drawFilledRectangle(floor(cx - radius * 0.95), floor(cy - (bodyH < 260 and 20 or 34)), floor(radius * 1.90), bodyH < 260 and 55 or 75)
+    drawTextAligned(centerX, cy - (bodyH < 260 and 20 or 34), centerW, c.status or "WAITING", bodyH < 260 and "FONT_XL" or "FONT_XXL", C.white, "center")
     if c.issueText then
         drawTextAligned(centerX + 12, cy + 15, centerW - 24, c.issueText, "FONT_XS", C.white, "center")
         drawTextAligned(centerX, cy + 40, centerW, c.statusSub or "ITEM TO REVIEW", "FONT_XXS", c.statusColor or C.muted, "center")
     else
-        drawTextAligned(centerX, cy + 22, centerW, c.statusSub or "CONNECT TELEMETRY", "FONT_XXS", c.statusColor or C.muted, "center")
+        drawTextAligned(centerX, cy + 20, centerW, c.statusSub or "CONNECT TELEMETRY", "FONT_XXS", c.statusColor or C.muted, "center")
     end
 
     local segY = bodyY + bodyH - 86
@@ -535,9 +561,9 @@ local function preflightPaint(x, y, w, h, box, c, telemetry)
     drawProgress(rightX + 12, bodyY + cardH - 36, sideW - 24, 9, c.esc and c.esc / c.escMax or 0, escColor)
 
     drawPanel(rightX, bodyY + cardH + pad, sideW, cardH, C.violet, "FLIGHT PROFILE")
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 38, sideW - 28, "RATES", c.rateText or "--", C.violet)
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 70, sideW - 28, "PID BANK", c.pidText or "--", C.violet)
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 102, sideW - 28, "PACK", c.voltageText or "--", C.cyan)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + floor(cardH * 0.3), sideW - 28, "RATES", c.rateText or "--", C.violet)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + floor(cardH * 0.54), sideW - 28, "PID BANK", c.pidText or "--", C.violet)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + floor(cardH * 0.78), sideW - 28, "PACK", c.voltageText or "--", C.cyan)
 end
 
 local boxes_cache = nil

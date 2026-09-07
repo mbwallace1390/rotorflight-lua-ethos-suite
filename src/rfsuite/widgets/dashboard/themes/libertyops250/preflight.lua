@@ -6,7 +6,12 @@ local math = math
 local floor = math.floor
 local min = math.min
 local max = math.max
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local tostring = tostring
 local type = type
 local format = string.format
@@ -52,7 +57,6 @@ local colorMode = {
     rssifillbgcolor = C.lineDim
 }
 
-local THEME_SECTION = "system/libertyops250"
 local DEFAULTS = {
     rpm_min = 0,
     rpm_max = 3000,
@@ -66,9 +70,8 @@ local suiteVersion = rfsuite and rfsuite.config and rfsuite.config.version or {}
 local SUITE_VERSION = format("RF%d.%d.%d", tonumber(suiteVersion.major) or 0, tonumber(suiteVersion.minor) or 0, tonumber(suiteVersion.revision) or 0)
 
 local function getThemeValue(key)
-    local session = rfsuite and rfsuite.session
-    local prefs = session and session.modelPreferences and session.modelPreferences[THEME_SECTION]
-    local value = prefs and tonumber(prefs[key])
+    -- Preferences belong to the Suite's active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
     return value or DEFAULTS[key]
 end
 
@@ -81,7 +84,7 @@ end
 
 local function updateFormatted(cache, keyField, textField, value, decimals, suffix, missing)
     local multiplier = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
-    local key = value == nil and false or floor(value * multiplier + 0.5)
+    local key = value ~= nil and floor(value * multiplier + 0.5) or false
     if cache[keyField] ~= key or cache[textField] == nil then
         cache[keyField] = key
         cache[textField] = fmt(value, decimals, suffix, missing)
@@ -98,17 +101,49 @@ local function font(name)
     return resolved
 end
 
+local FONT_FALLBACK = {FONT_XXL="FONT_XL", FONT_XL="FONT_L", FONT_L="FONT_STD", FONT_STD="FONT_S", FONT_S="FONT_XS", FONT_XS="FONT_XXS"}
 local function drawText(x, y, w, text, fontName, color, align)
     local f = font(fontName)
     if type(f) ~= "number" then return 0, 0 end
     lcd.font(f)
     lcd.color(color)
     local tw, th = lcd.getTextSize(text)
+    local nextFont = FONT_FALLBACK[fontName]
+    while tw > w and nextFont do
+        local smaller = font(nextFont)
+        if type(smaller) == "number" then lcd.font(smaller); tw, th = lcd.getTextSize(text) end
+        nextFont = FONT_FALLBACK[nextFont]
+    end
     local tx = x
     if align == "center" then tx = x + (w - tw) / 2 end
     if align == "right" then tx = x + w - tw end
     lcd.drawText(floor(tx + 0.5), floor(y + 0.5), text)
     return tw, th
+end
+
+local HEADER_LABEL = "Rotorflight // Ethos"
+local HEADER_SIGNATURE = " | MWRC"
+local function paintHeaderLogo(x, y, w, h)
+    local signatureFont = FONT_XXS or FONT_XS
+    lcd.font(signatureFont)
+    local signatureW, signatureH = lcd.getTextSize(HEADER_SIGNATURE)
+    lcd.font(FONT_S)
+    local labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    -- Fit the group without giving the builder signature equal visual weight.
+    if labelW + signatureW > w - 20 then
+        lcd.font(FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    end
+    if labelW + signatureW > w - 20 then
+        lcd.font(FONT_XXS or FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    end
+    local groupX = x + max(10, floor((w - labelW - signatureW) / 2))
+    lcd.color(C.gold)
+    lcd.drawText(groupX, y + max(0, floor((h - labelH) / 2)), HEADER_LABEL)
+    lcd.font(signatureFont)
+    lcd.color(C.muted)
+    lcd.drawText(groupX + labelW, y + max(0, floor((h - signatureH) / 2)), HEADER_SIGNATURE)
 end
 
 local function header_boxes()
@@ -120,54 +155,15 @@ local function header_boxes()
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
         for _, box in ipairs(boxes) do
+            if box.subtype == "craftname" then box.font = "FONT_S" end
             box.bgcolor = "transparent"
             if box.type == "image" then
                 box.type = "func"
                 box.subtype = "func"
                 box.paint = function(x, y, w, h)
-                    local bg = colorMode.tbbgcolor or colorMode.bgcolor
-                    if type(bg) == "number" then
-                        lcd.color(bg)
-                        lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
-                    end
-                    local f = font("FONT_L")
-                    if type(f) ~= "number" then return end
-                    lcd.font(f)
-                    local a, b, c = "ETHOS ", "// ", "ROTORFLIGHT"
-                    local aw = lcd.getTextSize(a)
-                    local bw = lcd.getTextSize(b)
-                    local cw = lcd.getTextSize(c)
-
-                    local watermarkFont = font("FONT_XS")
-                    local watermark = "LIBERTY"
-                    local watermarkW, watermarkH = 0, 0
-                    if type(watermarkFont) == "number" then
-                        lcd.font(watermarkFont)
-                        watermarkW, watermarkH = lcd.getTextSize(watermark)
-                        lcd.font(f)
-                    end
-
-                    local titleW = aw + bw + cw
-                    local dividerGap = watermarkW > 0 and 14 or 0
-                    local total = titleW + dividerGap + watermarkW
-                    local tx = x + (w - total) / 2
-                    local ty = y + 4
-
-                    lcd.color(C.white)
-                    lcd.drawText(floor(tx), ty, a)
-                    lcd.color(C.amber)
-                    lcd.drawText(floor(tx + aw), ty, b)
-                    lcd.color(C.white)
-                    lcd.drawText(floor(tx + aw + bw), ty, c)
-
-                    if watermarkW > 0 then
-                        local dividerX = floor(tx + titleW + 6)
-                        lcd.color(C.line)
-                        lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)
-                        lcd.font(watermarkFont)
-                        lcd.color(C.red)
-                        lcd.drawText(dividerX + 7, floor(y + (h - watermarkH) / 2), watermark)
-                    end
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+                    paintHeaderLogo(x, y, w, h)
                 end
             end
         end
@@ -229,78 +225,38 @@ local function governorColor(text)
     return C.muted
 end
 
-local NAV_TARGETS = {
-    "FBL SETUP", "fbl", C.red,
-    "TOOLS", "tools", C.white,
-    "DATA", "data", C.blueBright,
-    "FLIGHT LOGS", "logs", C.white,
-    "SYSTEM", "system", C.blueBright
-}
-local NAV_COUNT = 5
-local navRects = {}
-local navEnabledState
-local mainBox
-
-local function isFblConnected()
-    -- The current dashboard context does not expose the legacy system-tool
-    -- navigation API. Keep the shortcut tiles visible but non-interactive.
-    return false
-end
-
-local function handleNavigationPress()
-    return nil
-end
-
-local function refreshNavigationAvailability(enabled)
-    enabled = enabled == true
-    if navEnabledState == enabled then return end
-    navEnabledState = enabled
-
-    -- One full-screen touch handler replaces five extra dashboard objects.
-    -- This keeps the RF Suite object count unchanged and avoids exhausting
-    -- the ETHOS instruction budget while header battery widgets are painting.
-    if mainBox then
-        mainBox.onpress = enabled and handleNavigationPress or nil
-    end
-
-    local dashboard = rfsuite.widgets and rfsuite.widgets.dashboard
-    if dashboard then
-        dashboard._onpressIndicesReady = false
-        dashboard.selectedBoxIndex = nil
-    end
-end
-
 local function wakeup(box, telemetry)
     local c = box._cache or {}
     box._cache = c
     local getSensor = telemetry and telemetry.getSensor
 
-    c.rpm = getSensor and getSensor("rpm") or nil
-    c.throttle = getSensor and getSensor("throttle_percent") or nil
-    c.rate = getSensor and getSensor("rate_profile") or nil
-    c.pid = getSensor and getSensor("pid_profile") or nil
-    c.voltage = getSensor and getSensor("voltage") or nil
-    c.fuel = getSensor and getSensor("smartfuel") or nil
-    c.consumed = getSensor and getSensor("smartconsumption") or nil
-    c.bec = getSensor and getSensor("bec_voltage") or nil
+    c.rpm = getSensor and tonumber((getSensor("rpm"))) or nil
+    c.throttle = getSensor and tonumber((getSensor("throttle_percent"))) or nil
+    c.rate = getSensor and tonumber((getSensor("rate_profile"))) or nil
+    c.pid = getSensor and tonumber((getSensor("pid_profile"))) or nil
+    c.voltage = getSensor and tonumber((getSensor("voltage"))) or nil
+    c.fuel = getSensor and tonumber((getSensor("smartfuel"))) or nil
+    c.consumed = getSensor and tonumber((getSensor("smartconsumption"))) or nil
+    c.bec = getSensor and tonumber((getSensor("bec_voltage"))) or nil
     local escWarn = getThemeValue("esctemp_warn")
     local escMax = getThemeValue("esctemp_max")
     local escValue, _, escUnit, presentedEscWarn, presentedEscMax
     if getSensor then
         escValue, _, escUnit, presentedEscWarn, presentedEscMax = getSensor("temp_esc", escWarn, escMax)
     end
-    c.esc = escValue
-    c.escWarn = presentedEscWarn or escWarn
-    c.escMax = presentedEscMax or escMax
+    c.esc = tonumber(escValue)
+    c.escWarn = tonumber(presentedEscWarn) or escWarn
+    c.escMax = tonumber(presentedEscMax) or escMax
     escUnit = escUnit or "°C"
     if c.escUnit ~= escUnit or c.escSuffix == nil then
         c.escUnit = escUnit
         c.escSuffix = " " .. escUnit
         c._escTextKey = nil
     end
-    c.link = getSensor and getSensor("vfr") or nil
+    c.link = getSensor and tonumber((getSensor("vfr"))) or nil
 
-    local govRaw = getSensor and getSensor("governor")
+    if c.link == nil and getSensor then c.link = tonumber((getSensor("rssi"))) end
+    local govRaw = getSensor and tonumber((getSensor("governor")))
     if govRaw == nil then
         c.governor = "WAITING"
     else
@@ -312,7 +268,6 @@ local function wakeup(box, telemetry)
     c.becColor = c.bec and (c.bec < getThemeValue("bec_min") and C.red or (c.bec < getThemeValue("bec_warn") and C.amber or C.green)) or C.muted
     c.escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
     c.linkColor = c.link and (c.link < 50 and C.amber or C.green) or C.muted
-    c.controllerConnected = isFblConnected()
 
     updateFormatted(c, "_rpmTextKey", "rpmText", c.rpm, 0, "", "--")
     updateFormatted(c, "_throttleTextKey", "throttleText", c.throttle, 0, "", "--")
@@ -330,7 +285,6 @@ local function wakeup(box, telemetry)
         c.modeText = "R" .. c.rateText .. " / P" .. c.pidText
     end
 
-    refreshNavigationAvailability(c.controllerConnected)
     return c
 end
 
@@ -339,7 +293,7 @@ local function drawBadgePanel(x, y, w, h)
     drawHeliIcon(floor(x + 42), floor(y + 30), 18, C.white)
     drawText(x + 70, y + 10, w - 82, "ROTORFLIGHT", "FONT_S", C.white, "left")
     drawText(x + 70, y + 33, w - 82, SUITE_VERSION, "FONT_XS", C.muted, "left")
-    drawText(x + 10, y + 78, w - 20, "AMERICA", "FONT_STD", C.white, "center")
+    drawText(x + 10, y + 78, w - 20, "LIBERTY OPS", "FONT_STD", C.white, "center")
     drawText(x + 10, y + 108, w - 20, "250", "FONT_XXL", C.white, "center")
 
     local cx = x + w / 2
@@ -407,64 +361,45 @@ local function drawFooterBanner(x, y, w, h)
     drawText(x, subtitleY, w, "13 ORIGINAL COLONIES  |  250 YEARS OF LIBERTY", "FONT_XXS", C.white, "center")
 end
 
-local function drawNavIcon(x, y, w, h, kind, color)
-    local cx = floor(x + w / 2)
-    local cy = floor(y + h / 2 - 5)
-    lcd.color(color)
-
-    if kind == "fbl" then
-        drawHeliIcon(cx, cy, 14, color)
-    elseif kind == "tools" then
-        lcd.drawRectangle(cx - 10, cy - 7, 20, 15, 1)
-        lcd.drawLine(cx - 5, cy - 10, cx + 5, cy - 10)
-        lcd.drawLine(cx - 5, cy - 10, cx - 5, cy - 7)
-        lcd.drawLine(cx + 5, cy - 10, cx + 5, cy - 7)
-    elseif kind == "data" then
-        lcd.drawFilledRectangle(cx - 10, cy + 1, 5, 8)
-        lcd.drawFilledRectangle(cx - 2, cy - 5, 5, 14)
-        lcd.drawFilledRectangle(cx + 6, cy - 11, 5, 20)
-    elseif kind == "logs" then
-        lcd.drawRectangle(cx - 10, cy - 11, 20, 22, 1)
-        for i = 0, 2 do
-            lcd.drawLine(cx - 5, cy - 6 + i * 6, cx + 6, cy - 6 + i * 6)
-            lcd.drawRectangle(cx - 8, cy - 7 + i * 6, 2, 2, 1)
-        end
-    elseif kind == "system" then
-        lcd.drawRectangle(cx - 8, cy - 8, 16, 16, 1)
-        lcd.drawRectangle(cx - 3, cy - 3, 6, 6, 1)
-        lcd.drawLine(cx, cy - 12, cx, cy - 8)
-        lcd.drawLine(cx, cy + 8, cx, cy + 12)
-        lcd.drawLine(cx - 12, cy, cx - 8, cy)
-        lcd.drawLine(cx + 8, cy, cx + 12, cy)
-    end
+local function drawCompactMetric(x, y, w, h, title, value, accent)
+    drawPanel(x, y, w, h, title, accent)
+    drawText(x + 13, y + 27, w - 26, value or "--", "FONT_L", C.white, "left")
 end
 
-local function drawNavButton(x, y, w, h, label, kind, accent, enabled)
-    x, y, w, h = floor(x), floor(y), floor(w), floor(h)
-    enabled = enabled == true
-    local edge = enabled and accent or C.lineDim
-    local icon = enabled and accent or C.muted
-    local labelColor = enabled and C.white or C.muted
-
-    lcd.color(enabled and C.panel or C.bg)
-    lcd.drawFilledRectangle(x, y, w, h)
-    lcd.color(C.lineDim)
-    lcd.drawRectangle(x, y, w, h, 1)
-    lcd.color(edge)
-    lcd.drawLine(x + 2, y + 2, x + w - 3, y + 2)
-    lcd.drawLine(x + 2, y + 2, x + 2, y + h - 3)
-    drawNavIcon(x, y, w, h - 14, kind, icon)
-    drawText(x + 4, y + h - 17, w - 8, label, "FONT_XXS", labelColor, "center")
+local function paintCompact(x, y, w, h, c)
+    local pad, gap = 10, 8
+    drawText(x + pad, y + 7, w * 0.55, "LIBERTY OPS // PRE-FLIGHT", "FONT_S", C.gold, "left")
+    drawText(x + w * 0.60, y + 7, w * 0.40 - pad, c.governor or "WAITING", "FONT_S", c.govColor or C.muted, "right")
+    local top, bottom = y + 36, y + h - 28
+    local badgeW = floor(w * 0.24)
+    local cardX = x + pad + badgeW + gap
+    local cardW = floor((w - pad * 2 - badgeW - gap * 3) / 3)
+    local cardH = floor((bottom - top - gap) / 2)
+    drawPanel(x + pad, top, badgeW, bottom - top, nil, C.gold)
+    drawText(x + pad + 10, top + 12, badgeW - 20, "LIBERTY OPS", "FONT_S", C.white, "center")
+    drawText(x + pad + 10, top + 36, badgeW - 20, "250", "FONT_XXL", C.gold, "center")
+    drawText(x + pad + 10, bottom - 42, badgeW - 20, "1776  /  2026", "FONT_XS", C.muted, "center")
+    drawText(x + pad + 10, bottom - 23, badgeW - 20, c.modeText or "R- / P-", "FONT_XS", C.blueBright, "center")
+    drawCompactMetric(cardX, top, cardW, cardH, "HEADSPEED RPM", c.rpmText, C.blueBright)
+    drawCompactMetric(cardX + cardW + gap, top, cardW, cardH, "PACK VOLTAGE", c.voltageText, C.green)
+    drawCompactMetric(cardX + (cardW + gap) * 2, top, cardW, cardH, "SMART FUEL", c.fuelText, c.fuelColor)
+    local row2 = top + cardH + gap
+    drawCompactMetric(cardX, row2, cardW, cardH, "BEC POWER", c.becText, c.becColor)
+    drawCompactMetric(cardX + cardW + gap, row2, cardW, cardH, "ESC TEMP", c.escText, c.escColor)
+    drawCompactMetric(cardX + (cardW + gap) * 2, row2, cardW, cardH, "RADIO LINK", c.linkText, c.linkColor)
+    drawText(x + pad, y + h - 20, w - pad * 2, "RF SUITE TOOLS  /  RADIO TOOLS MENU", "FONT_XXS", C.muted, "center")
 end
 
 local function paint(x, y, w, h, box, c)
     c = c or box._cache or {}
+    box._cache = c
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+    if h < 340 then return paintCompact(x, y, w, h, c) end
 
     local pad = 10
     local footerH = min(58, floor(h * 0.145))
-    local navH = min(52, floor(h * 0.13))
+    local navH = 24
     local bottomGap = 6
     local footerY = y + h - footerH - 4
     local navY = footerY - navH - bottomGap
@@ -529,20 +464,7 @@ local function paint(x, y, w, h, box, c)
     drawPanel(tx4, tilesY, tileW, tileH, "PACK", C.blueBright)
     drawText(tx4 + 12, tilesY + 20, tileW - 24, c.voltageText or "--", "FONT_STD", C.white, "right")
 
-    -- Five cockpit-style RF Suite shortcuts. They are dimmed and have no
-    -- onpress callback until the FBL has completed its connection handshake.
-    local navGap = 7
-    local navW = floor((w - pad * 2 - navGap * 4) / 5)
-    for i = 1, NAV_COUNT do
-        local itemBase = (i - 1) * 3
-        local rectBase = (i - 1) * 4
-        local nx = x + pad + (i - 1) * (navW + navGap)
-        navRects[rectBase + 1] = nx
-        navRects[rectBase + 2] = navY
-        navRects[rectBase + 3] = navW
-        navRects[rectBase + 4] = navH
-        drawNavButton(nx, navY, navW, navH, NAV_TARGETS[itemBase + 1], NAV_TARGETS[itemBase + 2], NAV_TARGETS[itemBase + 3], c.controllerConnected)
-    end
+    drawText(x + pad, navY + 3, w - pad * 2, "RF SUITE TOOLS  /  OPEN FROM THE RADIO TOOLS MENU", "FONT_XXS", C.muted, "center")
 
     -- Fully Lua-drawn flag footer with a visible blue canton and 13 stars.
     drawFooterBanner(x + pad, footerY, w - pad * 2, footerH)
@@ -560,7 +482,7 @@ local boxes_cache
 
 local function boxes()
     if boxes_cache == nil then
-        mainBox = {
+        local mainBox = {
             col = 1, row = 1, colspan = 12, rowspan = 12,
             type = "func", subtype = "func",
             wakeup = wakeup,
@@ -568,7 +490,6 @@ local function boxes()
             bgcolor = "transparent"
         }
         boxes_cache = {mainBox}
-        refreshNavigationAvailability(isFblConnected())
     end
     return boxes_cache
 end

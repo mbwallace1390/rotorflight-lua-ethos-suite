@@ -6,7 +6,12 @@
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local rfsuite = requireModule("widgets/dashboard/context.lua")
 local lcd = lcd
-local tonumber = tonumber
+local rawTonumber = tonumber
+local function tonumber(value)
+    local number = rawTonumber(value)
+    if number == nil or number ~= number or number == math.huge or number == -math.huge then return nil end
+    return number
+end
 local tostring = tostring
 local type = type
 local ipairs = ipairs
@@ -53,7 +58,9 @@ local colorMode = {
     fillwarncolor = rc.amber,
     fillcritcolor = rc.red,
     accentcolor = rc.cyan,
-    rssifillbgcolor = rc.cyan,
+    cntextcolor = rc.white, tbtextcolor = rc.white, rssitextcolor = rc.white,
+    txbgfillcolor = rc.dim, txaccentcolor = rc.cyan, txfillcolor = rc.green,
+    rssifillcolor = rc.green, rssifillbgcolor = rc.dim,
     fillbgcolor = rc.dim
 }
 
@@ -65,19 +72,15 @@ local theme_section = "system/mwrc"
 local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 6.5, bec_warn = 8.0, bec_max = 12.0, esctemp_warn = 110, esctemp_max = 150}
 
 local function getThemeValue(key)
+    if key == "throttle_max" then return 100 end
     if key == "tx_min" or key == "tx_warn" or key == "tx_max" then
-        if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
-            local val = rfsuite.preferences.general[key]
-            if val ~= nil then return tonumber(val) end
-        end
+        local general = rfsuite.preferences and rfsuite.preferences.general
+        local value = tonumber(general and general[key])
+        if value ~= nil then return value end
     end
-
-    if rfsuite and rfsuite.session and rfsuite.session.modelPreferences and rfsuite.session.modelPreferences[theme_section] then
-        local val = rfsuite.session.modelPreferences[theme_section][key]
-        val = tonumber(val)
-        if val ~= nil then return val end
-    end
-    return THEME_DEFAULTS[key]
+    -- The rewritten dashboard installs the selected theme's preferences here.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
+    return value or THEME_DEFAULTS[key]
 end
 
 local function getThemeOptionKey(W)
@@ -116,40 +119,29 @@ local screenBorderStyle = {
     inset = -1
 }
 
-local HEADER_TEXT_1 = "ETHOS "
-local HEADER_TEXT_2 = "// "
-local HEADER_TEXT_3 = "ROTORFLIGHT"
-local HEADER_WATERMARK = "MWRC"
-local headerTextWidth1 = nil
-local headerTextWidth2 = nil
-local headerTextWidth3 = nil
-local headerWatermarkWidth = nil
-
-local function paintHeaderLogo(x, y)
-    lcd.font(FONT_L or 0)
-
-    if headerTextWidth1 == nil then
-        headerTextWidth1 = lcd.getTextSize(HEADER_TEXT_1)
-        headerTextWidth2 = lcd.getTextSize(HEADER_TEXT_2)
-        headerTextWidth3 = lcd.getTextSize(HEADER_TEXT_3)
+local HEADER_LABEL = "Rotorflight // Ethos"
+local HEADER_SIGNATURE = " | MWRC"
+local function paintHeaderLogo(x, y, w, h)
+    local signatureFont = FONT_XXS or FONT_XS
+    lcd.font(signatureFont)
+    local signatureW, signatureH = lcd.getTextSize(HEADER_SIGNATURE)
+    lcd.font(FONT_S)
+    local labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    -- Fit the complete group while keeping the builder signature subordinate.
+    if labelW + signatureW > w - 10 then
+        lcd.font(FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
     end
-
+    if labelW + signatureW > w - 10 then
+        lcd.font(FONT_XXS or FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    end
+    local groupX = x + math.max(5, math.floor((w - labelW - signatureW) / 2))
     lcd.color(rc.cyan)
-    lcd.drawText(x + 5, y + 4, HEADER_TEXT_1)
-    lcd.color(rc.amber)
-    lcd.drawText(x + 5 + headerTextWidth1, y + 4, HEADER_TEXT_2)
-    lcd.color(rc.white)
-    lcd.drawText(x + 5 + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)
-
-    -- Small permanent author mark in the common header. It is present on
-    -- preflight, inflight, and postflight without covering telemetry.
-    local watermarkX = x + 5 + headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10
-    lcd.color(rc.amber)
-    lcd.drawLine(watermarkX - 5, y + 9, watermarkX - 5, y + 25)
-    lcd.font(FONT_XS or FONT_XXS or 0)
-    if headerWatermarkWidth == nil then headerWatermarkWidth = lcd.getTextSize(HEADER_WATERMARK) end
-    lcd.color(rc.cyan)
-    lcd.drawText(watermarkX, y + 8, HEADER_WATERMARK)
+    lcd.drawText(groupX, y + math.max(0, math.floor((h - labelH) / 2)), HEADER_LABEL)
+    lcd.font(signatureFont)
+    lcd.color(rc.tick or rc.dim)
+    lcd.drawText(groupX + labelW, y + math.max(0, math.floor((h - signatureH) / 2)), HEADER_SIGNATURE)
 end
 
 local function header_boxes()
@@ -158,11 +150,12 @@ local function header_boxes()
 
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
-        local headerBgColor = "transparent"
+        local headerBgColor = rc.bg
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
             box.yoffset = (box.yoffset or 0) + topbarShiftY
 
+            if box.subtype == "craftname" then box.font = nil end
             if box.type == "image" then
                 box.type = "func"
                 box.subtype = "func"
@@ -376,8 +369,8 @@ local function wakeAesGauge(box, telemetry)
     local thresholds = box.thresholds
     -- Present the value, range, unit, and thresholds in one unit system.
     if telemetry and telemetry.getSensor then
-        local sensorUnit, sensorMin, sensorMax, sensorThresholds
-        val, _, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
+        local sensorPrecision, sensorUnit, sensorMin, sensorMax, sensorThresholds
+        val, sensorPrecision, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
         val = tonumber(val)
         if box.unit == nil and sensorUnit ~= nil then unit = sensorUnit end
         if sensorMin ~= nil then minValue = sensorMin end
@@ -567,10 +560,25 @@ local function paintAesGauge(x, y, w, h, box, cache)
 end
 
 
+local function paintBackdrop(x, y, w, h)
+    -- Theme-owned surface is painted before instrument and header boxes.
+    local screenW, screenH = lcd.getWindowSize()
+    lcd.color(rc.bg)
+    lcd.drawFilledRectangle(0, 0, screenW, screenH)
+    lcd.color(rc.panel)
+    lcd.drawFilledRectangle(x + 4, y + 4, math.max(1, w - 8), math.max(1, h - 8))
+    lcd.color(rc.dim)
+    lcd.drawRectangle(x + 4, y + 4, math.max(1, w - 8), math.max(1, h - 8))
+    lcd.color(rc.cyan)
+    lcd.drawFilledRectangle(x + 4, y + 4, math.max(1, math.floor(w * 0.12)), 2)
+end
+
 local function buildBoxes(W)
     local opts = themeOptions[getThemeOptionKey(W)] or themeOptions.ls_full
 
     return {
+        {col = 1, row = 1, colspan = layout.cols, rowspan = layout.rows,
+            type = "func", subtype = "func", paint = paintBackdrop, bgcolor = "transparent"},
         {
             col = 1, row = 1, colspan = 3, rowspan = 9,
             type = "image", subtype = "model", imagewidth = 280, imageheight = 300, imagealign = "center",
@@ -657,7 +665,7 @@ local function buildBoxes(W)
 end
 
 local function boxes()
-    local config = rfsuite and rfsuite.session and rfsuite.session.modelPreferences and rfsuite.session.modelPreferences[theme_section]
+    local config = rfsuite.preferences and rfsuite.preferences.dashboard
     local W = lcd.getWindowSize()
     if boxes_cache == nil or themeconfig ~= config or lastScreenW ~= W then
         boxes_cache = buildBoxes(W)

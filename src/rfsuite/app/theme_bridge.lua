@@ -34,6 +34,9 @@ local lcdRGB = lcd.RGB
 
 local bridge = {}
 local tracker = flightmode.new()
+-- The flight tracker caches radio sources on its input. Keep that state private:
+-- bus snapshots are retained and shared with other subscribers.
+local phaseInput = {}
 local paletteCache = {}
 local metadataCache = {}
 local chromeRects = {}
@@ -44,6 +47,7 @@ local settings
 local session
 local modelDashboard
 local loadedMcuId
+local lastConnectedMcuId
 local pendingSession
 local pendingSettings
 local modelLoadPending = false
@@ -482,7 +486,12 @@ local function updateFlightPhase(snapshot)
   if snapshot.timerFlightCounted == true or (tonumber(snapshot.timerSession) or 0) > 0 then
     tracker.hasBeenInFlight = true
   end
-  activePhase = tracker:update(snapshot)
+  phaseInput.connected = snapshot.connected
+  phaseInput.isArmed = snapshot.isArmed
+  phaseInput.governorState = snapshot.governorState
+  phaseInput.throttlePercent = snapshot.throttlePercent
+  phaseInput.rxMap = snapshot.rxMap
+  activePhase = tracker:update(phaseInput)
 end
 
 local function applyPending(now)
@@ -497,7 +506,13 @@ local function applyPending(now)
     pendingSession = nil
     local nextMcuId = nextSession.connected == true and nextSession.mcuId or nil
     if nextMcuId ~= loadedMcuId then
-      if nextMcuId ~= nil then tracker:reset() end
+      if nextMcuId ~= nil and nextMcuId ~= lastConnectedMcuId then
+        -- Only a different aircraft starts a new phase history. A temporary
+        -- disconnect must retain postflight, matching the dashboard tracker.
+        tracker:reset()
+        wipe(phaseInput)
+      end
+      if nextMcuId ~= nil then lastConnectedMcuId = nextMcuId end
       loadedMcuId = nextMcuId
       modelDashboard = nil
       modelLoadPending = nextMcuId ~= nil
@@ -540,12 +555,14 @@ function bridge.open(initialSettings)
   if opened then bridge.clearCache() end
   opened = true
   tracker:reset()
+  wipe(phaseInput)
   settings = initialSettings or settingsStore.load()
   activePhase = "preflight"
   activePath = nil
   activePalette = nil
   activeDark = nil
   loadedMcuId = nil
+  lastConnectedMcuId = nil
   modelDashboard = nil
   modelLoadPending = false
   pendingSession = nil
@@ -558,6 +575,7 @@ function bridge.open(initialSettings)
     session = pendingSession
     pendingSession = nil
     loadedMcuId = session.connected == true and session.mcuId or nil
+    lastConnectedMcuId = loadedMcuId
     modelLoadPending = loadedMcuId ~= nil
     updateFlightPhase(session)
   end
@@ -573,6 +591,8 @@ end
 
 function bridge.wakeup()
   if not opened then return end
+  local width, height = lcdGetWindowSize()
+  if width ~= canvasWidth or height ~= canvasHeight then geometryDirty = true end
   if geometryDirty then rebuildGeometry() end
   local now = clock()
   if now < nextCheck then return end
@@ -667,10 +687,12 @@ function bridge.clearCache()
   bridge.clearPage()
   wipe(railSegments)
   tracker:reset()
+  wipe(phaseInput)
   settings = nil
   session = nil
   modelDashboard = nil
   loadedMcuId = nil
+  lastConnectedMcuId = nil
   pendingSession = nil
   pendingSettings = nil
   modelLoadPending = false

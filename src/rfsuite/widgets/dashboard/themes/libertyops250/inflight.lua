@@ -7,7 +7,12 @@ local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("
 local rfsuite = requireModule("widgets/dashboard/context.lua")
 local lcd = lcd
 
-local tonumber = tonumber
+local rawTonumber = tonumber
+local function tonumber(value)
+    local number = rawTonumber(value)
+    if number == nil or number ~= number or number == math.huge or number == -math.huge then return nil end
+    return number
+end
 local tostring = tostring
 local type = type
 local ipairs = ipairs
@@ -28,18 +33,18 @@ local headeropts = utils.getHeaderOptions()
 local rc = {
     strobeBright = lcd.RGB(255, 30, 30),
     strobeDark = lcd.RGB(60, 0, 0),
-    amber = lcd.RGB(255, 170, 0),
-    red = lcd.RGB(255, 0, 60),
-    cyan = lcd.RGB(0, 240, 255),
-    green = lcd.RGB(57, 255, 20),
-    dim = lcd.RGB(30, 45, 60),
-    bg = lcd.RGB(5, 8, 14),
-    panel = lcd.RGB(12, 18, 28),
+    amber = lcd.RGB(216, 178, 83),
+    red = lcd.RGB(227, 58, 66),
+    cyan = lcd.RGB(64, 145, 255),
+    green = lcd.RGB(83, 210, 104),
+    dim = lcd.RGB(24, 46, 75),
+    bg = lcd.RGB(2, 5, 10),
+    panel = lcd.RGB(8, 16, 28),
     white = lcd.RGB(230, 240, 255),
-    magenta = lcd.RGB(190, 30, 255),
+    magenta = lcd.RGB(216, 178, 83),
     tick = lcd.RGB(64, 86, 110),
-    cyanDim = lcd.RGB(0, 42, 52),
-    magentaDim = lcd.RGB(48, 6, 66),
+    cyanDim = lcd.RGB(15, 40, 72),
+    magentaDim = lcd.RGB(59, 45, 20),
     greenDim = lcd.RGB(10, 54, 14)
 }
 
@@ -54,7 +59,9 @@ local colorMode = {
     fillwarncolor = rc.amber,
     fillcritcolor = rc.red,
     accentcolor = rc.cyan,
-    rssifillbgcolor = rc.cyan,
+    cntextcolor = rc.white, tbtextcolor = rc.white, rssitextcolor = rc.white,
+    txbgfillcolor = rc.dim, txaccentcolor = rc.cyan, txfillcolor = rc.green,
+    rssifillcolor = rc.green, rssifillbgcolor = rc.dim,
     fillbgcolor = rc.dim
 }
 
@@ -266,8 +273,8 @@ local function wakeAesGauge(box, telemetry)
     local thresholds = box.thresholds
     -- Present the value, range, unit, and thresholds in one unit system.
     if telemetry and telemetry.getSensor then
-        local sensorUnit, sensorMin, sensorMax, sensorThresholds
-        val, _, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
+        local sensorPrecision, sensorUnit, sensorMin, sensorMax, sensorThresholds
+        val, sensorPrecision, sensorUnit, sensorMin, sensorMax, sensorThresholds = telemetry.getSensor(cache.source, minValue, maxValue, thresholds)
         val = tonumber(val)
         if box.unit == nil and sensorUnit ~= nil then unit = sensorUnit end
         if sensorMin ~= nil then minValue = sensorMin end
@@ -490,18 +497,15 @@ local function drawCyberBracket(x, y, w, h, style)
 end
 
 local function getThemeValue(key)
+    if key == "throttle_max" then return 100 end
     if key == "tx_min" or key == "tx_warn" or key == "tx_max" then
-        if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
-            local val = rfsuite.preferences.general[key]
-            if val ~= nil then return tonumber(val) end
-        end
+        local general = rfsuite.preferences and rfsuite.preferences.general
+        local value = tonumber(general and general[key])
+        if value ~= nil then return value end
     end
-    if rfsuite and rfsuite.session and rfsuite.session.modelPreferences and rfsuite.session.modelPreferences[theme_section] then
-        local val = rfsuite.session.modelPreferences[theme_section][key]
-        val = tonumber(val)
-        if val ~= nil then return val end
-    end
-    return THEME_DEFAULTS[key]
+    -- The rewritten dashboard installs the selected theme's preferences here.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
+    return value or THEME_DEFAULTS[key]
 end
 
 local function getThemeOptionKey(W)
@@ -538,26 +542,29 @@ if header_layout and header_layout.height then
     header_layout.height = header_layout.height + topbarShiftY
 end
 
-local HEADER_TEXT_1 = "ETHOS "
-local HEADER_TEXT_2 = "// "
-local HEADER_TEXT_3 = "ROTORFLIGHT"
-local headerTextWidth1 = nil
-local headerTextWidth2 = nil
-
-local function paintHeaderLogo(x, y)
-    lcd.font(FONT_L or 0)
-
-    if headerTextWidth1 == nil then
-        headerTextWidth1 = lcd.getTextSize(HEADER_TEXT_1)
-        headerTextWidth2 = lcd.getTextSize(HEADER_TEXT_2)
+local HEADER_LABEL = "Rotorflight // Ethos"
+local HEADER_SIGNATURE = " | MWRC"
+local function paintHeaderLogo(x, y, w, h)
+    local signatureFont = FONT_XXS or FONT_XS
+    lcd.font(signatureFont)
+    local signatureW, signatureH = lcd.getTextSize(HEADER_SIGNATURE)
+    lcd.font(FONT_S)
+    local labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    -- Fit the complete group while keeping the builder signature subordinate.
+    if labelW + signatureW > w - 10 then
+        lcd.font(FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
     end
-
+    if labelW + signatureW > w - 10 then
+        lcd.font(FONT_XXS or FONT_XS)
+        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    end
+    local groupX = x + math.max(5, math.floor((w - labelW - signatureW) / 2))
     lcd.color(rc.cyan)
-    lcd.drawText(x + 5, y + 4, HEADER_TEXT_1)
-    lcd.color(rc.amber)
-    lcd.drawText(x + 5 + headerTextWidth1, y + 4, HEADER_TEXT_2)
-    lcd.color(rc.white)
-    lcd.drawText(x + 5 + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)
+    lcd.drawText(groupX, y + math.max(0, math.floor((h - labelH) / 2)), HEADER_LABEL)
+    lcd.font(signatureFont)
+    lcd.color(rc.tick or rc.dim)
+    lcd.drawText(groupX + labelW, y + math.max(0, math.floor((h - signatureH) / 2)), HEADER_SIGNATURE)
 end
 
 local function header_boxes()
@@ -566,11 +573,12 @@ local function header_boxes()
 
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
-        local headerBgColor = "transparent"
+        local headerBgColor = rc.bg
         for _, box in ipairs(boxes) do
             box.bgcolor = headerBgColor
             box.yoffset = (box.yoffset or 0) + topbarShiftY
 
+            if box.subtype == "craftname" then box.font = nil end
             if box.type == "image" then
                 box.type = "func"
                 box.subtype = "func"
@@ -584,12 +592,39 @@ local function header_boxes()
 end
 
 
+local function paintBackdrop(x, y, w, h)
+    -- Theme-owned surface is painted before instrument and header boxes.
+    local screenW, screenH = lcd.getWindowSize()
+    lcd.color(rc.bg)
+    lcd.drawFilledRectangle(0, 0, screenW, screenH)
+    lcd.color(rc.panel)
+    lcd.drawFilledRectangle(x + 4, y + 4, math.max(1, w - 8), math.max(1, h - 8))
+    lcd.color(rc.dim)
+    lcd.drawRectangle(x + 4, y + 4, math.max(1, w - 8), math.max(1, h - 8))
+    local cellW = w / 12
+    for i = 0, 2 do
+        local cardX = x + i * cellW * 3 + 7
+        lcd.color(rc.bg)
+        lcd.drawFilledRectangle(cardX, y + 20, max(1, floor(cellW * 3 - 12)), max(1, h - 35))
+        lcd.color(rc.dim)
+        lcd.drawRectangle(cardX, y + 20, max(1, floor(cellW * 3 - 12)), max(1, h - 35))
+    end
+    lcd.color(rc.cyan)
+    lcd.drawFilledRectangle(x + 4, y + 4, math.max(1, math.floor(w * 0.12)), 2)
+end
+
+local function safeDisplay(value)
+    value = tonumber(value)
+    if value == nil then return "--" end
+    return math.floor(value + 0.5)
+end
+
 local function buildBoxes(W)
     local optionKey = getThemeOptionKey(W)
     local opts = themeOptions[optionKey] or themeOptions.ms_std
     local compactWindow = optionKey == nil or optionKey == "ls_std" or optionKey == "ms_std" or optionKey == "ss_std"
-    local arcTitleFont = compactWindow and "FONT_S" or "FONT_STD"
-    local arcMaxFont = compactWindow and opts.maxfont or "FONT_L"
+    local arcTitleFont = W < 640 and "FONT_XS" or (compactWindow and "FONT_S" or "FONT_STD")
+    local arcMaxFont = W < 640 and "FONT_XS" or (compactWindow and opts.maxfont or "FONT_L")
 
     -- We kept this one because the context-aware bracket still uses it
     local arcGroupTileBg = {
@@ -605,6 +640,8 @@ local function buildBoxes(W)
     }
 
     return {
+        {col = 1, row = 1, colspan = layout.cols, rowspan = layout.rows,
+            type = "func", subtype = "func", paint = paintBackdrop, bgcolor = "transparent"},
         {
             col = 1, row = 1, colspan = 9, rowspan = 10, xoffset = 0,
             type = "func", subtype = "func",
@@ -686,7 +723,7 @@ local function buildBoxes(W)
         },
         {
             col = 11, row = 9, colspan = 2, rowspan = 2,
-            type = "text", subtype = "telemetry", source = "smartconsumption",
+            type = "text", subtype = "telemetry", source = "smartconsumption", transform = safeDisplay,
             title = "MAH", titlepos = "bottom", unit = "",
             font = "FONT_S", titlefont = "FONT_XS", bgcolor = "transparent",
             titlecolor = rc.cyan, textcolor = rc.white
@@ -695,7 +732,7 @@ local function buildBoxes(W)
 end
 
 local function boxes()
-    local config = rfsuite and rfsuite.session and rfsuite.session.modelPreferences and rfsuite.session.modelPreferences[theme_section]
+    local config = rfsuite.preferences and rfsuite.preferences.dashboard
     local W = lcd.getWindowSize()
     if boxes_cache == nil or themeconfig ~= config or lastScreenW ~= W then
         boxes_cache = buildBoxes(W)

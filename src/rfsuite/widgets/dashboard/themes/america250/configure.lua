@@ -5,7 +5,12 @@
 
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local rfsuite = requireModule("widgets/dashboard/context.lua")
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local floor = math.floor
 local pairs = pairs
 
@@ -54,10 +59,6 @@ local function loadConfig()
     for key, default in pairs(DEFAULTS) do
         config[key] = tonumber(getPref(key)) or default
     end
-
-    -- Migrate the original 8.0 V default, which is too high for a normal
-    -- 7.2 V BEC. User-entered values other than exactly 8.0 V are preserved.
-    if config.bec_warn == 8 then config.bec_warn = DEFAULTS.bec_warn end
 
     config.rpm_max = clamp(config.rpm_max, 100, 20000)
     config.bec_min = clamp(config.bec_min, 2.0, 14.8)

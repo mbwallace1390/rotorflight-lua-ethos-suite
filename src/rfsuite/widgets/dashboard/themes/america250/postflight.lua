@@ -8,14 +8,21 @@ local max = math.max
 local sin = math.sin
 local cos = math.cos
 local rad = math.rad
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local tostring = tostring
 local type = type
 local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
 local headeropts = utils.getHeaderOptions()
-local colorMode = utils.themeColors()
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
 local header_layout = utils.standardHeaderLayout(headeropts)
 local header_boxes_cache = nil
 local last_txbatt_type = nil
@@ -33,56 +40,48 @@ local function header_boxes()
         -- Keep the native ETHOS header widgets, but replace the stock logo
         -- with the shared America 250 / MWRC title treatment.
         for _, headerBox in ipairs(boxes) do
+            if headerBox.subtype == "craftname" then headerBox.font = "FONT_S" end
             if headerBox.type == "image" then
                 headerBox.type = "func"
                 headerBox.subtype = "func"
                 headerBox.bgcolor = "transparent"
                 headerBox.paint = function(x, y, w, h)
-                    local headerBg = colorMode.tbbgcolor or colorMode.bgcolor
-                    if type(headerBg) == "number" then
-                        lcd.color(headerBg)
-                        lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+                    -- Fit the title beside a discreet builder signature, then reuse the measurements.
+                    if headerBox._titleWidth ~= w then
+                        local titleFont = utils.resolveFont("FONT_S", nil)
+                        local markFont = utils.resolveFont("FONT_XXS", nil)
+                        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+                        lcd.font(markFont)
+                        local mw, mh = lcd.getTextSize("| MWRC")
+                        local available = w - 28 - mw
+                        lcd.font(titleFont)
+                        local tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        if tw > available then
+                            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw > available then
+                            titleFont = utils.resolveFont("FONT_XXS", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- The complete header reads Rotorflight // Ethos | MWRC.
+                        headerBox._titleWidth = w
+                        headerBox._titleFont = titleFont
+                        headerBox._titleHeight = th
+                        headerBox._titleTextWidth = tw
+                        headerBox._markFont = markFont
+                        headerBox._markHeight = mh
                     end
-
-                    local font = utils.resolveFont("FONT_L", nil)
-                    if type(font) ~= "number" then return end
-                    lcd.font(font)
-
-                    local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"
-                    local tw1, th = lcd.getTextSize(t1)
-                    local tw2 = lcd.getTextSize(t2)
-                    local tw3 = lcd.getTextSize(t3)
-
-                    local watermarkFont = utils.resolveFont("FONT_XS", nil)
-                    local watermarkText = "MWRC"
-                    local watermarkWidth, watermarkHeight = 0, 0
-                    if type(watermarkFont) == "number" then
-                        lcd.font(watermarkFont)
-                        watermarkWidth, watermarkHeight = lcd.getTextSize(watermarkText)
-                        lcd.font(font)
-                    end
-
-                    local titleW = tw1 + tw2 + tw3
-                    local dividerGap = watermarkWidth > 0 and 14 or 0
-                    local totalW = titleW + dividerGap + watermarkWidth
-                    local tx = floor(x + (w - totalW) / 2)
-                    local ty = floor(y + (h - th) / 2)
-
-                    lcd.color(C.white)
-                    lcd.drawText(tx, ty, t1)
+                    lcd.font(headerBox._titleFont)
                     lcd.color(C.amber)
-                    lcd.drawText(tx + tw1, ty, t2)
-                    lcd.color(C.white)
-                    lcd.drawText(tx + tw1 + tw2, ty, t3)
-
-                    if watermarkWidth > 0 then
-                        local dividerX = tx + titleW + 6
-                        lcd.color(C.line2)
-                        lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)
-                        lcd.font(watermarkFont)
-                        lcd.color(C.red)
-                        lcd.drawText(dividerX + 7, floor(y + (h - watermarkHeight) / 2), watermarkText)
-                    end
+                    lcd.drawText(floor(x + 10), floor(y + (h - headerBox._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(headerBox._markFont)
+                    lcd.color(C.muted)
+                    lcd.drawText(floor(x + 18 + headerBox._titleTextWidth), floor(y + (h - headerBox._markHeight) / 2), "| MWRC")
                 end
             end
         end
@@ -93,7 +92,6 @@ local function header_boxes()
     return header_boxes_cache
 end
 
-local THEME_SECTION = "system/america250"
 local DEFAULTS = {
     rpm_max = 3000,
     bec_min = 6.5,
@@ -199,9 +197,8 @@ local function drawPatrioticTitle(x, y, w)
 end
 
 local function getThemeValue(key)
-    local session = rfsuite and rfsuite.session
-    local prefs = session and session.modelPreferences and session.modelPreferences[THEME_SECTION]
-    local value = prefs and tonumber(prefs[key])
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
 
     if key == "bec_warn" and value == 8 then value = 7.0 end
     return value or DEFAULTS[key]
@@ -226,6 +223,11 @@ local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
 
+local FONT_FALLBACK = {
+    FONT_XXL = "FONT_XL", FONT_XL = "FONT_L", FONT_L = "FONT_STD",
+    FONT_STD = "FONT_S", FONT_S = "FONT_XS", FONT_XS = "FONT_XXS"
+}
+
 local function drawTextAligned(x, y, w, text, fontName, color, align)
     local font = resolveFont(fontName)
     if type(font) ~= "number" then return 0, 0 end
@@ -233,6 +235,16 @@ local function drawTextAligned(x, y, w, text, fontName, color, align)
     lcd.font(font)
     lcd.color(color)
     local tw, th = lcd.getTextSize(text)
+    -- Step down through native fonts when narrow cards cannot fit a reading.
+    local nextFont = FONT_FALLBACK[fontName]
+    while tw > w and nextFont do
+        local smaller = resolveFont(nextFont)
+        if type(smaller) == "number" then
+            lcd.font(smaller)
+            tw, th = lcd.getTextSize(text)
+        end
+        nextFont = FONT_FALLBACK[nextFont]
+    end
     local tx = x
 
     if align == "center" then
@@ -496,7 +508,7 @@ local function postflightWakeup(box, telemetry)
     c.current = stat(telemetry, "current", "max")
     c.watts = stat(telemetry, "watts", "max")
     c.bec = stat(telemetry, "bec_voltage", "min", "bec")
-    c.link = stat(telemetry, "vfr", "min")
+    c.link = stat(telemetry, "vfr", "min", "rssi")
     c.fuel = stat(telemetry, "smartfuel", "min")
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
@@ -602,6 +614,7 @@ local EMPTY_CARDS = {}
 
 local function postflightPaint(x, y, w, h, box, c, telemetry)
     c = c or box._cache or {}
+    box._cache = c
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
@@ -630,7 +643,7 @@ local function postflightPaint(x, y, w, h, box, c, telemetry)
     drawPatrioticTitleRail(x + pad, y + 34, w - pad * 2)
 
     local summaryY = y + 44
-    local summaryH = 68
+    local summaryH = h < 330 and 40 or 68
     local summaryX = x + pad
     local summaryW = w - pad * 2
     local gradeColor = c.gradeColor or C.muted
@@ -639,21 +652,21 @@ local function postflightPaint(x, y, w, h, box, c, telemetry)
 
     local leftX = summaryX + 18
     local leftW = floor(summaryW * 0.35)
-    drawTextAligned(leftX, summaryY + 11, leftW, "FLIGHT RESULT", "FONT_XXS", C.muted, "left")
-    drawTextAligned(leftX, summaryY + 25, leftW, c.grade or "NO DATA", "FONT_STD", gradeColor, "left")
-    drawTextAligned(leftX, summaryY + 48, leftW, c.gradeSub or "NO FLIGHT TELEMETRY", "FONT_XXS", C.white, "left")
+    if h >= 330 then drawTextAligned(leftX, summaryY + 11, leftW, "FLIGHT RESULT", "FONT_XXS", C.muted, "left") end
+    drawTextAligned(leftX, summaryY + (h < 330 and 10 or 25), leftW, c.grade or "NO DATA", "FONT_STD", gradeColor, "left")
+    if h >= 330 then drawTextAligned(leftX, summaryY + 48, leftW, c.gradeSub or "NO FLIGHT TELEMETRY", "FONT_XXS", C.white, "left") end
 
     local centerX = summaryX + summaryW * 0.51
     local centerY = summaryY + summaryH * 0.50
-    drawShield(centerX, centerY + 1, 86, 50, C.line2)
-    drawAnniversaryStars(centerX, summaryY + 12, summaryY + summaryH - 10)
-    drawTextAligned(centerX - 50, summaryY + 17, 100, "250", "FONT_L", C.amber, "center")
-    drawCenteredDotLine(centerX - 50, summaryY + 42, 100, "1776", "2026", "FONT_XXS", C.white, C.amber)
+    if h >= 330 then drawShield(centerX, centerY + 1, 86, 50, C.line2) end
+    if h >= 330 then drawAnniversaryStars(centerX, summaryY + 12, summaryY + summaryH - 10) end
+    drawTextAligned(centerX - 50, summaryY + (h < 330 and 6 or 17), 100, "250", "FONT_L", C.amber, "center")
+    if h >= 330 then drawCenteredDotLine(centerX - 50, summaryY + 42, 100, "1776", "2026", "FONT_XXS", C.white, C.amber) end
 
     local timeX = summaryX + summaryW - 220
     local timeW = 198
-    drawTextAligned(timeX, summaryY + 10, timeW, c.time or "00:00", "FONT_XL", C.white, "right")
-    drawTextAligned(timeX, summaryY + 48, timeW, "FLIGHT TIME", "FONT_XXS", C.muted, "right")
+    drawTextAligned(timeX, summaryY + 6, timeW, c.time or "00:00", h < 330 and "FONT_L" or "FONT_XL", C.white, "right")
+    if h >= 330 then drawTextAligned(timeX, summaryY + 48, timeW, "FLIGHT TIME", "FONT_XXS", C.muted, "right") end
 
     local gridY = summaryY + summaryH + 8
     local footerReserve = 20
