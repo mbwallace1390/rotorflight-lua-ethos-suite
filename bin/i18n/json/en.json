@@ -114,6 +114,18 @@
       "needs_translation": false,
       "max_length": 67
     },
+    "msg_save_not_commited": {
+      "english": "Save not committed",
+      "translation": "Save not committed",
+      "needs_translation": false,
+      "max_length": 18
+    },
+    "msg_please_disarm_to_save_warning": {
+      "english": "The flight controller rejected the save while armed. Your changes are safe and will be written to flash when you disarm.",
+      "translation": "The flight controller rejected the save while armed. Your changes are safe and will be written to flash when you disarm.",
+      "needs_translation": false,
+      "max_length": 120
+    },
     "msg_background_task_missing_title": {
       "english": "Background task not running",
       "translation": "Background task not running",
@@ -3714,6 +3726,12 @@
           "needs_translation": false,
           "translation": "Min Cell Voltage"
         },
+        "model_type": {
+          "english": "Power Type",
+          "max_length": 10,
+          "needs_translation": false,
+          "translation": "Power Type"
+        },
         "name": {
           "english": "Power",
           "max_length": 5,
@@ -6992,6 +7010,24 @@
         "max_length": 7,
         "needs_translation": false,
         "translation": "RX Batt"
+      },
+      "tbl_auto": {
+        "english": "Auto",
+        "max_length": 4,
+        "needs_translation": false,
+        "translation": "Auto"
+      },
+      "tbl_electric": {
+        "english": "Electric",
+        "max_length": 8,
+        "needs_translation": false,
+        "translation": "Electric"
+      },
+      "tbl_nitro": {
+        "english": "Nitro",
+        "max_length": 5,
+        "needs_translation": false,
+        "translation": "Nitro"
       }
     },
     "BATTERY_CONFIG": {
