@@ -1,6 +1,11 @@
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local rfsuite = requireModule("widgets/dashboard/context.lua")
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local floor = math.floor
 local pairs = pairs
 
