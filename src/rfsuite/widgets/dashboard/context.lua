@@ -50,7 +50,6 @@ end
 
 local utils = {}
 local dashboardPrefs = {}
-local dashboardPreferenceSection = nil
 local tempThresholdCache = setmetatable({}, {__mode = "k"})
 local fmtCache = {}
 local paletteCache = {}
@@ -64,6 +63,9 @@ local liveSourceCache = {}
 local liveMissRetryAt = {}
 local liveMissCount = {}
 local liveRevalidateAt = {}
+local electricEngineCacheConfig = nil
+local electricEngineCacheModelType = nil
+local electricEngineCacheResult = false
 -- Same fix as lib/telemetry_sensors.lua's own MISS_RETRY_INITIAL/_MAX: a flat
 -- 5s lockout from the first miss meant a box whose sensor simply hadn't
 -- broadcast yet (common right after connect) stayed blank for up to 5s
@@ -2076,8 +2078,65 @@ function utils.isImageTooLarge(path, maxBytes)
   return context.utils.isImageTooLarge(path, maxBytes)
 end
 
+local function configuredCapacity(value)
+  if type(value) == "number" then return value end
+  if type(value) == "string" then return tonumber(value:match("(%d+)")) end
+  if type(value) == "table" then
+    if type(value.capacity) == "number" then return value.capacity end
+    if type(value.capacity) == "string" then return tonumber(value.capacity:match("(%d+)")) end
+    if type(value.name) == "string" then return tonumber(value.name:match("(%d+)")) end
+  end
+  return nil
+end
+
+local function hasConfiguredBatteryCapacity(config)
+  if not config then return false end
+  local capacity = tonumber(config.batteryCapacity) or 0
+  if capacity > 0 then return true end
+
+  local profiles = config.profiles
+  if type(profiles) ~= "table" then return false end
+  for i = 0, 5 do
+    capacity = configuredCapacity(profiles[i])
+    if capacity and capacity > 0 then return true end
+  end
+  for i = 1, 6 do
+    capacity = configuredCapacity(profiles[i])
+    if capacity and capacity > 0 then return true end
+  end
+  return false
+end
+
 function utils.isElectricEngine()
-  return true
+  local modelType = tonumber(currentWidget and currentWidget.smartfuelModelType)
+  if modelType == nil then
+    local batteryPrefs = context.session
+      and context.session.modelPreferences
+      and context.session.modelPreferences.battery
+    modelType = tonumber(batteryPrefs and batteryPrefs.smartfuel_model_type) or 0
+  end
+
+  local config = currentWidget and currentWidget.batteryConfig
+  if electricEngineCacheConfig == config and electricEngineCacheModelType == modelType then
+    return electricEngineCacheResult
+  end
+
+  local isElectric
+  if modelType == 0 then
+    if not config then
+      isElectric = false
+    else
+      local cellCount = tonumber(config.cellCount or config.batteryCellCount) or 0
+      isElectric = cellCount ~= 0 or hasConfiguredBatteryCapacity(config)
+    end
+  else
+    isElectric = modelType == 1
+  end
+
+  electricEngineCacheConfig = config
+  electricEngineCacheModelType = modelType
+  electricEngineCacheResult = isElectric
+  return isElectric
 end
 
 function utils.applyOffset(x, y, box)
@@ -2288,13 +2347,11 @@ function context.widgets.dashboard.savePreference(key, value)
   dashboardPrefs[key] = value
 end
 
-function context.widgets.dashboard.setPreferences(values, section)
+function context.widgets.dashboard.setPreferences(values)
   dashboardPrefs = {}
   if type(values) == "table" then
     for key, value in pairs(values) do dashboardPrefs[key] = value end
   end
-  dashboardPreferenceSection = type(section) == "string" and section or nil
-  context.widgets.dashboard.currentWidgetPath = dashboardPreferenceSection
 end
 
 function context.widgets.dashboard.preferences()
@@ -2321,16 +2378,13 @@ function context.setWidget(widget)
   context.session.bblSize = widget and widget.bblSize
   context.session.bblUsed = widget and widget.bblUsed
   context.session.headspeedVariancePct = widget and widget.headspeedVariancePct
-  context.session.modelPreferences = {
-    general = {
-      flightcount = widget and widget.modelStats and widget.modelStats.flightcount or 0,
-      totalflighttime = widget and widget.modelStats and widget.modelStats.totalflighttime or 0,
-      lastflighttime = widget and widget.modelStats and widget.modelStats.lastflighttime or 0,
-    },
-  }
-  if dashboardPreferenceSection then
-    context.session.modelPreferences[dashboardPreferenceSection] = dashboardPrefs
-  end
+  local modelPrefs = context.session.modelPreferences
+  modelPrefs.general = modelPrefs.general or {}
+  modelPrefs.battery = modelPrefs.battery or {}
+  modelPrefs.general.flightcount = widget and widget.modelStats and widget.modelStats.flightcount or 0
+  modelPrefs.general.totalflighttime = widget and widget.modelStats and widget.modelStats.totalflighttime or 0
+  modelPrefs.general.lastflighttime = widget and widget.modelStats and widget.modelStats.lastflighttime or 0
+  modelPrefs.battery.smartfuel_model_type = widget and widget.smartfuelModelType or 0
   context.flightmode.current = widget and widget.flightmodeState or "preflight"
 end
 
