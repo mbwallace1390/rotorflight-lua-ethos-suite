@@ -272,16 +272,9 @@ local function prepareGeometry(x, y, w, h, box, c)
     return g
 end
 
-local STAT_SOURCE_ALIASES = {
-    headspeed = "rpm",
-    smartconsumption = "consumption",
-    fuel = "smartfuel"
-}
-
 local function getStatsValue(telemetry, source, statType)
     if source == nil then return nil end
-    local allStats = telemetry and telemetry.sensorStats
-    local stats = allStats and (allStats[source] or allStats[STAT_SOURCE_ALIASES[source]])
+    local stats = telemetry and telemetry.sensorStats and telemetry.sensorStats[source]
     if stats and stats[statType] ~= nil then
         local value = stats[statType]
         local sensorDef = telemetry and telemetry.sensorTable and telemetry.sensorTable[source]
@@ -304,20 +297,6 @@ local function getSensorUnit(telemetry, source)
         if localizedUnit ~= nil then return localizedUnit end
     end
     return sensorDef and sensorDef.unit_string or nil
-end
-
-local function getSensorPresentation(telemetry, source, minValue, maxValue, thresholds)
-    local sensorDef = source and telemetry and telemetry.sensorTable and telemetry.sensorTable[source]
-    local localize = sensorDef and sensorDef.localizations
-    if type(localize) ~= "function" then
-        return nil, minValue, maxValue, thresholds
-    end
-
-    local _, _, unit, presentedMin, presentedMax, presentedThresholds = localize(nil, minValue, maxValue, thresholds)
-    if presentedMin == nil then presentedMin = minValue end
-    if presentedMax == nil then presentedMax = maxValue end
-    if presentedThresholds == nil then presentedThresholds = thresholds end
-    return unit, presentedMin, presentedMax, presentedThresholds
 end
 
 local function getAliasStatsValue(telemetry, statType, sourceA, sourceB, sourceC, sourceD)
@@ -452,18 +431,16 @@ function render.wakeup(box)
     elseif source == "watts" and telemetry then
         dynamicUnit = "W"
 
-        if cfg.stattype then
-            -- Prefer the sampled watts statistic; independent voltage/current
-            -- peaks may occur at different times and their product is not a
-            -- true maximum. Older telemetry providers can use the component
-            -- statistics as a compatibility fallback.
-            value = getStatsValue(telemetry, "watts", cfg.stattype)
-            if value == nil then
-                local vStat = getStatsValue(telemetry, "voltage", cfg.stattype)
-                local iStat = getStatsValue(telemetry, "current", cfg.stattype)
-                if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
-            end
-        else
+        local statType = cfg.stattype or "current"
+        local vStat = getStatsValue(telemetry, "voltage", statType)
+        local iStat = getStatsValue(telemetry, "current", statType)
+
+        if statType == "min" or statType == "max" or statType == "avg" then
+            if vStat ~= nil and iStat ~= nil then value = vStat * iStat end
+        end
+
+        -- Fallback to live watts if stats are unavailable.
+        if value == nil then
             local volts = readLiveSensor(telemetry, "voltage")
             local amps = readLiveSensor(telemetry, "current")
             if volts ~= nil and amps ~= nil then value = volts * amps end
@@ -486,6 +463,11 @@ function render.wakeup(box)
 
             dynamicUnit = dynamicUnit or getSensorUnit(telemetry, source)
 
+            -- If the requested stat is not ready yet, fall back to the live sensor so
+            -- the bar still populates instead of showing loading dots forever.
+            if value == nil then
+                value, dynamicUnit = readLiveSensor(telemetry, source)
+            end
         else
             value, dynamicUnit = readLiveSensor(telemetry, source)
         end
@@ -499,25 +481,11 @@ function render.wakeup(box)
     local consumed = getSensor and getSensor("smartconsumption") or 0
     local perCellVoltage = (cellCount > 0) and (voltage / cellCount) or 0
 
-    local minCfg, maxCfg
-    if source == "txbatt" then
-        minCfg = getParam(box, "min") or 7.2
-        maxCfg = getParam(box, "max") or 8.4
-    else
-        minCfg = getParam(box, "min") or 0
-        maxCfg = getParam(box, "max") or 100
-    end
-
-    local thresholdsCfg = getParam(box, "thresholds")
-    local localizedUnit, vmin, vmax, presentedThresholds = getSensorPresentation(telemetry, source, minCfg, maxCfg, thresholdsCfg)
-
     local manualUnit = cfg.manualUnit
     local unit
 
     if manualUnit ~= nil then
         unit = manualUnit
-    elseif localizedUnit ~= nil then
-        unit = localizedUnit
     elseif dynamicUnit ~= nil then
         unit = dynamicUnit
     elseif source and telemetry and telemetry.sensorTable[source] then
@@ -536,13 +504,6 @@ function render.wakeup(box)
         c._lastValidDisplayValue = displayValue
         c._lastValidUnit = unit
     else
-        -- Stats are cleared in place at the start of a flight. Do not let the
-        -- box-level cache resurrect a value from the previous flight.
-        if cfg.stattype then
-            c._lastValidValue = nil
-            c._lastValidDisplayValue = nil
-            c._lastValidUnit = nil
-        end
         if c._lastValidValue ~= nil then
             value = c._lastValidValue
             displayValue = c._lastValidDisplayValue
@@ -553,6 +514,15 @@ function render.wakeup(box)
             displayValue = LOADING_DOTS[c._dotCount + 1]
             unit = nil
         end
+    end
+
+    local vmin, vmax
+    if source == "txbatt" then
+        vmin = getParam(box, "min") or 7.2
+        vmax = getParam(box, "max") or 8.4
+    else
+        vmin = getParam(box, "min") or 0
+        vmax = getParam(box, "max") or 100
     end
 
     local percent = 0
@@ -618,8 +588,8 @@ function render.wakeup(box)
     local thresholdValue = displayValue
     if type(thresholdValue) ~= "number" then thresholdValue = value end
 
-    c.textcolor = resolveThresholdColor(thresholdValue, box, "textcolor", "textcolor", presentedThresholds)
-    c.fillcolor = resolveThresholdColor(thresholdValue, box, "fillcolor", "fillcolor", presentedThresholds)
+    c.textcolor = resolveThresholdColor(thresholdValue, box, "textcolor", "textcolor")
+    c.fillcolor = resolveThresholdColor(thresholdValue, box, "fillcolor", "fillcolor")
     c.fillbgcolor = cfg.fillbgcolor
     c.bgcolor = cfg.bgcolor
     c.titlecolor = cfg.titlecolor

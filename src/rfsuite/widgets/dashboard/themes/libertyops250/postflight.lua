@@ -174,12 +174,15 @@ local function wakeStatTile(box, telemetry)
         cache = {text = "--", percent = 0, color = box.fillcolor or rc.cyan}
         box._cache = cache
     end
-    local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(box.source)
+    local statSource = box.source == "rssi" and "vfr" or box.source
+    local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(statSource)
     local value = tonumber(stats and stats[box.stattype or "max"])
     if box.source == "rssi" then
-        -- Older flights may retain VFR rather than LQ; both must be percent values.
+        -- Prefer recorded VFR; the Suite's RSSI fallback can return minLink in dB.
+        -- Only an explicit RSSI statistic is safe as a percentage fallback.
         if value == nil or value < 0 or value > 100 then
-            local fallback = telemetry and telemetry.getSensorStats and telemetry.getSensorStats("vfr")
+            local allStats = telemetry and telemetry.sensorStats
+            local fallback = allStats and allStats.rssi
             value = tonumber(fallback and fallback[box.stattype or "max"])
         end
         if value ~= nil and (value < 0 or value > 100) then value = nil end

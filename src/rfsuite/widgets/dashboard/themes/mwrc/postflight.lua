@@ -174,15 +174,23 @@ local function wakeStatTile(box, telemetry)
         cache = {text = "--", percent = 0, color = box.fillcolor or rc.cyan}
         box._cache = cache
     end
-    local stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(box.source)
-    local value = tonumber(stats and stats[box.stattype or "max"])
+    local stats
+    local value
+    local statType = box.stattype or "max"
     if box.source == "rssi" then
-        -- Older flights may retain VFR rather than LQ; both must be percent values.
+        -- Match the live percentage source priority. The generic RSSI reader
+        -- can fall back to legacy minLink/maxLink signal strength, not percent.
+        stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats("vfr")
+        value = tonumber(stats and stats[statType])
         if value == nil or value < 0 or value > 100 then
-            local fallback = telemetry and telemetry.getSensorStats and telemetry.getSensorStats("vfr")
-            value = tonumber(fallback and fallback[box.stattype or "max"])
+            local recorded = telemetry and telemetry.sensorStats
+            local percentRssi = recorded and recorded.rssi
+            value = tonumber(percentRssi and percentRssi[statType])
         end
         if value ~= nil and (value < 0 or value > 100) then value = nil end
+    else
+        stats = telemetry and telemetry.getSensorStats and telemetry.getSensorStats(box.source)
+        value = tonumber(stats and stats[statType])
     end
     local unit = box.unit
     local minimum, maximum, thresholds = box.min or 0, box.max or 100, box.thresholds

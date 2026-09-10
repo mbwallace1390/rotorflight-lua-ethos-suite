@@ -242,9 +242,12 @@ class ThemeContractTests(unittest.TestCase):
     def test_postflight_link_uses_valid_percentage_history_and_refreshes(self):
         for theme in ("mwrc", "libertyops250"):
             for rssi_min, expected in ((None, "87%"), (float("nan"), "87%"),
-                                       (-82, "87%"), (101, "87%"), (93, "93%")):
+                                       (-82, "87%"), (101, "87%"), (93, "87%")):
                 with self.subTest(theme=theme, rssi_min=rssi_min):
                     def link_history(radio, widget):
+                        # Upstream's legacy rssi statistics getter can fall back
+                        # to these dB fields. They must never become a percentage.
+                        widget.dashboardStats.minLink, widget.dashboardStats.maxLink = 65, 90
                         widget.dashboardStats.rssi = None if rssi_min is None else radio.table({"min": rssi_min})
                         widget.dashboardStats.vfr = radio.table({"min": 87})
                     radio, state, widget = render(theme, "postflight", prepare=link_history)
@@ -262,6 +265,20 @@ class ThemeContractTests(unittest.TestCase):
                         radio.engine.wakeup(widget, state, radio.width, radio.height)
                     self.assertEqual(card._cache.text, "--", "removed history left a stale link summary")
                     self.assertEqual(card._cache.percent, 0)
+
+    def test_postflight_link_fallback_uses_only_recorded_percentages(self):
+        for theme in ("mwrc", "libertyops250"):
+            for vfr, rssi, expected in ((None, None, "--"), (None, 93, "93%"),
+                                         (120, 93, "93%"), (0, 93, "0%"),
+                                         (None, -82, "--"), (87, 93, "87%")):
+                with self.subTest(theme=theme, vfr=vfr, rssi=rssi):
+                    def link_history(radio, widget):
+                        widget.dashboardStats.minLink, widget.dashboardStats.maxLink = 65, 90
+                        widget.dashboardStats.vfr = None if vfr is None else radio.table({"min": vfr})
+                        widget.dashboardStats.rssi = None if rssi is None else radio.table({"min": rssi})
+                    radio, state, _ = render(theme, "postflight", prepare=link_history)
+                    card = next(box for box in boxes(state) if box.title == "Link Min")
+                    self.assertEqual(card._cache.text, expected)
 
 
 if __name__ == "__main__":
