@@ -8,7 +8,12 @@ local rfsuite = requireModule("widgets/dashboard/context.lua")
 
 local floor = math.floor
 local pairs = pairs
-local tonumber = tonumber
+local rawTonumber = tonumber
+local function tonumber(value)
+    local number = rawTonumber(value)
+    if number == nil or number ~= number or number == math.huge or number == -math.huge then return nil end
+    return number
+end
 
 local config = {}
 
