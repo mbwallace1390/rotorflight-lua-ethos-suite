@@ -37,6 +37,7 @@ local DiySensor = requireModule("lib/diy_sensor.lua")
 local telemetryConfig = requireModule("lib/msp_telemetry_config.lua")
 local flightTimer = requireModule("tasks/flight_timer.lua")
 local debugLog = requireModule("lib/debug_log.lua")
+local rxMapApi = requireModule("lib/msp_rx_map.lua")
 
 local TELEMETRY_VALUE_INTERVAL = 0.5
 local PROFILE_INTERVAL = 0.5
@@ -101,6 +102,7 @@ local session = {
   timerSession = 0,
   timerFlightCounted = false,
   timerTarget = 300,
+  smartfuelModelType = 0,
   modelPreferences = nil,
   modelPreferencesFile = nil,
   modelPreferencesMcuId = nil,
@@ -124,6 +126,13 @@ local session = {
   -- armingDisableFlagsToString() for how the dashboard's governor/armflags
   -- objects turn this into a human-readable reason list.
   armDisableFlags = nil,
+  -- Physical RX channel index for each logical control (MSP_RX_MAP, cmd
+  -- 64), read once per connect same as the rest of runHandshake(). Lets
+  -- widgets/dashboard/flightmode.lua resolve the radio's own throttle
+  -- channel via system.getSource({category = CATEGORY_CHANNEL, member =
+  -- rxMap.throttle}) -- a local, instant signal, not FC telemetry -- see
+  -- that file's own header for why this matters.
+  rxMap = nil,
 }
 
 local localSmartFuel = SmartFuel.new()
@@ -311,12 +320,14 @@ local function flush()
     timerSession = session.timerSession,
     timerFlightCounted = session.timerFlightCounted,
     timerTarget = session.timerTarget,
+    smartfuelModelType = session.smartfuelModelType,
     modelStats = copyStats(session.modelStats),
     bblFlags = session.bblFlags,
     bblSize = session.bblSize,
     bblUsed = session.bblUsed,
     isArmed = session.isArmed,
     armDisableFlags = session.armDisableFlags,
+    rxMap = session.rxMap,
   })
 end
 
@@ -324,9 +335,11 @@ local function updateModelSnapshots()
   if session.modelPreferences then
     session.modelStats = modelPreferences.stats(session.modelPreferences)
     session.timerTarget = modelPreferences.timerTarget(session.modelPreferences)
+    session.smartfuelModelType = modelPreferences.smartfuelModelType(session.modelPreferences)
   else
     session.modelStats = nil
     session.timerTarget = 300
+    session.smartfuelModelType = 0
   end
 end
 
@@ -621,6 +634,13 @@ local function runHandshake(mspQueue, protocol)
     end))
   end
 
+  if not session.rxMap then
+    mspQueue:add(rxMapApi.buildReadMessage(function(data)
+      session.rxMap = data
+      publish()
+    end))
+  end
+
   -- Fetched regardless of protocol (cheap, and tasks/elrs_sensors.lua wants
   -- the same slot data for its own SID-relevance filtering on CRSF) -- retry
   -- in wakeup() if the first read exhausts the queue's own per-message tries.
@@ -672,6 +692,7 @@ local function setConnected(value, mspQueue, protocol)
     session.fuelPercent = nil
     session.governorMode = nil
     session.governorState = nil
+    session.rxMap = nil
     session.telemetrySlots = nil
     session.pidProfile = nil
     session.rateProfile = nil
@@ -682,6 +703,7 @@ local function setConnected(value, mspQueue, protocol)
     session.timerSession = 0
     session.timerFlightCounted = false
     session.timerTarget = 300
+    session.smartfuelModelType = 0
     session.modelPreferences = nil
     session.modelPreferencesFile = nil
     session.modelPreferencesMcuId = nil
@@ -916,6 +938,18 @@ local function onModelTimerUpdate(payload)
 end
 
 bus.subscribe("model.timer.update", onModelTimerUpdate)
+
+local function onModelSmartfuelTypeUpdate(payload)
+  if type(payload) ~= "table" then return end
+  if not session.mcuId or payload.mcuId ~= session.mcuId then return end
+  loadModelPreferences()
+  session.modelPreferences = modelPreferences.setSmartfuelModelType(session.modelPreferences, payload.smartfuelModelType)
+  saveModelPreferences()
+  updateModelSnapshots()
+  publish()
+end
+
+bus.subscribe("model.smartfuel_type.update", onModelSmartfuelTypeUpdate)
 
 -- Setup > Power > Battery / SmartFuel each write straight to the FC (see
 -- app/pages/power_battery.lua and app/pages/power_smartfuel.lua's own
