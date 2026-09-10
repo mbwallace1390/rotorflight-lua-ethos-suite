@@ -9,7 +9,12 @@ local sin = math.sin
 local cos = math.cos
 local rad = math.rad
 local pi = math.pi
-local tonumber = tonumber
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
 local tostring = tostring
 local type = type
 local format = string.format
@@ -17,12 +22,14 @@ local ipairs = ipairs
 
 local utils = rfsuite.widgets.dashboard.utils
 local headeropts = utils.getHeaderOptions()
-local colorMode = utils.themeColors()
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
 local header_layout = utils.standardHeaderLayout(headeropts)
 
 local C = {
-    bg = lcd.RGB(34, 26, 42),
-    panel = lcd.RGB(34, 26, 42),
+    bg = lcd.RGB(20, 15, 30),
+    panel = lcd.RGB(37, 27, 51),
     line = lcd.RGB(104, 75, 119),
     line2 = lcd.RGB(151, 107, 160),
     white = lcd.RGB(246, 239, 255),
@@ -42,12 +49,17 @@ local C = {
     red = lcd.RGB(255, 74, 96)
 }
 
--- Use the native ETHOS header surface everywhere so the theme is visually
--- continuous from the system header through the custom dashboard.
-C.bg = colorMode.tbbgcolor or colorMode.bgcolor or C.bg
-C.panel = C.bg
+-- Keep telemetry contrast stable when the transmitter uses a light system theme.
+colorMode.bgcolor = C.bg
+colorMode.tbbgcolor = C.panel
+colorMode.tbtextcolor = C.white
+colorMode.cntextcolor = C.white
+colorMode.rssitextcolor = C.white
+colorMode.rssifillcolor = C.cyan or C.turquoise
+colorMode.rssifillbgcolor = C.line
+colorMode.txbgfillcolor = C.line
+colorMode.txfillcolor = C.green or C.emerald
 
-local THEME_SECTION = "system/zafira"
 local DEFAULTS = {
     rpm_max = 3000,
     bec_min = 6.5,
@@ -67,9 +79,8 @@ local function clamp(v, lo, hi)
 end
 
 local function getThemeValue(key)
-    local session = rfsuite and rfsuite.session
-    local prefs = session and session.modelPreferences and session.modelPreferences[THEME_SECTION]
-    local value = prefs and tonumber(prefs[key])
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
     return value or DEFAULTS[key]
 end
 
@@ -169,12 +180,27 @@ local function resolveFont(name)
     return utils.resolveFont(name, nil)
 end
 
+local FONT_FALLBACK = {
+    FONT_XXL = "FONT_XL", FONT_XL = "FONT_L", FONT_L = "FONT_STD",
+    FONT_STD = "FONT_S", FONT_S = "FONT_XS", FONT_XS = "FONT_XXS"
+}
+
 local function drawTextAligned(x, y, w, text, fontName, color, align)
     local font = resolveFont(fontName)
     if type(font) ~= "number" then return 0, 0 end
     lcd.font(font)
     lcd.color(color)
     local tw, th = lcd.getTextSize(text)
+    -- Step down through native fonts when narrow cards cannot fit a reading.
+    local nextFont = FONT_FALLBACK[fontName]
+    while tw > w and nextFont do
+        local smaller = resolveFont(nextFont)
+        if type(smaller) == "number" then
+            lcd.font(smaller)
+            tw, th = lcd.getTextSize(text)
+        end
+        nextFont = FONT_FALLBACK[nextFont]
+    end
     local tx = x
     if align == "center" then tx = x + (w - tw) / 2
     elseif align == "right" then tx = x + w - tw end
@@ -265,8 +291,11 @@ end
 
 local function drawMetric(x, y, w, h, title, value, accent, subtitle)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 13, y + 28, w - 26, value, "FONT_L", value == "--" and C.muted or C.white, "left")
-    if subtitle then drawTextAligned(x + 13, y + h - 23, w - 26, subtitle, "FONT_XXS", C.muted, "left") end
+    local compact = h < 75
+    drawTextAligned(x + 13, y + (compact and 21 or 27), w - 26, value, compact and "FONT_S" or "FONT_L", value == "--" and C.muted or C.white, "left")
+    if subtitle and h >= 88 then
+        drawTextAligned(x + 13, y + h - 21, w - 26, subtitle, "FONT_XXS", C.muted, "left")
+    end
 end
 
 local function drawProgress(x, y, w, h, percent, color)
@@ -289,43 +318,35 @@ local function drawGemLine(x, y, w, count, percent, activeColor, dimColor)
     end
 end
 
+local HEADER_LABEL = "Rotorflight // Ethos"
+local HEADER_SIGNATURE = " | MWRC"
 local function drawHeaderTitle(x, y, w, h)
-    lcd.color(C.bg)
+    lcd.color(C.panel)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
-    local t1, t2, t3 = "ETHOS ", "// ", "ROTORFLIGHT"
-    local f = resolveFont("FONT_L")
-    if type(f) ~= "number" then return end
-    lcd.font(f)
-    local w1, th = lcd.getTextSize(t1)
-    local w2 = lcd.getTextSize(t2)
-    local w3 = lcd.getTextSize(t3)
-
-    local watermarkFont = resolveFont("FONT_XS")
-    local watermarkText = "MWRC"
-    local watermarkWidth, watermarkHeight = 0, 0
-    if type(watermarkFont) == "number" then
-        lcd.font(watermarkFont)
-        watermarkWidth, watermarkHeight = lcd.getTextSize(watermarkText)
-        lcd.font(f)
+    local signatureFont = utils.resolveFont("FONT_XXS", nil)
+    if type(signatureFont) ~= "number" then return end
+    lcd.font(signatureFont)
+    local sw, sh = lcd.getTextSize(HEADER_SIGNATURE)
+    local fontName = "FONT_S"
+    local titleFont = utils.resolveFont(fontName, nil)
+    if type(titleFont) ~= "number" then return end
+    lcd.font(titleFont)
+    local tw, th = lcd.getTextSize(HEADER_LABEL)
+    -- Reserve room for the smaller builder signature when fitting the title.
+    while (tw + sw > w - 20 or th > h) and FONT_FALLBACK[fontName] do
+        fontName = FONT_FALLBACK[fontName]
+        local smaller = utils.resolveFont(fontName, nil)
+        if type(smaller) == "number" then
+            lcd.font(smaller)
+            tw, th = lcd.getTextSize(HEADER_LABEL)
+        end
     end
-
-    local titleWidth = w1 + w2 + w3
-    local dividerGap = watermarkWidth > 0 and 14 or 0
-    local totalWidth = titleWidth + dividerGap + watermarkWidth
-    local tx = floor(x + (w - totalWidth) / 2)
-    local ty = floor(y + (h - th) / 2)
-    lcd.color(C.gold); lcd.drawText(tx, ty, t1)
-    lcd.color(C.fuchsia); lcd.drawText(tx + w1, ty, t2)
-    lcd.color(C.white); lcd.drawText(tx + w1 + w2, ty, t3)
-
-    if watermarkWidth > 0 then
-        local dividerX = tx + titleWidth + 6
-        lcd.color(C.line2)
-        lcd.drawLine(dividerX, y + 7, dividerX, y + h - 7)
-        lcd.font(watermarkFont)
-        lcd.color(C.gold)
-        lcd.drawText(dividerX + 7, floor(y + (h - watermarkHeight) / 2), watermarkText)
-    end
+    local tx = floor(x + (w - tw - sw) / 2)
+    lcd.color(C.gold)
+    lcd.drawText(tx, floor(y + (h - th) / 2), HEADER_LABEL)
+    lcd.font(signatureFont)
+    lcd.color(C.muted)
+    lcd.drawText(tx + tw, floor(y + (h - sh) / 2), HEADER_SIGNATURE)
 end
 
 local header_boxes_cache = nil
@@ -338,6 +359,7 @@ local function header_boxes()
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
         for _, b in ipairs(boxes) do
+            if b.subtype == "craftname" then b.font = "FONT_S" end
             b.bgcolor = C.bg
             if b.type == "image" then
                 b.type = "func"
@@ -420,7 +442,7 @@ local function inflightWakeup(box, telemetry)
     c.current = sensor(telemetry, "current")
     c.watts = sensor(telemetry, "watts")
     c.bec = sensor(telemetry, "bec_voltage", "bec")
-    c.link = sensor(telemetry, "vfr")
+    c.link = sensor(telemetry, "vfr", "rssi")
     c.consumed = sensor(telemetry, "smartconsumption", "consumption")
     c.flightState, c.flightColor = getFlightState(telemetry)
     updateFlightTime(c)
@@ -466,10 +488,11 @@ local function drawEmberColumn(x, y, w, h, value, maximum, valueText, color)
     local baseY = y + h - 27
     local active = floor(9 * pct + 0.999)
     for i = 0, 8 do
-        local cy = baseY - i * 20
-        drawDiamond(x + 34, cy, 8, i < active and color or C.line2, i < active and C.gold or nil)
+        local step = max(3, (h - 60) / 8)
+        local cy = baseY - i * step
+        drawDiamond(x + 28, cy, min(6, max(2, (h - 60) / 18)), i < active and color or C.line2, i < active and C.gold or nil)
     end
-    drawTextAligned(x + 62, y + 46, w - 74, valueText, "FONT_L", value and C.white or C.muted, "left")
+    drawTextAligned(x + 48, y + 31, w - 60, valueText, "FONT_L", value and C.white or C.muted, "left")
 end
 
 local function drawThrustRibbon(x, y, w, h, throttle, valueText, color)
@@ -477,13 +500,13 @@ local function drawThrustRibbon(x, y, w, h, throttle, valueText, color)
     local pct = clamp((throttle or 0) / 100, 0, 1)
     local active = floor(10 * pct + 0.999)
     for i = 0, 9 do
-        local bh = 18 + i * 7
+        local bh = max(2, (h - 72) * (0.20 + i * 0.08))
         local bx = x + 16 + i * floor((w - 34) / 10)
         local by = y + h - 24 - bh
         lcd.color(i < active and (i % 2 == 0 and C.turquoise or C.fuchsia) or C.line)
         lcd.drawFilledRectangle(floor(bx), floor(by), 6, bh)
     end
-    drawTextAligned(x + 16, y + 40, w - 32, valueText, "FONT_L", throttle and C.white or C.muted, "center")
+    drawTextAligned(x + 16, y + 27, w - 32, valueText, "FONT_L", throttle and C.white or C.muted, "center")
 end
 
 local FEATHER_COUNT = 25
@@ -521,6 +544,7 @@ end
 
 local function inflightPaint(x, y, w, h, box, c)
     c = c or box._cache or {}
+    box._cache = c
 
     -- Safety net: if paint() runs before the first wakeup() cycle has
     -- populated the cache (e.g. very first frame), fall back to a live
@@ -565,7 +589,9 @@ local function inflightPaint(x, y, w, h, box, c)
     drawPlumeGauge(cx, cy, radius, c.rpm, rpmMax, rpmColor)
     drawDiamond(cx, cy, radius * 0.42, C.gold, C.fuchsia)
     drawDiamond(cx, cy, radius * 0.27, c.flightColor or C.turquoise, C.white)
-    drawTextAligned(cx - radius, cy - 48, radius * 2, c.rpmText or "--", "FONT_XXL", c.rpm and C.white or C.muted, "center")
+    lcd.color(C.panel)
+    lcd.drawFilledRectangle(floor(cx - radius * 0.62), floor(cy - 44), floor(radius * 1.24), 108)
+    drawTextAligned(cx - radius, cy - 44, radius * 2, c.rpmText or "--", "FONT_XXL", c.rpm and C.white or C.muted, "center")
     drawTextAligned(cx - radius, cy + 6, radius * 2, "HEADSPEED RPM", "FONT_XS", C.muted, "center")
     drawTextAligned(cx - radius, cy + 35, radius * 2, c.flightState or "STATE --", "FONT_XS", c.flightColor or C.muted, "center")
 
