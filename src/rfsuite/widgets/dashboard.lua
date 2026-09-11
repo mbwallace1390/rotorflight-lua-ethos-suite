@@ -15,19 +15,25 @@ local ethosVersion = requireModule("lib/ethos_version.lua")
 local mspApiVersion = requireModule("lib/msp_api_version.lua")
 
 local THEME_DIRS = {
+  aegis = "widgets/dashboard/themes/aegis",
   ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
   aerc = "widgets/dashboard/themes/aerc",
+  america250 = "widgets/dashboard/themes/america250",
   claude = "widgets/dashboard/themes/claude",
   danielrc = "widgets/dashboard/themes/danielrc",
   default = "widgets/dashboard/themes/default",
   gismo = "widgets/dashboard/themes/gismo",
   helihud = "widgets/dashboard/themes/helihud",
   kevd = "widgets/dashboard/themes/kevd",
+  libertyops250 = "widgets/dashboard/themes/libertyops250",
+  mwrc = "widgets/dashboard/themes/mwrc",
   rfstatus = "widgets/dashboard/themes/rfstatus",
   ["rt-rc-n"] = "widgets/dashboard/themes/rt-rc-n",
   ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
+  singularity = "widgets/dashboard/themes/singularity",
   ["srb-rc"] = "widgets/dashboard/themes/srb-rc",
   timer = "widgets/dashboard/themes/timer",
+  zafira = "widgets/dashboard/themes/zafira",
 }
 
 local DEFAULT_DASHBOARD_SETTINGS = {

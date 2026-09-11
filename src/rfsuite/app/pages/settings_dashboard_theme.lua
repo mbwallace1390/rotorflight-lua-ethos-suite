@@ -18,8 +18,10 @@ local MODEL_DISABLED = "@i18n(app.modules.settings.dashboard_theme_panel_model_d
 local DEFAULT_THEME = "system/default"
 
 local THEME_DEFS = {
+  {label = "Aegis", path = "system/aegis", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", path = "system/aerc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", path = "system/aerc-n"},
+  {label = "America 250", path = "system/america250", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_timer)@", path = "system/timer"},
   {label = "@i18n(app.modules.settings.dashboard_theme_claude)@", path = "system/claude"},
   {label = "@i18n(app.modules.settings.dashboard_theme_danielrc)@", path = "system/danielrc"},
@@ -27,10 +29,14 @@ local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_gismo)@", path = "system/gismo"},
   {label = "@i18n(app.modules.settings.dashboard_theme_helihud)@", path = "system/helihud"},
   {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", path = "system/kevd", minResolution = {x = 784, y = 294}},
+  {label = "Liberty Ops 250", path = "system/libertyops250", minResolution = {x = 784, y = 294}},
+  {label = "MWRC", path = "system/mwrc", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", path = "system/rfstatus"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", path = "system/rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", path = "system/rt-rc-n"},
+  {label = "Singularity", path = "system/singularity", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", path = "system/srb-rc"},
+  {label = "Zafira", path = "system/zafira", minResolution = {x = 784, y = 294}},
 }
 
 local function coerceBool(value, default)

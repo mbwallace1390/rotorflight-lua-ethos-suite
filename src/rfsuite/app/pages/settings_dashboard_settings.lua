@@ -11,21 +11,28 @@ local header = requireModule("app/header.lua")
 local tileGrid = requireModule("app/tile_grid.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
 local dashboardContext = requireModule("widgets/dashboard/context.lua")
+local themeBridge = requireModule("app/theme_bridge.lua")
 
 local PAGE_TITLE = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settings.dashboard)@ / @i18n(app.modules.settings.dashboard_settings)@"
 local NO_THEMES = "@i18n(app.modules.settings.no_themes_available_to_configure)@"
 
 local THEME_DEFS = {
+  {label = "Aegis", folder = "aegis", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", folder = "aerc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", folder = "aerc-n"},
+  {label = "America 250", folder = "america250", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_claude)@", folder = "claude"},
   {label = "@i18n(app.modules.settings.dashboard_theme_default)@", folder = "default"},
   {label = "@i18n(app.modules.settings.dashboard_theme_gismo)@", folder = "gismo"},
   {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", folder = "kevd", minResolution = {x = 784, y = 294}},
+  {label = "Liberty Ops 250", folder = "libertyops250", minResolution = {x = 784, y = 294}},
+  {label = "MWRC", folder = "mwrc", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", folder = "rfstatus"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", folder = "rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", folder = "rt-rc-n"},
+  {label = "Singularity", folder = "singularity", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", folder = "srb-rc"},
+  {label = "Zafira", folder = "zafira", minResolution = {x = 784, y = 294}},
 }
 
 local lastSelected
@@ -176,7 +183,8 @@ local function open(opts)
         icon = lcd.loadMask(theme.icon) or false
         iconCache[theme.icon] = icon
       end
-      buttons[i] = form.addButton(nil, {x = x, y = y, w = tileW, h = tileH}, {
+      local tileRect = {x = x, y = y, w = tileW, h = tileH}
+      buttons[i] = form.addButton(nil, tileRect, {
         text = theme.label,
         icon = icon or nil,
         options = tileFont,
@@ -185,6 +193,7 @@ local function open(opts)
           openTheme(theme)
         end,
       })
+      themeBridge.registerChromeRect(tileRect, "tile")
 
       col = col + 1
       if col >= numPerRow then

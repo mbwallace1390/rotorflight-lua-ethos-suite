@@ -1,0 +1,822 @@
+local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
+local rfsuite = requireModule("widgets/dashboard/context.lua")
+local lcd = lcd
+local math = math
+local floor = math.floor
+local min = math.min
+local max = math.max
+local sin = math.sin
+local cos = math.cos
+local rad = math.rad
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number > -math.huge and number < math.huge then return number end
+    return nil
+end
+local tostring = tostring
+local type = type
+local format = string.format
+
+local utils = rfsuite.widgets.dashboard.utils
+local headeropts = utils.getHeaderOptions()
+-- This theme owns its header geometry; leave the Suite defaults unchanged.
+headeropts.height = math.max(headeropts.height or 0, 44)
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
+local header_layout = utils.standardHeaderLayout(headeropts)
+local header_boxes_cache = nil
+local last_txbatt_type = nil
+local C
+
+local function header_boxes()
+    local txbatt_type = 0
+    if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
+        txbatt_type = rfsuite.preferences.general.txbatt_type or 0
+    end
+
+    if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
+        local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
+
+        -- Replace the stock Rotorflight logo with the MWRC-style title while
+        -- keeping the radio's native header surface and battery/RSSI widgets.
+        for _, headerBox in ipairs(boxes) do
+            if headerBox.subtype == "craftname" then headerBox.font = nil end
+            if headerBox.type == "image" then
+                headerBox.type = "func"
+                headerBox.subtype = "func"
+                headerBox.bgcolor = "transparent"
+                headerBox.paint = function(x, y, w, h)
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(math.floor(x), math.floor(y), math.floor(w), math.floor(h))
+                    local cache = headerBox
+                    -- Measure only when the header geometry changes; keep the builder mark smaller.
+                    if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+                        local titleFont = utils.resolveFont("FONT_L", nil)
+                        local markFont = utils.resolveFont("FONT_XS", nil)
+                        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+                        lcd.font(markFont)
+                        local mw, mh = lcd.getTextSize("| MWRC")
+                        lcd.font(titleFont)
+                        local tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_STD", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_S", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- Narrow header slots retain the same hierarchy with the smallest pair.
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            markFont = utils.resolveFont("FONT_XXS", nil) or markFont
+                            lcd.font(markFont)
+                            mw, mh = lcd.getTextSize("| MWRC")
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        cache._titleWidth = w
+                        cache._titleLayoutHeight = h
+                        cache._titleFont = titleFont
+                        cache._titleHeight = th
+                        cache._titleTextWidth = tw
+                        cache._markFont = markFont
+                        cache._markHeight = mh
+                        cache._titleGroupWidth = tw + 8 + mw
+                    end
+                    local screenW = lcd.getWindowSize()
+                    local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
+                    lcd.font(cache._titleFont)
+                    lcd.color(C.amber)
+                    lcd.drawText(groupX, math.floor(y + (h - cache._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(cache._markFont)
+                    lcd.color(C.muted)
+                    lcd.drawText(groupX + cache._titleTextWidth + 8, math.floor(y + (h - cache._markHeight) / 2), "| MWRC")
+                end
+            end
+        end
+
+        header_boxes_cache = boxes
+        last_txbatt_type = txbatt_type
+    end
+    return header_boxes_cache
+end
+
+local DEFAULTS = {
+    rpm_max = 3000,
+    bec_min = 6.5,
+    bec_warn = 7.0,
+    esc_warn = 110,
+    esc_max = 150,
+    fuel_warn = 25,
+    link_warn = 50
+}
+
+C = {
+    bg = lcd.RGB(4, 14, 31),
+    panel = lcd.RGB(8, 24, 47),
+    panel2 = lcd.RGB(12, 34, 61),
+    line = lcd.RGB(68, 91, 116),
+    line2 = lcd.RGB(153, 126, 72),
+    white = lcd.RGB(240, 231, 207),
+    muted = lcd.RGB(160, 174, 187),
+    cyan = lcd.RGB(49, 120, 198),
+    cyanDim = lcd.RGB(19, 55, 94),
+    green = lcd.RGB(86, 188, 125),
+    greenDim = lcd.RGB(26, 79, 51),
+    amber = lcd.RGB(216, 170, 78),
+    amberDim = lcd.RGB(92, 61, 18),
+    red = lcd.RGB(184, 48, 49),
+    redDim = lcd.RGB(83, 24, 29),
+    violet = lcd.RGB(184, 194, 207),
+    violetDim = lcd.RGB(70, 80, 94)
+}
+
+-- America 250 uses a dedicated deep-navy instrument surface.
+
+-- Cached red -> parchment white -> patriotic blue colors. The gradient is
+-- built once at load time so the paint loop only replays draw calls.
+local PATRIOTIC_GRADIENT = {}
+local GRADIENT_STEPS = 18
+
+local function lerp(a, b, t)
+    return floor(a + (b - a) * t + 0.5)
+end
+
+local function buildPatrioticGradient()
+    local red = {184, 48, 49}
+    local white = {240, 231, 207}
+    local blue = {49, 120, 198}
+    for i = 0, GRADIENT_STEPS - 1 do
+        local t = i / max(1, GRADIENT_STEPS - 1)
+        local a, b, localT
+        if t <= 0.5 then
+            a, b, localT = red, white, t * 2
+        else
+            a, b, localT = white, blue, (t - 0.5) * 2
+        end
+        PATRIOTIC_GRADIENT[i + 1] = lcd.RGB(
+            lerp(a[1], b[1], localT),
+            lerp(a[2], b[2], localT),
+            lerp(a[3], b[3], localT)
+        )
+    end
+end
+
+buildPatrioticGradient()
+
+local function drawPatrioticGradient(x, y, w, h, reverse)
+    x, y, w, h = floor(x), floor(y), floor(w), floor(h)
+    if w <= 0 or h <= 0 then return end
+    local lastX = x
+    for i = 1, GRADIENT_STEPS do
+        local nextX = x + floor(i * w / GRADIENT_STEPS)
+        local colorIndex = reverse and (GRADIENT_STEPS - i + 1) or i
+        lcd.color(PATRIOTIC_GRADIENT[colorIndex])
+        lcd.drawFilledRectangle(lastX, y, max(1, nextX - lastX), h)
+        lastX = nextX
+    end
+end
+
+local function drawPatrioticTitleRail(x, y, w)
+    drawPatrioticGradient(x, y, w, 4)
+end
+
+local function drawPatrioticTitle(x, y, w)
+    local font = utils.resolveFont("FONT_STD", nil)
+    if type(font) ~= "number" then return end
+    lcd.font(font)
+    local a, b, c, d = "AMERICA ", "250", "  //  ", "FREEDOM FLIGHT"
+    local aw = lcd.getTextSize(a)
+    local bw = lcd.getTextSize(b)
+    local cw = lcd.getTextSize(c)
+    local dw = lcd.getTextSize(d)
+    local total = aw + bw + cw + dw
+    local tx = x + max(0, (w - total) / 2)
+    lcd.color(C.red)
+    lcd.drawText(floor(tx), floor(y), a)
+    lcd.color(C.white)
+    lcd.drawText(floor(tx + aw), floor(y), b)
+    lcd.color(C.amber)
+    lcd.drawText(floor(tx + aw + bw), floor(y), c)
+    lcd.color(C.cyan)
+    lcd.drawText(floor(tx + aw + bw + cw), floor(y), d)
+end
+
+local function getThemeValue(key)
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
+
+    return value or DEFAULTS[key]
+end
+
+local function sensor(telemetry, name, alias1, alias2)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    if not (telemetry and telemetry.getSensor) then return nil end
+    local value = tonumber((telemetry.getSensor(name)))
+    if value ~= nil then return value end
+    if alias1 then
+        value = tonumber((telemetry.getSensor(alias1)))
+        if value ~= nil then return value end
+    end
+    if alias2 then
+        value = tonumber((telemetry.getSensor(alias2)))
+        if value ~= nil then return value end
+    end
+    return nil
+end
+
+local function temperatureSensor(telemetry, warning, maximum)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    if not (telemetry and telemetry.getSensor) then
+        return nil, "°C", warning, maximum
+    end
+
+    local value, _, unit, displayWarning, displayMaximum = telemetry.getSensor("temp_esc", warning, maximum)
+    return tonumber(value), unit or "°C", tonumber(displayWarning) or warning, tonumber(displayMaximum) or maximum
+end
+
+
+local GOVERNOR_LABELS = {
+    [0] = "OFF",
+    [1] = "IDLE",
+    [2] = "SPOOLUP",
+    [3] = "RECOVERY",
+    [4] = "ACTIVE",
+    [5] = "THR OFF",
+    [6] = "LOST HS",
+    [7] = "AUTOROT",
+    [8] = "BAILOUT",
+    [100] = "GOV DISABLED",
+    [101] = "DISARMED"
+}
+
+local GOVERNOR_COLORS = {
+    [0] = C.amber,
+    [1] = C.amber,
+    [2] = C.red,
+    [3] = C.amber,
+    [4] = C.red,
+    [5] = C.green,
+    [6] = C.red,
+    [7] = C.amber,
+    [8] = C.red,
+    [100] = C.muted,
+    [101] = C.green
+}
+
+local function getFlightState(telemetry)
+    local armflags = sensor(telemetry, "armflags")
+    local governor = sensor(telemetry, "governor")
+    local armed = nil
+
+    if rfsuite.utils and rfsuite.utils.armFlagsToIsArmed then
+        armed = rfsuite.utils.armFlagsToIsArmed(armflags)
+    end
+
+    if armed == nil and armflags == nil and governor == nil then
+        local session = rfsuite and rfsuite.session
+        if session and session.telemetryState then armed = session.isArmed == true end
+    end
+
+    if armed == false then return "DISARMED", C.green end
+
+    local governorCode = governor and floor(governor + 0.5) or nil
+    local governorLabel = governorCode and GOVERNOR_LABELS[governorCode] or nil
+    local governorColor = governorCode and GOVERNOR_COLORS[governorCode] or nil
+
+    if governorCode == 101 then return "DISARMED", C.green end
+    if armed == true then
+        if governorLabel and governorCode ~= 100 then
+            return "ARMED / " .. governorLabel, governorColor or C.red
+        end
+        return "ARMED", C.red
+    end
+    if governorLabel then return governorLabel, governorColor or C.cyan end
+    return "STATE --", C.muted
+end
+
+local function fmt(value, decimals, suffix, missing)
+    if value == nil then return missing or "--" end
+    local text
+    if decimals == 1 then
+        text = format("%.1f", value)
+    elseif decimals == 2 then
+        text = format("%.2f", value)
+    else
+        text = tostring(floor(value + 0.5))
+    end
+    return text .. (suffix or "")
+end
+
+local function cacheText(c, textKey, valueKey, unitKey, value, decimals, suffix, prefix)
+    suffix = suffix or ""
+    local scale = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    value = value and floor(value * scale + 0.5) / scale or nil
+    if c[valueKey] ~= value or c[unitKey] ~= suffix or c[textKey] == nil then
+        c[valueKey] = value
+        c[unitKey] = suffix
+        c[textKey] = (prefix or "") .. fmt(value, decimals, suffix)
+    end
+end
+
+local function resolveFont(name)
+    return utils.resolveFont(name, nil)
+end
+
+local FONT_FALLBACK = {
+    FONT_XXL = "FONT_XL", FONT_XL = "FONT_L", FONT_L = "FONT_STD",
+    FONT_STD = "FONT_S", FONT_S = "FONT_XS", FONT_XS = "FONT_XXS"
+}
+
+local function drawTextAligned(x, y, w, text, fontName, color, align)
+    local font = resolveFont(fontName)
+    if type(font) ~= "number" then return 0, 0 end
+    lcd.font(font)
+    lcd.color(color)
+    local tw, th = lcd.getTextSize(text)
+    -- Step down through native fonts when narrow cards cannot fit a reading.
+    local nextFont = FONT_FALLBACK[fontName]
+    while tw > w and nextFont do
+        local smaller = resolveFont(nextFont)
+        if type(smaller) == "number" then
+            lcd.font(smaller)
+            tw, th = lcd.getTextSize(text)
+        end
+        nextFont = FONT_FALLBACK[nextFont]
+    end
+    local tx = x
+    if align == "center" then
+        tx = x + (w - tw) / 2
+    elseif align == "right" then
+        tx = x + w - tw
+    end
+    lcd.drawText(floor(tx + 0.5), floor(y + 0.5), text)
+    return tw, th
+end
+
+local function drawCenteredDotLine(x, y, w, leftText, rightText, fontName, textColor, dotColor)
+    local font = resolveFont(fontName)
+    if type(font) ~= "number" then return end
+    lcd.font(font)
+
+    local leftW, textH = lcd.getTextSize(leftText)
+    local rightW = lcd.getTextSize(rightText)
+    local dotSize = 3
+    local gap = 7
+    local totalW = leftW + gap + dotSize + gap + rightW
+    local tx = floor(x + (w - totalW) / 2 + 0.5)
+    local ty = floor(y + 0.5)
+
+    lcd.color(textColor)
+    lcd.drawText(tx, ty, leftText)
+
+    local dotX = tx + leftW + gap
+    local dotY = floor(y + (textH - dotSize) / 2 + 0.5)
+    lcd.color(dotColor or textColor)
+    lcd.drawFilledRectangle(dotX, dotY, dotSize, dotSize)
+
+    lcd.color(textColor)
+    lcd.drawText(dotX + dotSize + gap, ty, rightText)
+end
+
+local function drawCenteredTripleDotLine(x, y, w, leftText, middleText, rightText, fontName, textColor, dotColor)
+    local font = resolveFont(fontName)
+    if type(font) ~= "number" then return end
+    lcd.font(font)
+
+    local leftW, textH = lcd.getTextSize(leftText)
+    local middleW = lcd.getTextSize(middleText)
+    local rightW = lcd.getTextSize(rightText)
+    local dotSize = 3
+    local gap = 7
+    local totalW = leftW + middleW + rightW + dotSize * 2 + gap * 4
+    local tx = floor(x + (w - totalW) / 2 + 0.5)
+    local ty = floor(y + 0.5)
+    local dotY = floor(y + (textH - dotSize) / 2 + 0.5)
+
+    lcd.color(textColor)
+    lcd.drawText(tx, ty, leftText)
+
+    local dot1X = tx + leftW + gap
+    lcd.color(dotColor or textColor)
+    lcd.drawFilledRectangle(dot1X, dotY, dotSize, dotSize)
+
+    local middleX = dot1X + dotSize + gap
+    lcd.color(textColor)
+    lcd.drawText(middleX, ty, middleText)
+
+    local dot2X = middleX + middleW + gap
+    lcd.color(dotColor or textColor)
+    lcd.drawFilledRectangle(dot2X, dotY, dotSize, dotSize)
+
+    lcd.color(textColor)
+    lcd.drawText(dot2X + dotSize + gap, ty, rightText)
+end
+
+local function drawPanel(x, y, w, h, accent, title)
+    x, y, w, h = floor(x), floor(y), floor(w), floor(h)
+    lcd.color(C.panel)
+    lcd.drawFilledRectangle(x, y, w, h)
+    lcd.color(C.line)
+    lcd.drawRectangle(x, y, w, h, 1)
+    lcd.color(C.line2)
+    lcd.drawRectangle(x + 2, y + 2, max(1, w - 4), max(1, h - 4), 1)
+
+    drawPatrioticGradient(x + 3, y + 3, max(1, w - 6), 3)
+    lcd.color(accent or C.cyan)
+    lcd.drawFilledRectangle(x + 3, y + 6, 3, max(1, h - 9))
+
+    if title then
+        drawTextAligned(x + 13, y + 9, w - 24, title, "FONT_XS", C.muted, "left")
+    end
+end
+
+local function drawStateBadge(x, y, w, h, label, color)
+    x, y, w, h = floor(x), floor(y), floor(w), floor(h)
+    color = color or C.muted
+    lcd.color(C.panel2)
+    lcd.drawFilledRectangle(x, y, w, h)
+    lcd.color(C.line)
+    lcd.drawRectangle(x, y, w, h, 1)
+    drawPatrioticGradient(x + 2, y + 2, max(1, w - 4), 3)
+    lcd.color(color)
+    lcd.drawFilledRectangle(x + 2, y + 5, 4, max(1, h - 7))
+    drawTextAligned(x + 10, y + 7, w - 18, label or "STATE --", "FONT_XS", color, "center")
+end
+
+local function drawMetric(x, y, w, h, title, valueText, accent, subtitle)
+    drawPanel(x, y, w, h, accent, title)
+    local compact = h < 110
+    local valueY = h < 64 and 22 or 28
+    local valueFont = h < 64 and "FONT_S" or (compact and "FONT_L" or "FONT_XL")
+    drawTextAligned(x + 13, y + valueY, w - 26, valueText, valueFont, valueText == "--" and C.muted or C.white, "left")
+    if subtitle and h >= 100 then
+        drawTextAligned(x + 13, y + h - 22, w - 26, subtitle, "FONT_XXS", C.muted, "left")
+    end
+end
+
+local function drawDualMetric(x, y, w, h, title, leftValue, rightValue, accent, subtitle)
+    drawPanel(x, y, w, h, accent, title)
+    local valueFont = h < 90 and "FONT_S" or "FONT_L"
+    drawTextAligned(x + 13, y + 24, (w - 30) * 0.58, leftValue, valueFont, C.white, "left")
+    drawTextAligned(x + w * 0.60, y + 24, w * 0.40 - 13, rightValue, valueFont, C.white, "right")
+    if subtitle and h >= 95 then
+        drawTextAligned(x + 13, y + h - 22, w - 26, subtitle, "FONT_XXS", C.muted, "left")
+    end
+end
+
+local function drawSegments(x, y, w, h, percent, count, activeColor, emptyColor)
+    count = count or 10
+    percent = max(0, min(100, percent or 0))
+    local gap = 4
+    local segW = floor((w - gap * (count - 1)) / count)
+    if segW < 2 then return end
+    local active = percent > 0 and max(1, min(count, floor(percent * count / 100 + 0.999))) or 0
+    for i = 1, count do
+        local sx = x + (i - 1) * (segW + gap)
+        if i <= active then
+            local segmentColor = activeColor
+            if activeColor ~= C.red and activeColor ~= C.amber then
+                if i <= floor(count / 3) then
+                    segmentColor = C.red
+                elseif i <= floor(count * 2 / 3) then
+                    segmentColor = C.white
+                else
+                    segmentColor = C.cyan
+                end
+            end
+            lcd.color(segmentColor)
+            lcd.drawFilledRectangle(floor(sx), floor(y), segW, floor(h))
+        else
+            lcd.color(emptyColor or C.line)
+            lcd.drawRectangle(floor(sx), floor(y), segW, floor(h), 1)
+        end
+    end
+end
+
+local STAR_UNIT = {}
+for i = 0, 9 do
+    local a = rad(-90 + i * 36)
+    STAR_UNIT[i + 1] = {cos(a), sin(a)}
+end
+
+local function drawStar(cx, cy, outerRadius, innerRadius, color)
+    -- Stream vertices to avoid allocating eleven temporary tables per call.
+    innerRadius = innerRadius or outerRadius * 0.45
+    lcd.color(color)
+    local firstx, firsty, px, py
+    for i = 0, 9 do
+        local radius = (i % 2 == 0) and outerRadius or innerRadius
+        local u = STAR_UNIT[i + 1]
+        local sx = floor(cx + u[1] * radius)
+        local sy = floor(cy + u[2] * radius)
+        if i == 0 then firstx, firsty = sx, sy else lcd.drawLine(px, py, sx, sy) end
+        px, py = sx, sy
+    end
+    lcd.drawLine(px, py, firstx, firsty)
+end
+
+local STAR_RING13_UNIT = {}
+for i = 0, 12 do
+    local a = rad(-90 + (i + 0.5) * 360 / 13)
+    STAR_RING13_UNIT[i + 1] = {cos(a), sin(a)}
+end
+
+local function drawPatrioticStarRing(cx, cy, radius, count)
+    count = count or 13
+    -- Rotate the 13-star ring by half a step so the title rail has a clean
+    -- gap at twelve o'clock instead of a star touching the upper frame.
+    for i = 0, count - 1 do
+        local ux, uy
+        if count == 13 then
+            local u = STAR_RING13_UNIT[i + 1]
+            ux, uy = u[1], u[2]
+        else
+            local angle = rad(-90 + (i + 0.5) * 360 / count)
+            ux, uy = cos(angle), sin(angle)
+        end
+        local color
+        local band = i / max(1, count - 1)
+        if band < 0.34 then
+            color = C.red
+        elseif band < 0.67 then
+            color = C.white
+        else
+            color = C.cyan
+        end
+        drawStar(cx + ux * radius, cy + uy * radius, 5, 2.2, color)
+    end
+end
+
+local function drawShield(cx, cy, w, h, color)
+    local top = cy - h * 0.50
+    local left = cx - w * 0.50
+    local right = cx + w * 0.50
+    local shoulder = cy - h * 0.20
+    local lower = cy + h * 0.22
+    local tip = cy + h * 0.52
+    lcd.color(color)
+    lcd.drawLine(floor(left), floor(top), floor(right), floor(top))
+    lcd.drawLine(floor(left), floor(top), floor(left), floor(shoulder))
+    lcd.drawLine(floor(right), floor(top), floor(right), floor(shoulder))
+    lcd.drawLine(floor(left), floor(shoulder), floor(cx - w * 0.34), floor(lower))
+    lcd.drawLine(floor(right), floor(shoulder), floor(cx + w * 0.34), floor(lower))
+    lcd.drawLine(floor(cx - w * 0.34), floor(lower), floor(cx), floor(tip))
+    lcd.drawLine(floor(cx + w * 0.34), floor(lower), floor(cx), floor(tip))
+end
+
+local layout = {cols = 12, rows = 12, padding = 0}
+local screenBorderStyle = {enabled = false}
+
+local function updateFlightTime(c)
+    local session = rfsuite and rfsuite.session
+    local seconds = session and session.timer and tonumber(session.timer.live) or 0
+    seconds = floor(max(0, seconds))
+    if c._timerSecond ~= seconds then
+        c._timerSecond = seconds
+        c.timer = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
+end
+
+local function inflightWakeup(box, telemetry)
+    local c = box._cache
+    if not c then
+        c = {}
+        box._cache = c
+    end
+
+    local escWarnC = getThemeValue("esc_warn")
+    local escMaxC = getThemeValue("esc_max")
+
+    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm")
+    local rpmStats = telemetry and telemetry.sensorStats and telemetry.sensorStats.rpm
+    c.maxRpm = tonumber(rpmStats and rpmStats.max)
+    if c.rpm ~= nil and (c.maxRpm == nil or c.rpm > c.maxRpm) then
+        c.maxRpm = c.rpm
+    end
+
+    c.throttle = sensor(telemetry, "throttle_percent", "throttle")
+    c.esc, c.escUnit, c.escWarn, c.escMax = temperatureSensor(telemetry, escWarnC, escMaxC)
+    c.fuel = sensor(telemetry, "smartfuel")
+    c.current = sensor(telemetry, "current")
+    c.bec = sensor(telemetry, "bec_voltage", "bec")
+    c.link = sensor(telemetry, "vfr", "rssi")
+    c.consumed = sensor(telemetry, "smartconsumption", "consumption")
+    c.flightState, c.flightStateColor = getFlightState(telemetry)
+    updateFlightTime(c)
+
+    -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
+    -- calling getThemeValue() from paint(), which runs on every invalidate.
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.linkWarn = getThemeValue("link_warn")
+    c.rpmMax = getThemeValue("rpm_max")
+
+    cacheText(c, "rpmText", "_rpmTextValue", "_rpmTextUnit", c.rpm, 0, "")
+    cacheText(c, "maxRpmText", "_maxRpmTextValue", "_maxRpmTextUnit", c.maxRpm, 0, " RPM", "MAX ")
+    cacheText(c, "rpmLimitText", "_rpmLimitTextValue", "_rpmLimitTextUnit", c.rpmMax, 0, " RPM", "LIMIT ")
+    cacheText(c, "escText", "_escTextValue", "_escTextUnit", c.esc, 0, c.escUnit)
+    cacheText(c, "throttleText", "_throttleTextValue", "_throttleTextUnit", c.throttle, 0, "%")
+    cacheText(c, "fuelText", "_fuelTextValue", "_fuelTextUnit", c.fuel, 0, "%")
+    cacheText(c, "currentText", "_currentTextValue", "_currentTextUnit", c.current, 1, " A")
+    cacheText(c, "becText", "_becTextValue", "_becTextUnit", c.bec, 1, " V")
+    cacheText(c, "linkText", "_linkTextValue", "_linkTextUnit", c.link, 0, "%")
+    cacheText(c, "consumedText", "_consumedTextValue", "_consumedTextUnit", c.consumed, 0, " mAh")
+
+    return c
+end
+
+local GAUGE_TICKS = 32
+local GAUGE_COS = {}
+local GAUGE_SIN = {}
+for i = 0, GAUGE_TICKS - 1 do
+    local angle = rad(140 + 260 * i / (GAUGE_TICKS - 1))
+    GAUGE_COS[i + 1] = cos(angle)
+    GAUGE_SIN[i + 1] = sin(angle)
+end
+
+local function drawRadialGauge(cx, cy, radius, value, maximum, color)
+    local pct = maximum > 0 and max(0, min(1, value / maximum)) or 0
+    local active = floor(GAUGE_TICKS * pct + 0.5)
+    local warning = color == C.red or color == C.amber
+    local r1 = radius - 14
+    local r2 = radius
+
+    for i = 0, GAUGE_TICKS - 1 do
+        local unitCos = GAUGE_COS[i + 1]
+        local unitSin = GAUGE_SIN[i + 1]
+        local x1 = cx + unitCos * r1
+        local y1 = cy + unitSin * r1
+        local x2 = cx + unitCos * r2
+        local y2 = cy + unitSin * r2
+        local tickColor = C.line
+        if i < active then
+            if warning then
+                tickColor = color
+            else
+                local gradientIndex = 1 + floor(i * (GRADIENT_STEPS - 1) / max(1, GAUGE_TICKS - 1))
+                tickColor = PATRIOTIC_GRADIENT[gradientIndex]
+            end
+        end
+        lcd.color(tickColor)
+        lcd.drawLine(floor(x1), floor(y1), floor(x2), floor(y2))
+    end
+
+end
+
+local function drawVerticalMeter(x, y, w, h, title, value, maximum, color, valueText)
+    drawPanel(x, y, w, h, color, title)
+    local barX = x + 15
+    local barY = y + 38
+    local barW = 14
+    local barH = h - 58
+    local pct = maximum > 0 and max(0, min(1, (value or 0) / maximum)) or 0
+    lcd.color(C.line)
+    lcd.drawRectangle(floor(barX), floor(barY), floor(barW), floor(barH), 1)
+    if pct > 0 then
+        local fillH = floor((barH - 4) * pct)
+        lcd.color(color)
+        lcd.drawFilledRectangle(floor(barX + 2), floor(barY + barH - 2 - fillH), floor(barW - 4), fillH)
+    end
+    local valueColor = value == nil and C.muted or C.white
+    drawTextAligned(x + 38, y + 48, w - 50, valueText or "--", "FONT_L", valueColor, "left")
+end
+
+local function inflightPaint(x, y, w, h, box, c, telemetry)
+    c = c or box._cache or {}
+    box._cache = c
+
+    -- Safety net: if paint() runs before the first wakeup() cycle has
+    -- populated the cache (e.g. very first frame), fall back to a live
+    -- lookup so we never compare a number against a nil threshold.
+    if c.escMax == nil or c.escWarn == nil then
+        local escWarnC = getThemeValue("esc_warn")
+        local escMaxC = getThemeValue("esc_max")
+        local _, unit, displayWarn, displayMax = temperatureSensor(telemetry, escWarnC, escMaxC)
+        c.escUnit, c.escWarn, c.escMax = unit, displayWarn, displayMax
+    end
+    c.fuelWarn = c.fuelWarn or getThemeValue("fuel_warn")
+    c.becMin = c.becMin or getThemeValue("bec_min")
+    c.becWarn = c.becWarn or getThemeValue("bec_warn")
+    c.linkWarn = c.linkWarn or getThemeValue("link_warn")
+    c.rpmMax = c.rpmMax or getThemeValue("rpm_max")
+
+    lcd.color(C.bg)
+    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+
+    local pad = 12
+    local topY = y + 6
+    drawPatrioticTitleRail(x, y + 1, w)
+    drawPatrioticTitle(x + pad, topY, w - 260)
+    drawTextAligned(x + w - 222, topY - 3, 210, c.timer or "00:00", "FONT_XL", C.white, "right")
+    drawPatrioticTitleRail(x + pad, y + 34, w - pad * 2)
+
+    local bodyY = y + 44
+    local bodyH = h - 58
+    local leftW = floor(w * 0.18)
+    local rightW = floor(w * 0.24)
+    local centerX = x + pad + leftW + pad
+    local centerW = w - leftW - rightW - pad * 4
+    local leftX = x + pad
+    local rightX = centerX + centerW + pad
+
+    local escColor = c.esc and (c.esc >= c.escMax and C.red or (c.esc >= c.escWarn and C.amber or C.green)) or C.muted
+    local throttleColor = c.throttle == nil and C.muted or (c.throttle >= 90 and C.amber or C.cyan)
+    local fuel = c.fuel or 0
+    local fuelColor = c.fuel == nil and C.muted or (fuel <= c.fuelWarn and C.red or (fuel <= 50 and C.amber or C.green))
+    local becColor = c.bec and (c.bec < c.becMin and C.red or (c.bec < c.becWarn and C.amber or C.cyan)) or C.muted
+    local linkColor = c.link and (c.link < c.linkWarn and C.amber or C.cyan) or C.muted
+
+    local halfH = floor((bodyH - pad) / 2)
+    drawVerticalMeter(leftX, bodyY, leftW, halfH, "ESC TEMP", c.esc, c.escMax, escColor, c.escText)
+    drawVerticalMeter(leftX, bodyY + halfH + pad, leftW, halfH, "THROTTLE", c.throttle, 100, throttleColor, c.throttleText)
+
+    drawPanel(centerX, bodyY, centerW, bodyH, C.cyan, nil)
+    local cx = centerX + centerW / 2
+    local cy = bodyY + bodyH * 0.46
+    local radius = min(centerW * 0.41, bodyH * 0.41)
+    local rpmMax = c.rpmMax
+    local rpmColor = c.rpm == nil and C.muted or (c.rpm > rpmMax and C.red or C.cyan)
+
+    drawPatrioticStarRing(cx, cy, radius + 17, 13)
+    drawShield(cx, cy + 2, radius * 0.88, radius * 1.02, C.line2)
+    drawRadialGauge(cx, cy, radius, c.rpm or 0, rpmMax, rpmColor)
+    lcd.color(C.panel)
+    lcd.drawFilledRectangle(floor(cx - radius * 0.60), floor(cy - 61), floor(radius * 1.20), 110)
+    drawCenteredDotLine(centerX, cy - 59, centerW, "1776", "2026", "FONT_S", C.amber, C.amber)
+    drawTextAligned(centerX, cy - 32, centerW, c.rpmText or "--", "FONT_XXL", c.rpm == nil and C.muted or C.white, "center")
+    drawTextAligned(centerX, cy + 22, centerW, "HEADSPEED  RPM", "FONT_XS", C.muted, "center")
+    drawTextAligned(centerX + 22, bodyY + bodyH - 34, centerW - 44, c.maxRpmText or "MAX --", "FONT_XS", c.maxRpm == nil and C.muted or C.amber, "left")
+    drawTextAligned(centerX + 22, bodyY + bodyH - 34, centerW - 44, c.rpmLimitText or "LIMIT --", "FONT_XS", C.muted, "right")
+
+    local fuelH = floor(bodyH * 0.30)
+    drawPanel(rightX, bodyY, rightW, fuelH, fuelColor, "SMART FUEL")
+    drawTextAligned(rightX + 12, bodyY + 25, rightW - 24, c.fuelText or "--", fuelH < 90 and "FONT_L" or "FONT_XL", C.white, "right")
+    drawSegments(rightX + 12, bodyY + fuelH - 16, rightW - 32, 8, fuel, 10, fuelColor, C.line)
+    lcd.color(fuelColor)
+    lcd.drawFilledRectangle(floor(rightX + rightW - 16), floor(bodyY + fuelH - 14), 4, 8)
+
+    local stateGap = bodyH < 260 and 5 or 8
+    local stateH = bodyH < 260 and 25 or 30
+    local stateY = bodyY + fuelH + stateGap
+    drawStateBadge(rightX, stateY, rightW, stateH, c.flightState, c.flightStateColor)
+
+    local smallY = stateY + stateH + stateGap
+    local smallH = floor((bodyY + bodyH - smallY - pad) / 2)
+    drawMetric(rightX, smallY, rightW, smallH, "POWER LOAD", c.currentText or "--", C.violet, "INSTANTANEOUS", 3)
+    drawDualMetric(
+        rightX,
+        smallY + smallH + pad,
+        rightW,
+        smallH,
+        "BEC / LINK",
+        c.becText or "--",
+        c.linkText or "--",
+        becColor == C.red and C.red or linkColor,
+        "POWER + RADIO HEALTH"
+    )
+
+    local throttleY = bodyY + halfH + pad
+    local consumedX = leftX + 38
+    local consumedW = leftW - 50
+    local consumedLabelY = throttleY + halfH - 38
+    local consumedValueY = consumedLabelY + 14
+    drawTextAligned(consumedX, consumedLabelY, consumedW, "CONSUMED", "FONT_XXS", C.muted, "center")
+    drawTextAligned(consumedX, consumedValueY, consumedW, c.consumedText or "--", "FONT_XS", C.white, "center")
+
+    drawCenteredTripleDotLine(
+        x + pad, y + h - 12, w - pad * 2,
+        "13 ORIGINAL COLONIES", "FREEDOM FLIGHT", "MWRC",
+        "FONT_XXS", C.line2, C.amber
+    )
+end
+
+local boxes_cache = nil
+
+local function boxes()
+    if boxes_cache == nil then
+        boxes_cache = {{
+        col = 1, row = 1, colspan = 12, rowspan = 12,
+        type = "func", subtype = "func",
+        wakeup = inflightWakeup,
+        paint = inflightPaint,
+        bgcolor = "transparent"
+        }}
+    end
+    return boxes_cache
+end
+
+return {
+    layout = layout,
+    boxes = boxes,
+    header_boxes = header_boxes,
+    header_layout = header_layout,
+    screenBorderStyle = screenBorderStyle,
+    scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.85}
+}
