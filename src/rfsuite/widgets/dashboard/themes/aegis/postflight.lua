@@ -17,6 +17,8 @@ local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
 local headeropts = utils.getHeaderOptions()
+-- This theme owns its header geometry; leave the Suite defaults unchanged.
+headeropts.height = math.max(headeropts.height or 0, 44)
 -- The Suite caches its native palette; each theme owns its presentation copy.
 local colorMode = {}
 for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
@@ -37,48 +39,60 @@ local function header_boxes()
         -- Replace the stock Rotorflight logo with the MWRC-style title while
         -- keeping the radio's native header surface and battery/RSSI widgets.
         for _, headerBox in ipairs(boxes) do
-            if headerBox.subtype == "craftname" then headerBox.font = "FONT_S" end
+            if headerBox.subtype == "craftname" then headerBox.font = nil end
             if headerBox.type == "image" then
                 headerBox.type = "func"
                 headerBox.subtype = "func"
                 headerBox.bgcolor = "transparent"
                 headerBox.paint = function(x, y, w, h)
                     lcd.color(C.panel)
-                    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
-                    -- Fit the title beside a discreet builder signature, then reuse the measurements.
-                    if headerBox._titleWidth ~= w then
-                        local titleFont = utils.resolveFont("FONT_S", nil)
-                        local markFont = utils.resolveFont("FONT_XXS", nil)
+                    lcd.drawFilledRectangle(math.floor(x), math.floor(y), math.floor(w), math.floor(h))
+                    local cache = headerBox
+                    -- Measure only when the header geometry changes; keep the builder mark smaller.
+                    if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+                        local titleFont = utils.resolveFont("FONT_L", nil)
+                        local markFont = utils.resolveFont("FONT_XS", nil)
                         if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
                         lcd.font(markFont)
                         local mw, mh = lcd.getTextSize("| MWRC")
-                        local available = w - 28 - mw
                         lcd.font(titleFont)
                         local tw, th = lcd.getTextSize("Rotorflight // Ethos")
-                        if tw > available then
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_STD", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_S", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- Narrow header slots retain the same hierarchy with the smallest pair.
+                        if tw + mw + 24 > w or th > h - 4 then
                             titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            markFont = utils.resolveFont("FONT_XXS", nil) or markFont
+                            lcd.font(markFont)
+                            mw, mh = lcd.getTextSize("| MWRC")
                             lcd.font(titleFont)
                             tw, th = lcd.getTextSize("Rotorflight // Ethos")
                         end
-                        if tw > available then
-                            titleFont = utils.resolveFont("FONT_XXS", nil) or titleFont
-                            lcd.font(titleFont)
-                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
-                        end
-                        -- The complete header reads Rotorflight // Ethos | MWRC.
-                        headerBox._titleWidth = w
-                        headerBox._titleFont = titleFont
-                        headerBox._titleHeight = th
-                        headerBox._titleTextWidth = tw
-                        headerBox._markFont = markFont
-                        headerBox._markHeight = mh
+                        cache._titleWidth = w
+                        cache._titleLayoutHeight = h
+                        cache._titleFont = titleFont
+                        cache._titleHeight = th
+                        cache._titleTextWidth = tw
+                        cache._markFont = markFont
+                        cache._markHeight = mh
+                        cache._titleGroupWidth = tw + 8 + mw
                     end
-                    lcd.font(headerBox._titleFont)
+                    local screenW = lcd.getWindowSize()
+                    local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
+                    lcd.font(cache._titleFont)
                     lcd.color(C.cyan)
-                    lcd.drawText(floor(x + 10), floor(y + (h - headerBox._titleHeight) / 2), "Rotorflight // Ethos")
-                    lcd.font(headerBox._markFont)
+                    lcd.drawText(groupX, math.floor(y + (h - cache._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(cache._markFont)
                     lcd.color(C.muted)
-                    lcd.drawText(floor(x + 18 + headerBox._titleTextWidth), floor(y + (h - headerBox._markHeight) / 2), "| MWRC")
+                    lcd.drawText(groupX + cache._titleTextWidth + 8, math.floor(y + (h - cache._markHeight) / 2), "| MWRC")
                 end
             end
         end
