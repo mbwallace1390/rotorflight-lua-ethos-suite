@@ -28,6 +28,8 @@ local rad = math.rad
 local utils = rfsuite.widgets.dashboard.utils
 
 local headeropts = utils.getHeaderOptions()
+-- This theme owns its header geometry; leave the Suite defaults unchanged.
+headeropts.height = math.max(headeropts.height or 0, 44)
 
 -- Pre-cached Render Colors for Zero-Lag Performance
 local rc = {
@@ -105,7 +107,7 @@ local last_txbatt_type = nil
 local layout = {cols = 7, rows = 12, padding = 0}
 
 local header_layout = utils.standardHeaderLayout(headeropts)
-local topbarShiftY = 4
+local topbarShiftY = 0
 if header_layout and header_layout.height then
     header_layout.height = header_layout.height + topbarShiftY
 end
@@ -120,28 +122,55 @@ local screenBorderStyle = {
 }
 
 local HEADER_LABEL = "Rotorflight // Ethos"
-local HEADER_SIGNATURE = " | MWRC"
+local HEADER_SIGNATURE = "| MWRC"
+local headerTitleCache = {}
 local function paintHeaderLogo(x, y, w, h)
-    local signatureFont = FONT_XXS or FONT_XS
-    lcd.font(signatureFont)
-    local signatureW, signatureH = lcd.getTextSize(HEADER_SIGNATURE)
-    lcd.font(FONT_S)
-    local labelW, labelH = lcd.getTextSize(HEADER_LABEL)
-    -- Fit the complete group while keeping the builder signature subordinate.
-    if labelW + signatureW > w - 10 then
-        lcd.font(FONT_XS)
-        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
+    local cache = headerTitleCache
+    -- Measure only when the header geometry changes; keep the builder mark smaller.
+    if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+        local titleFont = utils.resolveFont("FONT_L", nil)
+        local markFont = utils.resolveFont("FONT_XS", nil)
+        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+        lcd.font(markFont)
+        local mw, mh = lcd.getTextSize(HEADER_SIGNATURE)
+        lcd.font(titleFont)
+        local tw, th = lcd.getTextSize(HEADER_LABEL)
+        if tw + mw + 24 > w or th > h - 4 then
+            titleFont = utils.resolveFont("FONT_STD", nil) or titleFont
+            lcd.font(titleFont)
+            tw, th = lcd.getTextSize(HEADER_LABEL)
+        end
+        if tw + mw + 24 > w or th > h - 4 then
+            titleFont = utils.resolveFont("FONT_S", nil) or titleFont
+            lcd.font(titleFont)
+            tw, th = lcd.getTextSize(HEADER_LABEL)
+        end
+        -- Narrow header slots retain the same hierarchy with the smallest pair.
+        if tw + mw + 24 > w or th > h - 4 then
+            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+            markFont = utils.resolveFont("FONT_XXS", nil) or markFont
+            lcd.font(markFont)
+            mw, mh = lcd.getTextSize(HEADER_SIGNATURE)
+            lcd.font(titleFont)
+            tw, th = lcd.getTextSize(HEADER_LABEL)
+        end
+        cache._titleWidth = w
+        cache._titleLayoutHeight = h
+        cache._titleFont = titleFont
+        cache._titleHeight = th
+        cache._titleTextWidth = tw
+        cache._markFont = markFont
+        cache._markHeight = mh
+        cache._titleGroupWidth = tw + 8 + mw
     end
-    if labelW + signatureW > w - 10 then
-        lcd.font(FONT_XXS or FONT_XS)
-        labelW, labelH = lcd.getTextSize(HEADER_LABEL)
-    end
-    local groupX = x + math.max(5, math.floor((w - labelW - signatureW) / 2))
+    local screenW = lcd.getWindowSize()
+    local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
+    lcd.font(cache._titleFont)
     lcd.color(rc.cyan)
-    lcd.drawText(groupX, y + math.max(0, math.floor((h - labelH) / 2)), HEADER_LABEL)
-    lcd.font(signatureFont)
+    lcd.drawText(groupX, math.floor(y + (h - cache._titleHeight) / 2), HEADER_LABEL)
+    lcd.font(cache._markFont)
     lcd.color(rc.tick or rc.dim)
-    lcd.drawText(groupX + labelW, y + math.max(0, math.floor((h - signatureH) / 2)), HEADER_SIGNATURE)
+    lcd.drawText(groupX + cache._titleTextWidth + 8, math.floor(y + (h - cache._markHeight) / 2), HEADER_SIGNATURE)
 end
 
 local function header_boxes()
