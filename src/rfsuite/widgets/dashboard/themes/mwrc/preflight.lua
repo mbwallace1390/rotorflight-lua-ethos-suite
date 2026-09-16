@@ -9,7 +9,7 @@ local lcd = lcd
 local rawTonumber = tonumber
 local function tonumber(value)
     local number = rawTonumber(value)
-    if number == nil or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number == nil or number ~= number or number > 1000000000 or number < -1000000000 then return nil end
     return number
 end
 local tostring = tostring
@@ -26,6 +26,127 @@ local sin = math.sin
 local rad = math.rad
 
 local utils = rfsuite.widgets.dashboard.utils
+
+local FIT_FONTS = {FONT_XL="FONT_L", FONT_L="FONT_STD", FONT_STD="FONT_S", FONT_S="FONT_XS", FONT_XS="FONT_XXS"}
+local function fitInstrumentText(box, cacheName, text, fontName, width)
+    local fit = box[cacheName]
+    if not fit then fit = {}; box[cacheName] = fit end
+    if fit.text ~= text or fit.width ~= width or fit.requestedFont ~= fontName then
+        fit.text, fit.width, fit.requestedFont = text, width, fontName
+        local font = utils.resolveFont(fontName, nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        while tw > width and FIT_FONTS[fontName] do
+            fontName = FIT_FONTS[fontName]
+            font = utils.resolveFont(fontName, nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        fit.font, fit.w, fit.h = font, tw, th
+    end
+    lcd.font(fit.font)
+    return fit.w, fit.h
+end
+
+-- Format recorded summaries locally so malformed durations cannot reach %d.
+local function wakeFlightSummary(box)
+    local session = rfsuite.session
+    local general = session and session.modelPreferences and session.modelPreferences.general
+    local modelName = model and model.name and model.name() or ""
+    if box._summaryModel ~= modelName then
+        -- A different radio model must never inherit the previous flight's summary.
+        box._summaryModel, box._summaryLastValue = modelName, nil
+    end
+    local connected = session and session.isConnected and session.telemetryState
+    local postflight = rfsuite.flightmode and rfsuite.flightmode.current == "postflight"
+    local raw
+    if box.summaryKind == "flight" then
+        raw = session and session.timer and session.timer.live
+        if raw == nil or (not connected and raw == 0) then
+            if postflight and not connected and box._summaryLastValue ~= nil then
+                raw = box._summaryLastValue
+            else
+                raw = general and general.lastflighttime
+            end
+        end
+    elseif box.summaryKind == "total" then
+        raw = general and general.totalflighttime
+    else
+        raw = general and general.flightcount
+    end
+    local value = tonumber(raw)
+    if value and value < 0 then value = nil end
+    -- Offline preflight has no verified count; the context's default zero is not a sample.
+    if box.summaryKind == "count" and not connected and not postflight then value = nil end
+    -- The context clears live summaries to zero on disconnect; retain only known history.
+    if postflight and not connected and (raw == nil or raw == 0) and box._summaryLastValue ~= nil then
+        value = box._summaryLastValue
+    end
+    box._summaryLastValue = value
+    local key = value and math.floor(value) or false
+    local cache = box._cache or {}
+    if cache.key ~= key or cache.text == nil then
+        cache.key = key
+        if value == nil then cache.text = "--"
+        elseif box.summaryKind == "flight" then
+            cache.text = string.format("%02d:%02d", math.floor(value / 60), math.floor(value % 60))
+        elseif box.summaryKind == "total" then
+            cache.text = string.format("%02d:%02d:%02d", math.floor(value / 3600), math.floor(value / 60) % 60, math.floor(value % 60))
+        else cache.text = tostring(math.floor(value)) end
+    end
+    return cache
+end
+
+local function paintFlightSummary(x, y, w, h, box, cache)
+    local title = box.title or ""
+    local tw, th = fitInstrumentText(box, "_titleFit", title, box.titlefont or "FONT_XS", w - 16)
+    local bottom = box.titlepos == "bottom"
+    local titleY = bottom and y + h - th - 8 or y + 8
+    lcd.color(box.titlecolor)
+    lcd.drawText(math.floor(x + (w - tw) / 2), math.floor(titleY), title)
+    local text = cache and cache.text or "--"
+    local vw, vh = fitInstrumentText(box, "_valueFit", text, box.font or "FONT_XL", w - 16)
+    local valueY = bottom and y + math.max(2, (h - th - 16 - vh) / 2) or y + th + 12 + math.max(0, (h - th - 20 - vh) / 2)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + (w - vw) / 2), math.floor(valueY), text)
+end
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
@@ -184,7 +305,10 @@ local function header_boxes()
             box.bgcolor = headerBgColor
             box.yoffset = (box.yoffset or 0) + topbarShiftY
 
-            if box.subtype == "craftname" then box.font = nil end
+            if box.subtype == "craftname" then
+                box.type, box.subtype = "func", "func"
+                box.paint = paintModelName
+            end
             if box.type == "image" then
                 box.type = "func"
                 box.subtype = "func"
@@ -450,7 +574,7 @@ local function wakeAesGauge(box, telemetry)
         local maxVal = tonumber(stats and stats.max) or val
         local maxKey = floor(maxVal * multiplier + 0.5)
         if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
-            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. unit
+            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. (unit == "RPM" and " RPM" or unit)
             cache.maxKey = maxKey
             cache.maxUnit = unit
         end
@@ -547,9 +671,9 @@ local function paintAesGauge(x, y, w, h, box, cache)
     if type(titleFont) == "number" and box.title then
         lcd.font(titleFont)
         lcd.color(box.titlecolor or colorMode.titlecolor)
-        local titleW, titleH = lcd.getTextSize(box.title)
+        local titleW, titleH = fitInstrumentText(box, "_titleFit", box.title, box.titlefont or "FONT_S", w - 20)
         local titleX = floor(cx - titleW / 2)
-        local titleY = y + 2
+        local titleY = y + 8
         lcd.drawText(titleX, titleY, box.title)
         lcd.color(drawColor)
         local underlineY = titleY + titleH + 2
@@ -560,7 +684,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
     if type(valueFont) == "number" then
         lcd.font(valueFont)
         lcd.color(colorMode.textcolor)
-        local valueW, valueH = lcd.getTextSize(cache.valText)
+        local valueW, valueH = fitInstrumentText(box, "_valueFit", cache.valText, box.font or "FONT_XL", w - 32)
         local valueY = floor(cy - valueH * 0.55)
         lcd.drawText(floor(cx - valueW / 2), valueY, cache.valText)
 
@@ -582,7 +706,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
         if type(footerFont) == "number" then
             lcd.font(footerFont)
             lcd.color(box.maxtextcolor or colorMode.fillwarncolor)
-            local footerW, footerH = lcd.getTextSize(footer)
+            local footerW, footerH = fitInstrumentText(box, "_footerFit", footer, box.maxfont or "FONT_XS", w - 20)
             lcd.drawText(floor(cx - footerW / 2), y + h - footerH - 3, footer)
         end
     end
@@ -629,7 +753,7 @@ local function buildBoxes(W)
         },
         {
             col = 6, row = 9, colspan = 2, rowspan = 2, xoffset = -5, yoffset = -15,
-            type = "time", subtype = "count", title = "FLIGHTS", titlepos = "bottom",
+            type = "func", subtype = "func", summaryKind = "count", wakeup = wakeFlightSummary, paint = paintFlightSummary, title = "FLIGHTS", titlepos = "bottom",
             font = opts.tilefont, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingbottom = opts.tiletitlepaddingbottom, valuepaddingtop = opts.flightvaluepaddingtop, valuepaddingbottom = opts.flightvaluepaddingbottom,
             bgcolor = "transparent", titlecolor = colorMode.titlecolor, textcolor = colorMode.textcolor
         },
