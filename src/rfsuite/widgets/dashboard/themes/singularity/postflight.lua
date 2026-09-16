@@ -11,7 +11,7 @@ local rad = math.rad
 local rawNumber = tonumber
 local function tonumber(value)
     local number = rawNumber(value)
-    if number and number == number and number > -math.huge and number < math.huge then return number end
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
     return nil
 end
 local tostring = tostring
@@ -20,6 +20,43 @@ local format = string.format
 local ipairs = ipairs
 
 local utils = rfsuite.widgets.dashboard.utils
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -51,6 +88,13 @@ local C = {
     redDim = lcd.RGB(90, 19, 38),
     magenta = lcd.RGB(255, 74, 235)
 }
+
+-- A dark theme needs explicit header ink even under a light radio palette.
+colorMode.bgcolor, colorMode.tbbgcolor = C.space, C.space
+colorMode.cntextcolor, colorMode.tbtextcolor, colorMode.rssitextcolor = C.white, C.white, C.white
+colorMode.txbgfillcolor, colorMode.rssifillbgcolor = C.line, C.line
+colorMode.txfillcolor, colorMode.rssifillcolor = C.green, C.cyan
+colorMode.txaccentcolor, colorMode.fillwarncolor = C.cyan, C.amber
 
 local DEFAULTS = {
     rpm_max = 3000,
@@ -416,7 +460,10 @@ local function header_boxes()
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
         for _, b in ipairs(boxes) do
-            if b.subtype == "craftname" then b.font = nil end
+            if b.subtype == "craftname" then
+                b.type, b.subtype = "func", "func"
+                b.paint = paintModelName
+            end
             b.bgcolor = C.space
             if b.type == "image" then
                 b.type = "func"
@@ -432,11 +479,14 @@ end
 
 local function updateFlightTime(cache)
     local session = rfsuite and rfsuite.session
-    local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    seconds = floor(max(0, seconds))
-    if cache._timerSecond ~= seconds or cache.flightTimeText == nil then
+    local rawTime = session and session.timer and session.timer.live
+    local seconds = tonumber(rawTime)
+    local invalidTime = rawTime ~= nil and (seconds == nil or seconds < 0)
+    seconds = floor(max(0, seconds or 0))
+    if cache._timerSecond ~= seconds or cache.flightTimeText == nil or cache._invalidTime ~= invalidTime then
+        cache._invalidTime = invalidTime
         cache._timerSecond = seconds
-        cache.time = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+        cache.time = invalidTime and "--:--" or format("%02d:%02d", floor(seconds / 60), seconds % 60)
         cache.flightTimeText = "FLIGHT TIME " .. cache.time
     end
 end
@@ -564,26 +614,31 @@ local function postflightWakeup(box, telemetry)
     if available == 0 then
         c.mission = "NO FLIGHT DATA"
         c.missionColor = C.muted
-        c.integrity = nil
+        c.flags = nil
         c.missionSub = "NO RECORDED TELEMETRY"
     elseif faults > 0 then
         c.mission = "SYSTEM INSPECTION"
         c.missionColor = C.red
-        c.integrity = max(15, 55 - faults * 20 - cautions * 8)
+        c.flags = faults + cautions
         c.missionSub = "CRITICAL LIMIT EXCEEDED"
     elseif cautions > 0 then
         c.mission = "MISSION REVIEW"
         c.missionColor = C.amber
-        c.integrity = max(55, 100 - cautions * 10)
+        c.flags = cautions
         c.missionSub = cautions == 1 and "1 ANOMALY" or (tostring(cautions) .. " ANOMALIES")
     else
-        c.mission = "MISSION NOMINAL"
-        c.missionColor = C.green
-        c.integrity = 100
-        c.missionSub = "ALL SYSTEMS WITHIN LIMITS"
+        c.mission = available < 10 and "PARTIAL DEBRIEF" or "NO FLAGS RECORDED"
+        c.missionColor = available < 10 and C.muted or C.green
+        c.flags = 0
+        c.missionSub = "NO CHECKED LIMITS EXCEEDED"
     end
 
-    updateFormatted(c, "_integrityTextKey", "integrityText", c.integrity, 0, "%")
+    c.recordedCount = available
+    if c._coverageCount ~= available then
+        c._coverageCount = available
+        c.coverageText = tostring(available) .. "/10 SIGNALS RECORDED"
+    end
+    updateFormatted(c, "_flagsTextKey", "flagsText", c.flags, 0, "")
 
     return c
 end
@@ -619,12 +674,12 @@ local function postflightPaint(x, y, w, h, box, c)
     local radius = min(w, h) * 0.19
     drawOrbit(cx, cy, radius * 1.65, radius * 0.70, C.line, 64, ORBIT_UNIT_64)
     drawOrbit(cx, cy, radius * 1.10, radius * 1.20, C.line, 64, ORBIT_UNIT_64)
-    drawRingSegments(cx, cy, radius * 1.02, 32, c.integrity or 0, c.missionColor or C.muted, C.line, 11, 0, 360, INTEGRITY_RING_UNIT)
+    drawRingSegments(cx, cy, radius * 1.02, 32, (c.recordedCount or 0) * 10, c.missionColor or C.muted, C.line, 11, 0, 360, INTEGRITY_RING_UNIT)
     drawHex(cx, cy, radius * 0.72, C.line2)
     drawHex(cx, cy, radius * 0.48, c.missionColor or C.muted)
-    drawTextAligned(cx - radius, cy - (h < 330 and 27 or 45), radius * 2, c.integrityText or "--", h < 330 and "FONT_XL" or "FONT_XXL", c.integrity and C.white or C.muted, "center")
-    drawTextAligned(cx - radius, cy + 12, radius * 2, "SYSTEM INTEGRITY", "FONT_XS", C.muted, "center")
-    if h >= 330 then drawTextAligned(cx - radius, cy + 42, radius * 2, c.missionSub or "NO RECORDED TELEMETRY", "FONT_XXS", c.missionColor or C.muted, "center") end
+    drawTextAligned(cx - radius, cy - (h < 330 and 27 or 45), radius * 2, c.flagsText or "--", h < 330 and "FONT_XL" or "FONT_XXL", c.flags ~= nil and C.white or C.muted, "center")
+    drawTextAligned(cx - radius, cy + 12, radius * 2, "FLAGS RECORDED", "FONT_XS", C.muted, "center")
+    if h >= 330 then drawTextAligned(cx - radius, cy + 42, radius * 2, c.coverageText or "NO RECORDED TELEMETRY", "FONT_XXS", c.missionColor or C.muted, "center") end
     drawTextAligned(cx - radius, cy + radius * 1.28, radius * 2, c.flightTimeText or "FLIGHT TIME 00:00", "FONT_S", C.cyan, "center")
 
     local nw = floor(w * 0.19)

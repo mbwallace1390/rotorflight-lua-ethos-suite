@@ -12,7 +12,7 @@ local pi = math.pi
 local rawNumber = tonumber
 local function tonumber(value)
     local number = rawNumber(value)
-    if number and number == number and number > -math.huge and number < math.huge then return number end
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
     return nil
 end
 local tostring = tostring
@@ -21,6 +21,43 @@ local format = string.format
 local ipairs = ipairs
 
 local utils = rfsuite.widgets.dashboard.utils
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -375,7 +412,10 @@ local function header_boxes()
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
         for _, b in ipairs(boxes) do
-            if b.subtype == "craftname" then b.font = nil end
+            if b.subtype == "craftname" then
+                b.type, b.subtype = "func", "func"
+                b.paint = paintModelName
+            end
             b.bgcolor = C.bg
             if b.type == "image" then
                 b.type = "func"
@@ -476,11 +516,14 @@ local function postflightWakeup(box, telemetry)
     c.consumed = stat(telemetry, "smartconsumption", "max", "consumption")
     c.voltage = stat(telemetry, "voltage", "min")
     local session = rfsuite and rfsuite.session
-    local seconds = session and session.timer and tonumber(session.timer.live) or 0
-    seconds = floor(max(0, seconds))
-    if c._timerSecond ~= seconds or c.time == nil then
+    local rawTime = session and session.timer and session.timer.live
+    local seconds = tonumber(rawTime)
+    local invalidTime = rawTime ~= nil and (seconds == nil or seconds < 0)
+    seconds = floor(max(0, seconds or 0))
+    if c._timerSecond ~= seconds or c.time == nil or c._invalidTime ~= invalidTime then
+        c._invalidTime = invalidTime
         c._timerSecond = seconds
-        c.time = format("%02d:%02d", floor(seconds / 60), seconds % 60)
+        c.time = invalidTime and "--:--" or format("%02d:%02d", floor(seconds / 60), seconds % 60)
     end
 
     -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of

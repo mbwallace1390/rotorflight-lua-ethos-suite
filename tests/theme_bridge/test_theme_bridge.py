@@ -33,8 +33,18 @@ class ThemeBridgeTests(unittest.TestCase):
                 return {value = function() return 0 end}
             end}
             lcd = {
-                RGB = function(r, g, b) return r * 65536 + g * 256 + b end,
-                color = function() end,
+                RGB = function(r, g, b, a)
+                    for _, channel in ipairs({r, g, b}) do
+                        assert(type(channel) == "number" and channel >= 0 and channel <= 255
+                            and channel == math.floor(channel), "invalid LCD RGB channel")
+                    end
+                    assert(a == nil or (a >= 0 and a <= 1), "invalid LCD opacity")
+                    return r * 65536 + g * 256 + b
+                end,
+                color = function(value)
+                    assert(type(value) == "number" and value == value and value > -math.huge
+                        and value < math.huge, "invalid color reached drawing")
+                end,
                 drawFilledRectangle = function(x, y, w, h)
                     drawCalls[#drawCalls + 1] = {x, y, w, h}
                 end,
@@ -112,6 +122,23 @@ class ThemeBridgeTests(unittest.TestCase):
             assert(palettePath() == "system/singularity", "midflight opened as preflight")
         ''')
 
+    def test_custom_page_title_contrast_on_bridge_canvas(self):
+        def luminance(color):
+            channels = [(int(color) >> shift & 255) / 255 for shift in (16, 8, 0)]
+            linear = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+                      for v in channels]
+            return sum(v * weight for v, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+        self.run_lua("bridge.open(initialSettings)")
+        for name in ("aegis", "america250", "libertyops250", "mwrc", "singularity", "zafira"):
+            with self.subTest(theme=name):
+                self.lua.globals().initialSettings.dashboard.theme_preflight = "system/" + name
+                self.run_lua('bus.publish("settings.update", initialSettings); flush()')
+                palette = self.lua.globals().bridge.getPalette()
+                foreground, background = luminance(palette.accent), luminance(palette.background)
+                contrast = (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05)
+                self.assertGreaterEqual(contrast, 4.5, "small native page title lacks contrast")
+
     def test_same_aircraft_reconnect_preserves_postflight_but_new_aircraft_resets(self):
         self.run_lua('''
             bridge.open(initialSettings)
@@ -178,6 +205,55 @@ class ThemeBridgeTests(unittest.TestCase):
             bridge.paintBackground()
             assert(drawCalls[1][3] == 784 and drawCalls[1][4] == 294, "canvas size stayed stale")
             assert(loadCount() == count)
+        ''')
+
+    def test_invalid_metadata_colors_fall_back_before_drawing(self):
+        self.run_lua('''
+            local originalLoadfile = loadfile
+            loadfile = function(path)
+                if path == "widgets/dashboard/themes/aegis/init.lua" then
+                    return function() return {appTheme = {
+                        background = {0/0, 20, 30}, text = math.huge,
+                        accent = {10, -math.huge, 30},
+                        surface = {-20, 300, 127.5, 5},
+                        rail = {start = {0/0, 1, 2}, middle = {1, math.huge, 2}, finish = {1, 2, "invalid"}}
+                    }} end
+                end
+                return originalLoadfile(path)
+            end
+            local function finite(value)
+                return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+            end
+            bridge.open(initialSettings)
+            flush()
+            local palette = bridge.getPalette()
+            for _, key in ipairs({"background", "text", "accent", "surface"}) do
+                assert(finite(palette[key]), "invalid metadata color: " .. key)
+            end
+            assert(palette.background == lcd.RGB(20, 22, 26), "invalid background did not use native fallback")
+            assert(palette.accent == lcd.RGB(61, 174, 255), "invalid accent did not use native fallback")
+            assert(palette.surface == lcd.RGB(0, 255, 128), "RGB channels escaped integer 0..255")
+            for _, channels in ipairs({palette._backgroundRGB, palette._accentRGB,
+                palette._railStartRGB, palette._railMiddleRGB, palette._railFinishRGB}) do
+                for _, channel in ipairs(channels) do
+                    assert(finite(channel) and channel >= 0 and channel <= 255, "invalid gradient channel")
+                end
+            end
+            bridge.paintBackground(); bridge.paintChrome()
+        ''')
+
+    def test_invalid_native_colors_do_not_poison_signature_or_palette(self):
+        self.run_lua('''
+            THEME_PAGE_BGCOLOR, THEME_PRIMARY_COLOR = 1, 2
+            lcd.themeColor = function(index) return index == 1 and 0/0 or math.huge end
+            initialSettings.dashboard.theme_preflight = "system/helihud"
+            bridge.open(initialSettings)
+            flush()
+            assert(bridge.getPalette().background == lcd.RGB(20, 22, 26))
+            assert(bridge.getPalette().accent == lcd.RGB(61, 174, 255))
+            local palette = bridge.getPalette()
+            for i = 1, 5 do tick() end
+            assert(bridge.getPalette() == palette, "invalid native colors broke stable cache identity")
         ''')
 
     def test_missing_metadata_falls_back_and_close_releases_subscriptions(self):

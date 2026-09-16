@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-16T07:42:02.623142+00:00",
+  "title": "Design System: MWRC Rotorflight Ethos Themes",
+  "extensions": {
+    "breakpoints": [
+      {
+        "name": "full-screen",
+        "value": "800x480"
+      },
+      {
+        "name": "compact-widget",
+        "value": "784x294"
+      }
+    ],
+    "shadows": [],
+    "motion": []
+  },
+  "components": [
+    {
+      "name": "Native radio header",
+      "kind": "custom",
+      "refersTo": "native-header",
+      "description": "Desktop typography approximation of the 44px native radio header; board/editor titles are not radio content.",
+      "html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 44\" class=\"ds-radio-header\"><rect width=\"800\" height=\"44\" fill=\"#111B24\"/><text x=\"5\" y=\"28\" font-size=\"20\" fill=\"#E7F2F6\">MODEL NAME</text><text x=\"249\" y=\"30\" font-size=\"28\" fill=\"#89DCF1\">Rotorflight // Ethos</text><text x=\"491\" y=\"27\" font-size=\"16\" fill=\"#829CAA\">| MWRC</text><text x=\"620\" y=\"28\" font-size=\"16\" fill=\"#E7F2F6\">TX</text><text x=\"725\" y=\"28\" font-size=\"16\" fill=\"#E7F2F6\">LINK</text></svg>",
+      "css": ".ds-radio-header { width:100%; font-family:Arial,sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "overview": "Operational flight dashboards with seven existing identities. Implementation and device constraints govern the designs.",
+    "keyCharacteristics": [
+      "Native instruments",
+      "Distinct theme identities",
+      "Readable flight state"
+    ],
+    "rules": [],
+    "dos": [
+      "Preserve the native header at y=0.",
+      "Keep MWRC subordinate to the title."
+    ],
+    "donts": [
+      "Do not add a title above the battery/signal header.",
+      "Do not modify suite core."
+    ]
+  }
+}

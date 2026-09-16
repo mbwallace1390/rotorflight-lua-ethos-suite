@@ -10,7 +10,7 @@ local lcd = lcd
 local rawTonumber = tonumber
 local function tonumber(value)
     local number = rawTonumber(value)
-    if number == nil or number ~= number or number == math.huge or number == -math.huge then return nil end
+    if number == nil or number ~= number or number > 1000000000 or number < -1000000000 then return nil end
     return number
 end
 local tostring = tostring
@@ -26,6 +26,64 @@ local sin = math.sin
 local rad = math.rad
 
 local utils = rfsuite.widgets.dashboard.utils
+
+local FIT_FONTS = {FONT_XL="FONT_L", FONT_L="FONT_STD", FONT_STD="FONT_S", FONT_S="FONT_XS", FONT_XS="FONT_XXS"}
+local function fitInstrumentText(box, cacheName, text, fontName, width)
+    local fit = box[cacheName]
+    if not fit then fit = {}; box[cacheName] = fit end
+    if fit.text ~= text or fit.width ~= width or fit.requestedFont ~= fontName then
+        fit.text, fit.width, fit.requestedFont = text, width, fontName
+        local font = utils.resolveFont(fontName, nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        while tw > width and FIT_FONTS[fontName] do
+            fontName = FIT_FONTS[fontName]
+            font = utils.resolveFont(fontName, nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        fit.font, fit.w, fit.h = font, tw, th
+    end
+    lcd.font(fit.font)
+    return fit.w, fit.h
+end
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
@@ -327,7 +385,7 @@ local function wakeAesGauge(box, telemetry)
         local maxVal = tonumber(stats and stats.max) or val
         local maxKey = floor(maxVal * multiplier + 0.5)
         if cache.maxKey ~= maxKey or cache.maxUnit ~= unit then
-            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. unit
+            cache.maxText = "MAX " .. formatGaugeValue(maxVal, decimals) .. (unit == "RPM" and " RPM" or unit)
             cache.maxKey = maxKey
             cache.maxUnit = unit
         end
@@ -424,9 +482,9 @@ local function paintAesGauge(x, y, w, h, box, cache)
     if type(titleFont) == "number" and box.title then
         lcd.font(titleFont)
         lcd.color(box.titlecolor or colorMode.titlecolor)
-        local titleW, titleH = lcd.getTextSize(box.title)
+        local titleW, titleH = fitInstrumentText(box, "_titleFit", box.title, box.titlefont or "FONT_S", w - 20)
         local titleX = floor(cx - titleW / 2)
-        local titleY = y + 2
+        local titleY = y + 8
         lcd.drawText(titleX, titleY, box.title)
         lcd.color(drawColor)
         local underlineY = titleY + titleH + 2
@@ -437,7 +495,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
     if type(valueFont) == "number" then
         lcd.font(valueFont)
         lcd.color(colorMode.textcolor)
-        local valueW, valueH = lcd.getTextSize(cache.valText)
+        local valueW, valueH = fitInstrumentText(box, "_valueFit", cache.valText, box.font or "FONT_XL", w - 32)
         local valueY = floor(cy - valueH * 0.55)
         lcd.drawText(floor(cx - valueW / 2), valueY, cache.valText)
 
@@ -459,7 +517,7 @@ local function paintAesGauge(x, y, w, h, box, cache)
         if type(footerFont) == "number" then
             lcd.font(footerFont)
             lcd.color(box.maxtextcolor or colorMode.fillwarncolor)
-            local footerW, footerH = lcd.getTextSize(footer)
+            local footerW, footerH = fitInstrumentText(box, "_footerFit", footer, box.maxfont or "FONT_XS", w - 20)
             lcd.drawText(floor(cx - footerW / 2), y + h - footerH - 3, footer)
         end
     end
@@ -605,7 +663,10 @@ local function header_boxes()
             box.bgcolor = headerBgColor
             box.yoffset = (box.yoffset or 0) + topbarShiftY
 
-            if box.subtype == "craftname" then box.font = nil end
+            if box.subtype == "craftname" then
+                box.type, box.subtype = "func", "func"
+                box.paint = paintModelName
+            end
             if box.type == "image" then
                 box.type = "func"
                 box.subtype = "func"
@@ -651,7 +712,7 @@ local function buildBoxes(W)
     local opts = themeOptions[optionKey] or themeOptions.ms_std
     local compactWindow = optionKey == nil or optionKey == "ls_std" or optionKey == "ms_std" or optionKey == "ss_std"
     local arcTitleFont = W < 640 and "FONT_XS" or (compactWindow and "FONT_S" or "FONT_STD")
-    local arcMaxFont = W < 640 and "FONT_XS" or (compactWindow and opts.maxfont or "FONT_L")
+    local arcMaxFont = compactWindow and "FONT_XS" or "FONT_S"
 
     -- We kept this one because the context-aware bracket still uses it
     local arcGroupTileBg = {
@@ -722,15 +783,15 @@ local function buildBoxes(W)
             thresholds = {{value = getThemeValue("rpm_min"), fillcolor = rc.cyan}, {value = getThemeValue("rpm_max"), fillcolor = rc.magenta}, {value = 10000, fillcolor = rc.red}}
         },
         {
-            col = 11, row = 1, colspan = 2, rowspan = 3,
+            col = 10, row = 1, colspan = 3, rowspan = 3,
             type = "text", subtype = "governor", title = "GOV", titlepos = "bottom",
-            font = "FONT_S", titlefont = "FONT_XS", bgcolor = "transparent",
+            font = "FONT_S", titlefont = "FONT_XS", bgcolor = "transparent", titlecolor = rc.cyan,
             thresholds = {
                 {value = "DISARMED", textcolor = rc.red}, {value = "OFF", textcolor = rc.red}, {value = "IDLE", textcolor = rc.cyan}, {value = "SPOOLUP", textcolor = rc.cyan}, {value = "RECOVERY", textcolor = rc.amber}, {value = "ACTIVE", textcolor = rc.green}, {value = "THR OFF", textcolor = rc.red}
             }
         },
         {
-            col = 11, row = 5, colspan = 2, rowspan = 3,
+            col = 10, row = 5, colspan = 3, rowspan = 3,
             type = "func", subtype = "func",
             source = "smartfuel",
             wakeup = wakeSegmentedFuel,
@@ -743,15 +804,15 @@ local function buildBoxes(W)
             segmentcount = 10,
             segmentgap = 3,
             segmentheight = 18,
-            gaugepaddingleft = 7,
+            gaugepaddingleft = 12,
             gaugepaddingtop = 4,
             gaugepaddingbottom = 4,
             bgcolor = "transparent"
         },
         {
-            col = 11, row = 9, colspan = 2, rowspan = 2,
+            col = 10, row = 9, colspan = 3, rowspan = 2,
             type = "text", subtype = "telemetry", source = "smartconsumption", transform = safeDisplay,
-            title = "MAH", titlepos = "bottom", unit = "",
+            title = "mAh", titlepos = "bottom", unit = "", titlepaddingbottom = 10,
             font = "FONT_S", titlefont = "FONT_XS", bgcolor = "transparent",
             titlecolor = rc.cyan, textcolor = rc.white
         }

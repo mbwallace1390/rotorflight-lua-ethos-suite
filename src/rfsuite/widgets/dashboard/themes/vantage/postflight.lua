@@ -9,7 +9,7 @@ local max = math.max
 local rawNumber = tonumber
 local function tonumber(value)
     local number = rawNumber(value)
-    if number and number == number and number > -math.huge and number < math.huge then return number end
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
     return nil
 end
 local tostring = tostring
@@ -17,6 +17,43 @@ local type = type
 local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -40,7 +77,10 @@ local function header_boxes()
         -- Keep the shared Rotorflight / Ethos title and discreet builder mark while
         -- keeping the radio's native header surface and battery/RSSI widgets.
         for _, headerBox in ipairs(boxes) do
-            if headerBox.subtype == "craftname" then headerBox.font = nil end
+            if headerBox.subtype == "craftname" then
+                headerBox.type, headerBox.subtype = "func", "func"
+                headerBox.paint = paintModelName
+            end
             if headerBox.type == "image" then
                 headerBox.type = "func"
                 headerBox.subtype = "func"
@@ -276,8 +316,9 @@ local function postflightWakeup(box, telemetry)
 
     local session = rfsuite.session or {}
     local general = session.modelPreferences and session.modelPreferences.general
-    local seconds = tonumber(session.timer and session.timer.live)
-    if seconds == nil or seconds <= 0 then seconds = tonumber(general and general.lastflighttime) end
+    local rawTime = session.timer and session.timer.live
+    local seconds = tonumber(rawTime)
+    if rawTime == nil or (seconds ~= nil and seconds <= 0) then seconds = tonumber(general and general.lastflighttime) end
     if seconds == nil or seconds <= 0 then seconds = nil end
     if c._seconds ~= seconds or c.time == nil then
         c._seconds, c.time = seconds, duration(seconds, false)
@@ -296,7 +337,14 @@ local function postflightWakeup(box, telemetry)
     if c._craft ~= craft or c._narrow ~= narrow then
         c._craft, c._narrow = craft, narrow
         local limit = narrow and 12 or 24
-        c.craft = #craft > limit and craft:sub(1, limit - 3) .. "..." or craft
+        if #craft > limit then
+            -- Keep a shortened model label on a complete UTF-8 character boundary.
+            local cut = limit - 3
+            while cut > 0 and craft:byte(cut + 1) >= 128 and craft:byte(cut + 1) < 192 do cut = cut - 1 end
+            c.craft = craft:sub(1, cut) .. "..."
+        else
+            c.craft = craft
+        end
     end
     c.recorded = false
     for i = 1, #m do

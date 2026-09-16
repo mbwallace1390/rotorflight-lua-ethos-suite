@@ -11,7 +11,7 @@ local rad = math.rad
 local rawNumber = tonumber
 local function tonumber(value)
     local number = rawNumber(value)
-    if number and number == number and number > -math.huge and number < math.huge then return number end
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
     return nil
 end
 local tostring = tostring
@@ -19,6 +19,43 @@ local type = type
 local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -42,7 +79,10 @@ local function header_boxes()
         -- Replace the stock Rotorflight logo with the MWRC-style title while
         -- keeping the radio's native header surface and battery/RSSI widgets.
         for _, headerBox in ipairs(boxes) do
-            if headerBox.subtype == "craftname" then headerBox.font = nil end
+            if headerBox.subtype == "craftname" then
+                headerBox.type, headerBox.subtype = "func", "func"
+                headerBox.paint = paintModelName
+            end
             if headerBox.type == "image" then
                 headerBox.type = "func"
                 headerBox.subtype = "func"
@@ -131,6 +171,7 @@ C = {
     amber = lcd.RGB(216, 170, 78),
     amberDim = lcd.RGB(92, 61, 18),
     red = lcd.RGB(184, 48, 49),
+    statusRed = lcd.RGB(255, 112, 112),
     redDim = lcd.RGB(83, 24, 29),
     violet = lcd.RGB(184, 194, 207),
     violetDim = lcd.RGB(70, 80, 94)
@@ -339,7 +380,7 @@ local function drawTextAligned(x, y, w, text, fontName, color, align)
     local font = resolveFont(fontName)
     if type(font) ~= "number" then return 0, 0 end
     lcd.font(font)
-    lcd.color(color)
+    lcd.color(color == C.red and C.statusRed or color)
     local tw, th = lcd.getTextSize(text)
     -- Step down through native fonts when narrow cards cannot fit a reading.
     local nextFont = FONT_FALLBACK[fontName]
@@ -414,7 +455,7 @@ local function drawStateBadge(x, y, w, h, label, color)
     drawPatrioticGradient(x + 2, y + 2, max(1, w - 4), 3)
     lcd.color(color)
     lcd.drawFilledRectangle(x + 2, y + 5, 4, max(1, h - 7))
-    drawTextAligned(x + 10, y + 7, w - 18, label or "STATE --", "FONT_XS", color, "center")
+    drawTextAligned(x + 10, y + 7, w - 18, label or "STATE --", "FONT_XS", color == C.red and C.statusRed or color, "center")
 end
 
 local function drawMetric(x, y, w, h, title, valueText, accent, subtitle)

@@ -1,4 +1,4 @@
-"""Behavioral contract tests for the six themes against the unchanged suite.
+"""Behavioral contract tests for the seven themes against the unchanged suite.
 
 Run: python -m unittest discover -s tests/themes -p test_theme_contract.py
 Uses the same actual Lua engine/context and LCD fixture as render_themes.py.
@@ -24,8 +24,8 @@ class NullDrawing:
 
 
 def render(theme, phase, *, fahrenheit=False, scenario="connected", invalid=False,
-           preferences=None, prepare=None):
-    radio = Radio()
+           preferences=None, prepare=None, width=800, height=480):
+    radio = Radio(width=width, height=height)
     radio.draw = NullDrawing()
     widget = radio.widget(phase, scenario, fahrenheit)
     if prepare:
@@ -149,7 +149,7 @@ class ThemeContractTests(unittest.TestCase):
 
     def test_corrupt_saved_numbers_produce_finite_bounded_fields(self):
         for theme in THEMES:
-            for bad in (float("nan"), float("inf"), -float("inf")):
+            for bad in (float("nan"), float("inf"), -float("inf"), 1e100, -1e100):
                 with self.subTest(theme=theme, bad=bad):
                     keys = ("rpm_min", "rpm_max", "bec_min", "bec_warn", "bec_max", "esctemp_warn", "esctemp_max") \
                         if theme in ("mwrc", "libertyops250") else \
@@ -179,7 +179,7 @@ class ThemeContractTests(unittest.TestCase):
 
     def test_partial_preflight_data_does_not_claim_ready(self):
         prefs = dict(PREFERENCES, bec_warn=7.0)
-        for theme in ("aegis", "america250", "singularity", "zafira"):
+        for theme in ("aegis", "america250", "singularity", "zafira", "vantage"):
             with self.subTest(theme=theme):
                 radio, _, _ = render(theme, "preflight", preferences=prefs,
                                      prepare=lambda radio, widget: setattr(widget, "tempEsc", None))
