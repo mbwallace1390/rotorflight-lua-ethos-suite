@@ -9,7 +9,7 @@ local max = math.max
 local rawNumber = tonumber
 local function tonumber(value)
     local number = rawNumber(value)
-    if number and number == number and number > -math.huge and number < math.huge then return number end
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
     return nil
 end
 local tostring = tostring
@@ -17,6 +17,43 @@ local type = type
 local format = string.format
 
 local utils = rfsuite.widgets.dashboard.utils
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    if box.bgcolor ~= "transparent" then utils.drawBoxBackground(x, y, w, h, box.bgcolor) end
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -184,7 +221,10 @@ local function header_boxes()
     if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
         local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
         for _, box in ipairs(boxes) do
-            if box.subtype == "craftname" then box.font = nil end
+            if box.subtype == "craftname" then
+                box.type, box.subtype = "func", "func"
+                box.paint = paintModelName
+            end
             box.bgcolor = "transparent"
             if box.type == "image" then
                 box.type = "func"
@@ -379,15 +419,14 @@ local function drawFooterBanner(x, y, w, h)
         lcd.drawFilledRectangle(x + cantonW, y + i * stripeH, w - cantonW, stripeH)
     end
 
-    -- Keep the flag continuous.  A small text shadow provides contrast without
-    -- covering the canton or stripes with a large black rectangle.
-    local titleY = y + floor(h * 0.20)
-    drawText(x + 1, titleY + 1, w, "AMERICA 250", "FONT_L", C.bg, "center")
-    drawText(x, titleY, w, "AMERICA 250", "FONT_L", C.white, "center")
-
-    local subtitleY = y + h - 17
-    drawText(x + 1, subtitleY + 1, w, "13 ORIGINAL COLONIES  |  250 YEARS OF LIBERTY", "FONT_XXS", C.bg, "center")
-    drawText(x, subtitleY, w, "13 ORIGINAL COLONIES  |  250 YEARS OF LIBERTY", "FONT_XXS", C.white, "center")
+    -- A quiet navy inset keeps both lines legible over the flag stripes.
+    local insetW = min(w - 24, 390)
+    local insetX = x + floor((w - insetW) / 2)
+    lcd.color(C.panel)
+    lcd.drawFilledRectangle(insetX, y + 3, insetW, h - 6)
+    local titleY = y + 4
+    drawText(insetX + 8, titleY, insetW - 16, "AMERICA 250", "FONT_STD", C.white, "center")
+    drawText(insetX + 8, y + h - 17, insetW - 16, "13 ORIGINAL COLONIES  |  250 YEARS OF LIBERTY", "FONT_XXS", C.white, "center")
 end
 
 local function drawCompactMetric(x, y, w, h, title, value, accent)
