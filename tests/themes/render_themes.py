@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / 'build/test-deps'))
 from lupa.lua54 import LuaRuntime
 from PIL import Image, ImageDraw, ImageFont
 
-THEMES = ('aegis', 'america250', 'libertyops250', 'mwrc', 'singularity', 'zafira', 'vantage')
+THEMES = ('aegis', 'america250', 'libertyops250', 'mwrc', 'singularity', 'zafira', 'vantage', 'inkhalo')
 PHASES = ('preflight', 'inflight', 'postflight')
 SIZES = {'FONT_XXS': 12, 'FONT_XS': 16, 'FONT_S': 20, 'FONT_STD': 24,
          'FONT_L': 28, 'FONT_XL': 36, 'FONT_XXL': 48, 'FONT_XXXXL': 64}
