@@ -91,7 +91,7 @@ local palettes = {
   -- lets this branch remain independent while still composing cleanly with
   -- any one of the theme branches.
   aegis = {
-    name = "Aegis",
+    name = "Bastion",
     background = {7, 11, 16}, surface = {14, 21, 29}, surfaceAlt = {19, 28, 38},
     text = {230, 239, 247}, muted = {132, 151, 168}, accent = {48, 218, 238},
     focus = {75, 224, 149}, warning = {255, 183, 72}, error = {255, 86, 103}, border = {76, 97, 115},
