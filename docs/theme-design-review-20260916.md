@@ -4,7 +4,7 @@
 
 ## Scope and method
 
-Reviewed Aegis, America 250, Liberty Ops 250, MWRC, Singularity, Zafira, and Vantage across preflight, inflight, and postflight, plus Theme Bridge. The product mode is **Operate**: telemetry recognition, honest state, and readable numbers take priority over decorative expression. Each theme's existing identity is a constraint, not a defect.
+Reviewed Bastion (called Aegis at the time of this review), America 250, Liberty Ops 250, MWRC, Singularity, Zafira, and Vantage across preflight, inflight, and postflight, plus Theme Bridge. The product mode is **Operate**: telemetry recognition, honest state, and readable numbers take priority over decorative expression. Each theme's existing identity is a constraint, not a defect.
 
 The baseline is commit `2bb13409` and its current-header preview set in `build/header-review/`. All 21 compact screens in `build/polish-before/` were inspected at 784×294. All seven full-size inflight screens were compared in Ethos 26 light appearance; selected full-size dark previews provided comparison. These are desktop renders of the actual Lua engine using substituted fonts, not physical-radio screenshots or an outdoor visibility test.
 
@@ -50,7 +50,7 @@ The fixture's foreground `(32,40,52)` on `(3,5,12)` has approximately **1.37:1**
 
 | Theme | Preflight | Inflight | Postflight |
 |---|---|---|---|
-| Aegis | Clear status and instrument groups | Headspeed is dominant; no standard-fixture compact collision found | Clear min/peak labels; compact cards fit |
+| Bastion | Clear status and instrument groups | Headspeed is dominant; no standard-fixture compact collision found | Clear min/peak labels; compact cards fit |
 | America 250 | Patriotic identity retained; compact columns fit | Status contrast finding above | Dense but fitting summary; decorative 250 remains brand content |
 | Liberty Ops 250 | Compact instrument grid fits | Gauge/fuel geometry and GOV-title findings above | Recorded-stat grid fits standard fixture |
 | MWRC | Dials fit; absent model bitmap leaves a large empty area | Gauge/fuel geometry and GOV-title findings above | Recorded-stat grid fits standard fixture |

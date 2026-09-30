@@ -10,10 +10,13 @@ import subprocess
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
-THEMES = {'aegis':'Aegis', 'america250':'America 250', 'libertyops250':'Liberty Ops 250',
+THEMES = {'aegis':'Bastion', 'america250':'America 250', 'libertyops250':'Liberty Ops 250',
           'mwrc':'MWRC', 'singularity':'Singularity', 'zafira':'Zafira'}
 OUT = ROOT / 'artifacts/theme-refresh'
 PREVIEWS = ROOT / 'artifacts/theme-previews'
+BRANDING_FILES = ('src/rfsuite/app/pages/settings_dashboard_settings.lua',
+                  'src/rfsuite/app/pages/settings_dashboard_theme.lua',
+                  'src/rfsuite/app/theme_palettes.lua')
 
 
 def main():
@@ -25,7 +28,13 @@ def main():
     changed = subprocess.check_output(['git','-c','core.safecrlf=false','diff','--name-only',base,'--','src'], cwd=ROOT, text=True).splitlines()
     prefix = 'src/rfsuite/widgets/dashboard/themes/'
     allowed = [prefix + name + '/' for name in (*THEMES, 'vantage')]
-    assert all(path == 'src/rfsuite/app/theme_bridge.lua' or any(path.startswith(p) for p in allowed) for path in changed), 'suite core changed'
+    for path in changed:
+        if path in BRANDING_FILES:
+            previous = subprocess.check_output(['git', 'show', f'{base}:{path}'], cwd=ROOT)
+            current = (ROOT / path).read_bytes().replace(b'\r\n', b'\n')
+            assert current == previous.replace(b'Aegis', b'Bastion'), f'non-branding change: {path}'
+        else:
+            assert path == 'src/rfsuite/app/theme_bridge.lua' or any(path.startswith(p) for p in allowed), 'suite core changed'
     files = [ROOT/'src/rfsuite/app/theme_bridge.lua']
     for name in THEMES:
         files.extend(sorted((ROOT/prefix/name).rglob('*')))
@@ -39,7 +48,7 @@ def main():
     manifest = {name:hashlib.sha256(content).hexdigest() for name,content in entries.items()}
     readme = f'''# User theme refresh — September 7, 2026
 
-This update contains Aegis, America 250, Liberty Ops 250, MWRC, Singularity,
+This update contains Bastion, America 250, Liberty Ops 250, MWRC, Singularity,
 Zafira, and Theme Bridge. It targets the rewritten `radio-all-themes` branch,
 verified at `{base}`. Suite core files are unchanged from that branch.
 
@@ -111,6 +120,10 @@ Vantage is supplied separately in `src/rfsuite/widgets/dashboard/themes/vantage`
 It is a new theme folder; its registration in the suite's fixed picker is outside
 this update. The six-theme ZIP continues to contain only the original six themes
 and Theme Bridge.
+
+Bastion uses the legacy `aegis` folder and preference keys to preserve saved
+settings. The branch also renames the picker labels and Bridge fallback palette;
+those app files are part of a full branch installation, not this theme overlay.
 '''
     (OUT/'README.md').write_text(readme, encoding='utf-8')
     (OUT/'manifest.json').write_text(json.dumps({'base':base,'files':manifest},indent=2),encoding='utf-8')

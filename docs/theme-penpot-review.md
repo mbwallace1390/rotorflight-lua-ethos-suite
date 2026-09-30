@@ -1,5 +1,10 @@
 # Editable theme review in Penpot
 
+The radio theme formerly named Aegis is now Bastion; its legacy source folder is
+still `aegis`. The saved Penpot reference described below predates that rename.
+Fresh Bastion text records and source fingerprints are exported selectively to
+`build/bastion-rename/penpot`; updating the saved design requires Penpot sign-in.
+
 [Open MWRC — Rotorflight Ethos Themes](https://design.penpot.app/#/workspace?team-id=c514c1fb-1cda-8125-8008-a4c2900578e2&file-id=d8ac01df-6646-81d2-8008-a58c5471ce84&page-id=d8ac01df-6646-81d2-8008-a58c5471ce85).
 
 The design file contains a Design System page and individual pages for Aegis, America 250, Liberty Ops 250, MWRC, Singularity, Zafira, and Vantage. Each theme has preflight, inflight, and postflight boards at 800 × 480 and 784 × 294: 42 screen boards in total. Geometry and text are editable, with a shared library of 42 theme colors.

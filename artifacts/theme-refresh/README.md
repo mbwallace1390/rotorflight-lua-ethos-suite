@@ -1,8 +1,8 @@
 # User theme refresh — September 7, 2026
 
-This update contains Aegis, America 250, Liberty Ops 250, MWRC, Singularity,
+This update contains Bastion, America 250, Liberty Ops 250, MWRC, Singularity,
 Zafira, and Theme Bridge. It targets the rewritten `radio-all-themes` branch,
-verified at `28c5871ef1b126fbe5600fb804a138ba0b92fb02`. Suite core files are unchanged from that branch.
+verified at `989ced8e2936f5e22d9757f5c2f246a96d743d3b`. Suite core files are unchanged from that branch.
 
 ## Install
 
@@ -72,3 +72,7 @@ Vantage is supplied separately in `src/rfsuite/widgets/dashboard/themes/vantage`
 It is a new theme folder; its registration in the suite's fixed picker is outside
 this update. The six-theme ZIP continues to contain only the original six themes
 and Theme Bridge.
+
+Bastion uses the legacy `aegis` folder and preference keys to preserve saved
+settings. The branch also renames the picker labels and Bridge fallback palette;
+those app files are part of a full branch installation, not this theme overlay.

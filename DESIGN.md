@@ -72,7 +72,7 @@ The frontmatter extracts the persisted `appTheme` roles from each theme's `init.
 
 | Theme | Existing visual character | Dominant forms |
 |---|---|---|
-| Aegis | Graphite, cyan, green, restrained violet | Shield, clean rectangular instruments |
+| Bastion | Graphite, cyan, green, restrained violet | Shield, clean rectangular instruments |
 | America 250 | Navy, parchment, commemorative red and blue | Instrument panels and patriotic detail |
 | Liberty Ops 250 | Dark cockpit, blue, flag red, green | Arc gauges and flag detail |
 | MWRC | Near-black, electric cyan, lime, violet | Arc gauges and segmented fuel |
@@ -113,7 +113,7 @@ The radio themes use flat surfaces, tonal separation, fine rules, and their exis
 
 ## Shapes
 
-Preserve each theme's silhouette: Aegis shields, MWRC/Liberty arcs, Singularity orbits, Zafira facets, and Vantage's large dial. Rectangular information regions provide stable reading anchors. Decoration must stay behind clear numeric values and status labels.
+Preserve each theme's silhouette: Bastion shields, MWRC/Liberty arcs, Singularity orbits, Zafira facets, and Vantage's large dial. Rectangular information regions provide stable reading anchors. Decoration must stay behind clear numeric values and status labels.
 
 ## Components
 
