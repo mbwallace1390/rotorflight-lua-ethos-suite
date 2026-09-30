@@ -17,7 +17,7 @@ local PAGE_TITLE = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settin
 local NO_THEMES = "@i18n(app.modules.settings.no_themes_available_to_configure)@"
 
 local THEME_DEFS = {
-  {label = "Aegis", folder = "aegis", minResolution = {x = 784, y = 294}},
+  {label = "Bastion", folder = "aegis", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", folder = "aerc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", folder = "aerc-n"},
   {label = "America 250", folder = "america250", minResolution = {x = 784, y = 294}},
