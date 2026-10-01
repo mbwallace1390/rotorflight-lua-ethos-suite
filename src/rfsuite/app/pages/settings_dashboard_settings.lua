@@ -17,6 +17,7 @@ local NO_THEMES = "@i18n(app.modules.settings.no_themes_available_to_configure)@
 
 local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", folder = "aerc"},
+  {label = "Cinder", folder = "cinder", minResolution = {x = 784, y = 294}},
   {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", folder = "aerc-n"},
   {label = "@i18n(app.modules.settings.dashboard_theme_claude)@", folder = "claude"},
   {label = "@i18n(app.modules.settings.dashboard_theme_default)@", folder = "default"},
