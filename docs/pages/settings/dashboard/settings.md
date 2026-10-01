@@ -38,6 +38,9 @@ The controls depend on the selected theme. Meridian and Cinder provide:
   `SCRIPTS:/rfsuite.user/settings.ini` on the radio. These settings are shared by
   models using that theme; they do not write flight-controller EEPROM or change
   the FC's protection limits.
+- Bastion's source folder is now `bastion`, while its saved thresholds remain in
+  `dashboard.aegis`. Installing the matching current branch preserves those
+  values and the legacy theme selection; no settings migration is required.
 - Reload discards unsaved form edits and restores the values loaded for the page
   or last saved during this visit.
 - Temperature fields follow the unit selected in **System → Settings → General**.

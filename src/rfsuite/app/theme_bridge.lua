@@ -250,10 +250,16 @@ local function loadThemeMetadata(path, folder)
   if source == "user" then
     initPath = "SCRIPTS:/rfsuite.user/dashboard/" .. folder .. "/init.lua"
   else
-    initPath = "widgets/dashboard/themes/" .. folder .. "/init.lua"
+    -- Saved system/aegis selections now read Bastion's installed metadata.
+    local directory = folder == "aegis" and "bastion" or folder
+    initPath = "widgets/dashboard/themes/" .. directory .. "/init.lua"
   end
 
   local okLoad, chunk = pcall(loadfile, initPath)
+  -- A standalone Bridge update must also support older Aegis-folder installs.
+  if (not okLoad or type(chunk) ~= "function") and source == "system" and folder == "aegis" then
+    okLoad, chunk = pcall(loadfile, "widgets/dashboard/themes/aegis/init.lua")
+  end
   if not okLoad or type(chunk) ~= "function" then return nil end
   local okRun, metadata = pcall(chunk)
   if not okRun or type(metadata) ~= "table" or type(metadata.appTheme) ~= "table" then return nil end

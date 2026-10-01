@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[2]
 THEMES = {'aegis':'Bastion', 'america250':'America 250', 'libertyops250':'Liberty Ops 250',
           'mwrc':'MWRC', 'singularity':'Singularity', 'zafira':'Zafira'}
+# Preview keys retain the legacy identity; package files use the current folder.
+THEME_DIRECTORIES = {'aegis': 'bastion'}
 OUT = ROOT / 'artifacts/theme-refresh'
 PREVIEWS = ROOT / 'artifacts/theme-previews'
 BRANDING_FILES = ('src/rfsuite/app/pages/settings_dashboard_settings.lua',
@@ -27,7 +29,7 @@ def main():
     base = subprocess.check_output(['git','rev-parse','origin/radio-all-themes'], cwd=ROOT, text=True).strip()
     changed = subprocess.check_output(['git','-c','core.safecrlf=false','diff','--name-only',base,'--','src'], cwd=ROOT, text=True).splitlines()
     prefix = 'src/rfsuite/widgets/dashboard/themes/'
-    allowed = [prefix + name + '/' for name in (*THEMES, 'vantage')]
+    allowed = [prefix + THEME_DIRECTORIES.get(name, name) + '/' for name in (*THEMES, 'vantage')]
     for path in changed:
         if path in BRANDING_FILES:
             previous = subprocess.check_output(['git', 'show', f'{base}:{path}'], cwd=ROOT)
@@ -37,7 +39,7 @@ def main():
             assert path == 'src/rfsuite/app/theme_bridge.lua' or any(path.startswith(p) for p in allowed), 'suite core changed'
     files = [ROOT/'src/rfsuite/app/theme_bridge.lua']
     for name in THEMES:
-        files.extend(sorted((ROOT/prefix/name).rglob('*')))
+        files.extend(sorted((ROOT/prefix/THEME_DIRECTORIES.get(name, name)).rglob('*')))
     files = [path for path in files if path.is_file()]
     entries = {}
     for file in files:
@@ -121,9 +123,11 @@ It is a new theme folder; its registration in the suite's fixed picker is outsid
 this update. The six-theme ZIP continues to contain only the original six themes
 and Theme Bridge.
 
-Bastion uses the legacy `aegis` folder and preference keys to preserve saved
-settings. The branch also renames the picker labels and Bridge fallback palette;
-those app files are part of a full branch installation, not this theme overlay.
+Bastion uses the current `bastion` folder while preserving the `system/aegis`
+selection and `dashboard.aegis` settings section. This overlay requires an
+updated all-themes branch with matching dashboard, settings-page, and optional
+Theme Bridge routing. Install that complete branch first and restart the scripts
+or radio; the overlay does not supply those routing changes.
 '''
     (OUT/'README.md').write_text(readme, encoding='utf-8')
     (OUT/'manifest.json').write_text(json.dumps({'base':base,'files':manifest},indent=2),encoding='utf-8')

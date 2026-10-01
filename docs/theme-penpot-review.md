@@ -1,8 +1,9 @@
 # Editable theme review in Penpot
 
-The radio theme formerly named Aegis is now Bastion; its legacy source folder is
-still `aegis`. On 2026-09-30 the saved Penpot page, all six screens, palette-role
-labels, and six shared color assets were renamed to Bastion in place. Reload
+The radio theme formerly named Aegis is now Bastion; its current source folder is
+`src/rfsuite/widgets/dashboard/themes/bastion`. On 2026-09-30 the saved Penpot page,
+all six screens, palette-role labels, and six shared color assets were renamed to
+Bastion in place. Reload
 verification confirmed the eight native heading/footer text changes. Both
 inflight footers moved 16 pixels left to preserve their right alignment; the
 remaining screen geometry was preserved.

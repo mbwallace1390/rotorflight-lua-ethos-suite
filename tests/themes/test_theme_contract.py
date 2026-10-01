@@ -173,13 +173,13 @@ class ThemeContractTests(unittest.TestCase):
                 radio, module, _ = configure(theme, preferences=prefs)
                 module.write()
                 self.assertEqual(radio.context.widgets.dashboard.getPreference("bec_warn"), 8.0)
-                if theme in ("aegis", "america250", "singularity", "zafira"):
+                if theme in ("bastion", "america250", "singularity", "zafira"):
                     _, state, _ = render(theme, "preflight", preferences=prefs)
                     self.assertTrue(any(box._cache and box._cache.becWarn == 8.0 for box in boxes(state)))
 
     def test_partial_preflight_data_does_not_claim_ready(self):
         prefs = dict(PREFERENCES, bec_warn=7.0)
-        for theme in ("aegis", "america250", "singularity", "zafira", "vantage"):
+        for theme in ("bastion", "america250", "singularity", "zafira", "vantage"):
             with self.subTest(theme=theme):
                 radio, _, _ = render(theme, "preflight", preferences=prefs,
                                      prepare=lambda radio, widget: setattr(widget, "tempEsc", None))

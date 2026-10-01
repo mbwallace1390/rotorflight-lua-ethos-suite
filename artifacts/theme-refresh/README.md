@@ -1,10 +1,18 @@
 # User theme refresh — September 7, 2026
 
+**Archive notice — October 1, 2026:** The September ZIP and manifest in this
+directory retain the earlier `aegis` folder layout and their recorded source
+base. The installation and verification details below describe that historical
+overlay. For a current installation, use the complete Suite files from
+`radio-theme-bastion` or `radio-all-themes`, which include the `bastion` folder and
+its updated routing, then restart the scripts or radio. The archived ZIP,
+manifest, and preview images have not been regenerated for the folder rename.
+
 This update contains Bastion, America 250, Liberty Ops 250, MWRC, Singularity,
 Zafira, and Theme Bridge. It targets the rewritten `radio-all-themes` branch,
 verified at `989ced8e2936f5e22d9757f5c2f246a96d743d3b`. Suite core files are unchanged from that branch.
 
-## Install
+## Historical installation instructions
 
 1. Back up your radio's six theme folders and `scripts/rfsuite/app/theme_bridge.lua`.
 2. Close Rotorflight Suite. Merge this ZIP's `scripts` folder into the radio's
@@ -73,6 +81,8 @@ It is a new theme folder; its registration in the suite's fixed picker is outsid
 this update. The six-theme ZIP continues to contain only the original six themes
 and Theme Bridge.
 
-Bastion uses the legacy `aegis` folder and preference keys to preserve saved
-settings. The branch also renames the picker labels and Bridge fallback palette;
-those app files are part of a full branch installation, not this theme overlay.
+This historical overlay stores Bastion under `aegis`. Current branches use the
+physical folder `bastion`, with matching dashboard, settings-page, and optional
+Theme Bridge routing. The legacy `system/aegis` selection and `dashboard.aegis`
+settings section remain valid in current branches; saved settings do not require
+migration. The archive's old folder layout is not current installation guidance.

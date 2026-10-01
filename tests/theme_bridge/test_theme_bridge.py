@@ -104,7 +104,8 @@ class ThemeBridgeTests(unittest.TestCase):
                 bus.publish("settings.update", initialSettings)
                 flush()
                 assert(palettePath() == "system/" .. name, name)
-                local expected = assert(loadfile("widgets/dashboard/themes/" .. name .. "/init.lua"))().appTheme
+                local directory = name == "aegis" and "bastion" or name
+                local expected = assert(loadfile("widgets/dashboard/themes/" .. directory .. "/init.lua"))().appTheme
                 local accent = expected.accent
                 assert(bridge.getPalette().accent == lcd.RGB(accent[1], accent[2], accent[3]))
                 local count = loadCount()
@@ -211,7 +212,7 @@ class ThemeBridgeTests(unittest.TestCase):
         self.run_lua('''
             local originalLoadfile = loadfile
             loadfile = function(path)
-                if path == "widgets/dashboard/themes/aegis/init.lua" then
+                if path == "widgets/dashboard/themes/bastion/init.lua" then
                     return function() return {appTheme = {
                         background = {0/0, 20, 30}, text = math.huge,
                         accent = {10, -math.huge, 30},
@@ -258,7 +259,7 @@ class ThemeBridgeTests(unittest.TestCase):
 
     def test_missing_metadata_falls_back_and_close_releases_subscriptions(self):
         self.run_lua('''
-            missingFiles["widgets/dashboard/themes/aegis/init.lua"] = true
+            missingFiles["widgets/dashboard/themes/bastion/init.lua"] = true
             bridge.open(initialSettings)
             flush()
             assert(palettePath() == "system/default")
@@ -266,7 +267,7 @@ class ThemeBridgeTests(unittest.TestCase):
             bus.publish("session.update", {connected = true, isArmed = false, mcuId = "craft-a"})
             tick()
             assert(bridge.getPalette() == nil)
-            missingFiles["widgets/dashboard/themes/aegis/init.lua"] = nil
+            missingFiles["widgets/dashboard/themes/bastion/init.lua"] = nil
             bridge.open(initialSettings)
             flush()
             assert(palettePath() == "system/aegis", "stale missing-theme cache survived reopen")
