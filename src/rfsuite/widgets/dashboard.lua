@@ -18,6 +18,7 @@ local mspApiVersion = requireModule("lib/msp_api_version.lua")
 local THEME_DIRS = {
   ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
   aerc = "widgets/dashboard/themes/aerc",
+  meridian = "widgets/dashboard/themes/meridian",
   claude = "widgets/dashboard/themes/claude",
   danielrc = "widgets/dashboard/themes/danielrc",
   default = "widgets/dashboard/themes/default",

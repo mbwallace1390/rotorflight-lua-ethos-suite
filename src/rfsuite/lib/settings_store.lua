@@ -94,6 +94,7 @@ local DEFAULTS = {
 local DASHBOARD_THEMES = {
   ["aerc-n"] = true,
   aerc = true,
+  meridian = true,
   claude = true,
   danielrc = true,
   default = true,
