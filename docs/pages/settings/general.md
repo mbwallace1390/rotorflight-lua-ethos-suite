@@ -23,6 +23,9 @@ Always available offline without an active flight controller connection. Read-on
 
 ## Notes
 
+- With **Follow dashboard theme** enabled, Theme Bridge loads Bastion's palette
+  from `widgets/dashboard/themes/bastion`. Older installs with the `aegis`
+  folder remain supported; saved `system/aegis` selections continue to work.
 - Changes are written to the flight controller EEPROM upon Save.
 
 ## Related
