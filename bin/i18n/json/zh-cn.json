@@ -2470,6 +2470,13 @@
           "reverse_text": false,
           "max_length": 11
         },
+        "txt_follow_dashboard_theme": {
+          "english": "Follow dashboard theme",
+          "translation": "Follow dashboard theme",
+          "needs_translation": true,
+          "reverse_text": false,
+          "max_length": 22
+        },
         "txt_syncname": {
           "english": "Sync model name",
           "translation": "同步模型名称",
@@ -2490,6 +2497,66 @@
           "needs_translation": false,
           "reverse_text": false,
           "max_length": 16
+        },
+        "dashboard_theme_bastion": {
+          "english": "Bastion",
+          "translation": "Bastion",
+          "needs_translation": false,
+          "max_length": 7
+        },
+        "dashboard_theme_america250": {
+          "english": "America 250",
+          "translation": "America 250",
+          "needs_translation": false,
+          "max_length": 11
+        },
+        "dashboard_theme_libertyops250": {
+          "english": "Liberty Ops 250",
+          "translation": "Liberty Ops 250",
+          "needs_translation": false,
+          "max_length": 15
+        },
+        "dashboard_theme_mwrc": {
+          "english": "MWRC",
+          "translation": "MWRC",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "dashboard_theme_singularity": {
+          "english": "Singularity",
+          "translation": "Singularity",
+          "needs_translation": false,
+          "max_length": 11
+        },
+        "dashboard_theme_zafira": {
+          "english": "Zafira",
+          "translation": "Zafira",
+          "needs_translation": false,
+          "max_length": 6
+        },
+        "dashboard_theme_vantage": {
+          "english": "Vantage",
+          "translation": "Vantage",
+          "needs_translation": false,
+          "max_length": 7
+        },
+        "dashboard_theme_inkhalo": {
+          "english": "Ink & Halo",
+          "translation": "Ink & Halo",
+          "needs_translation": false,
+          "max_length": 10
+        },
+        "dashboard_theme_meridian": {
+          "english": "Meridian",
+          "translation": "Meridian",
+          "needs_translation": false,
+          "max_length": 8
+        },
+        "dashboard_theme_cinder": {
+          "english": "Cinder",
+          "translation": "Cinder",
+          "needs_translation": false,
+          "max_length": 6
         }
       },
       "telemetry": {
@@ -8551,6 +8618,13 @@
         "needs_translation": false,
         "reverse_text": false,
         "max_length": 8
+      },
+      "startup_invalid_device": {
+        "english": "Invalid device connected",
+        "translation": "Invalid device connected",
+        "needs_translation": true,
+        "reverse_text": false,
+        "max_length": 24
       },
       "startup_no_link": {
         "english": "No telemetry link detected",

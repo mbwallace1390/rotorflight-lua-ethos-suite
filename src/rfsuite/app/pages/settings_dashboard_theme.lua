@@ -7,6 +7,7 @@ local header = requireModule("app/header.lua")
 local modelPreferences = requireModule("lib/model_preferences.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
 local tableClone = requireModule("lib/table_clone.lua")
+local themeCatalog = requireModule("lib/dashboard_themes.lua")
 
 local PAGE_TITLE = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settings.dashboard)@ / @i18n(app.modules.settings.dashboard_theme)@"
 local BTN_OK = "@i18n(app.btn_ok)@"
@@ -17,21 +18,6 @@ local MSG_SAVE_BODY = "@i18n(app.msg_save_current_page)@"
 local MODEL_DISABLED = "@i18n(app.modules.settings.dashboard_theme_panel_model_disabled)@"
 local DEFAULT_THEME = "system/default"
 
-local THEME_DEFS = {
-  {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", path = "system/aerc"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", path = "system/aerc-n"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_timer)@", path = "system/timer"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_claude)@", path = "system/claude"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_danielrc)@", path = "system/danielrc"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_default)@", path = "system/default"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_gismo)@", path = "system/gismo"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_helihud)@", path = "system/helihud"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", path = "system/kevd", minResolution = {x = 784, y = 294}},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", path = "system/rfstatus"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", path = "system/rt-rc"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", path = "system/rt-rc-n"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", path = "system/srb-rc"},
-}
 
 local function coerceBool(value, default)
   if value == nil then return default end
@@ -41,10 +27,7 @@ local function coerceBool(value, default)
 end
 
 local function themeKey(path)
-  if type(path) ~= "string" then return nil end
-  local folder = path:match("^system/(.+)$") or path
-  if folder:sub(1, 1) == "@" then folder = folder:sub(2) end
-  return folder
+  return themeCatalog.key(path)
 end
 
 local function themeVisible(theme)
@@ -61,7 +44,7 @@ local function buildThemeChoices()
   local idByPath = {}
   local fallbackId = 1
 
-  for _, theme in ipairs(THEME_DEFS) do
+  for _, theme in ipairs(themeCatalog.list()) do
     if themeVisible(theme) then
       local id = #choices + 1
       choices[id] = {theme.label, id}
@@ -81,12 +64,8 @@ local function normalizeThemePath(path, allowDisabled, defaultPath)
     return "nil"
   end
 
-  local key = themeKey(path or defaultPath)
-  for _, theme in ipairs(THEME_DEFS) do
-    if key == themeKey(theme.path) then return theme.path end
-  end
-
-  return defaultPath or DEFAULT_THEME
+  -- Keep valid saved paths even if their folders are temporarily absent.
+  return themeCatalog.normalize(path or defaultPath) or defaultPath or DEFAULT_THEME
 end
 
 local function normalizeDashboard(dashboard, allowDisabled)
@@ -130,10 +109,11 @@ local function pathForChoice(value, pathById, allowDisabled)
   return pathById[value] or DEFAULT_THEME
 end
 
-local function copyPreflightToAll(dashboard, allowDisabled, pathById, idByPath, fallbackId)
+local function copyPreflightToAll(dashboard, allowDisabled)
   if type(dashboard) ~= "table" then return end
-  local id = choiceForPath(dashboard.theme_preflight, idByPath, fallbackId, allowDisabled)
-  local path = pathForChoice(id, pathById, allowDisabled)
+  -- Preserve an absent/hidden theme when saving unrelated model settings.
+  -- The picker fallback is presentation only, not a new user selection.
+  local path = normalizeThemePath(dashboard.theme_preflight, allowDisabled, allowDisabled and "nil" or DEFAULT_THEME)
   dashboard.theme_preflight = path
   dashboard.theme_inflight = path
   dashboard.theme_postflight = path
@@ -262,13 +242,13 @@ local function open(opts)
   local function save(focusFn)
     if disposed then return end
     settings.dashboard = normalizeDashboard(settings.dashboard, false)
-    if settings.dashboard.use_same_theme then copyPreflightToAll(settings.dashboard, false, pathById, idByPath, fallbackId) end
+    if settings.dashboard.use_same_theme then copyPreflightToAll(settings.dashboard, false) end
     settingsStore.save(settings)
     originalDashboard = tableClone.shallow(settings.dashboard)
 
     if modelEnabled() and modelPrefs and modelPath then
       modelDashboard = normalizeDashboard(modelDashboard, true)
-      if modelDashboard.use_same_theme then copyPreflightToAll(modelDashboard, true, pathById, idByPath, fallbackId) end
+      if modelDashboard.use_same_theme then copyPreflightToAll(modelDashboard, true) end
       if hasModelDashboardOverride(modelDashboard) then
         modelPrefs.dashboard = modelDashboard
       else
@@ -321,7 +301,7 @@ local function open(opts)
     end,
     function(value)
       settings.dashboard.use_same_theme = value == true
-      if settings.dashboard.use_same_theme then copyPreflightToAll(settings.dashboard, false, pathById, idByPath, fallbackId) end
+      if settings.dashboard.use_same_theme then copyPreflightToAll(settings.dashboard, false) end
       updateGlobalFields()
     end)
 
@@ -332,7 +312,7 @@ local function open(opts)
     function(value)
       if not settings then return end
       setTheme(settings.dashboard, "theme_preflight", value, false)
-      if globalUseSame() then copyPreflightToAll(settings.dashboard, false, pathById, idByPath, fallbackId) end
+      if globalUseSame() then copyPreflightToAll(settings.dashboard, false) end
       updateSaveEnabled()
     end)
 
@@ -365,7 +345,7 @@ local function open(opts)
     end,
     function(value)
       modelDashboard.use_same_theme = value == true
-      if modelDashboard.use_same_theme then copyPreflightToAll(modelDashboard, true, pathById, idByPath, fallbackId) end
+      if modelDashboard.use_same_theme then copyPreflightToAll(modelDashboard, true) end
       updateModelFields()
     end)
 
@@ -376,7 +356,7 @@ local function open(opts)
     function(value)
       if not modelDashboard then return end
       setTheme(modelDashboard, "theme_preflight", value, true)
-      if modelUseSame() then copyPreflightToAll(modelDashboard, true, pathById, idByPath, fallbackId) end
+      if modelUseSame() then copyPreflightToAll(modelDashboard, true) end
       updateSaveEnabled()
     end)
 

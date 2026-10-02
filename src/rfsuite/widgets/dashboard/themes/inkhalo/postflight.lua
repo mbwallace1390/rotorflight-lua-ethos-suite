@@ -1,0 +1,329 @@
+-- INK & HALO flight report. Historical telemetry and lifecycle adapted from Aegis.
+local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
+local rfsuite = requireModule("widgets/dashboard/context.lua")
+local lcd = lcd
+local math = math
+local floor = math.floor
+local min = math.min
+local max = math.max
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
+    return nil
+end
+local tostring = tostring
+local type = type
+local format = string.format
+
+local utils = rfsuite.widgets.dashboard.utils
+local drawing = requireModule("widgets/dashboard/themes/inkhalo/common.lua")
+local panels = requireModule("widgets/dashboard/themes/inkhalo/layout.lua")
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
+local headeropts = utils.getHeaderOptions()
+-- This theme owns its header geometry; leave the Suite defaults unchanged.
+headeropts.height = math.max(headeropts.height or 0, 44)
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
+local header_layout = utils.standardHeaderLayout(headeropts)
+local header_boxes_cache = nil
+local last_txbatt_type = nil
+local C
+
+local function header_boxes()
+    local txbatt_type = 0
+    if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
+        txbatt_type = rfsuite.preferences.general.txbatt_type or 0
+    end
+
+    if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
+        local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
+
+        -- Keep the shared Rotorflight / Ethos title and discreet builder mark while
+        -- keeping the radio's native header surface and battery/RSSI widgets.
+        for _, headerBox in ipairs(boxes) do
+            if headerBox.subtype == "craftname" then
+                headerBox.type, headerBox.subtype = "func", "func"
+                headerBox.paint = paintModelName
+            end
+            if headerBox.type == "image" then
+                headerBox.type = "func"
+                headerBox.subtype = "func"
+                headerBox.bgcolor = "transparent"
+                headerBox.paint = function(x, y, w, h)
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(math.floor(x), math.floor(y), math.floor(w), math.floor(h))
+                    local cache = headerBox
+                    -- Measure only when the header geometry changes; keep the builder mark smaller.
+                    if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+                        local titleFont = utils.resolveFont("FONT_L", nil)
+                        local markFont = utils.resolveFont("FONT_XS", nil)
+                        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+                        lcd.font(markFont)
+                        local mw, mh = lcd.getTextSize("| MWRC")
+                        lcd.font(titleFont)
+                        local tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_STD", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_S", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- Narrow header slots retain the same hierarchy with the smallest pair.
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            markFont = utils.resolveFont("FONT_XXS", nil) or markFont
+                            lcd.font(markFont)
+                            mw, mh = lcd.getTextSize("| MWRC")
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        cache._titleWidth = w
+                        cache._titleLayoutHeight = h
+                        cache._titleFont = titleFont
+                        cache._titleHeight = th
+                        cache._titleTextWidth = tw
+                        cache._markFont = markFont
+                        cache._markHeight = mh
+                        cache._titleGroupWidth = tw + 8 + mw
+                    end
+                    local screenW = lcd.getWindowSize()
+                    local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
+                    lcd.font(cache._titleFont)
+                    lcd.color(C.cyan)
+                    lcd.drawText(groupX, math.floor(y + (h - cache._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(cache._markFont)
+                    lcd.color(C.muted)
+                    lcd.drawText(groupX + cache._titleTextWidth + 8, math.floor(y + (h - cache._markHeight) / 2), "| MWRC")
+                end
+            end
+        end
+
+        header_boxes_cache = boxes
+        last_txbatt_type = txbatt_type
+    end
+    return header_boxes_cache
+end
+
+local DEFAULTS = {
+    rpm_max = 3000,
+    bec_min = 6.5,
+    bec_warn = 7.0,
+    esc_warn = 110,
+    esc_max = 150,
+    fuel_warn = 25,
+    link_warn = 50
+}
+
+C = drawing.colors
+
+-- Keep telemetry contrast stable when the transmitter uses a light system theme.
+colorMode.bgcolor = C.bg
+colorMode.tbbgcolor = C.panel
+colorMode.tbtextcolor = C.white
+colorMode.cntextcolor = C.white
+colorMode.rssitextcolor = C.white
+colorMode.rssifillcolor = C.cyan or C.turquoise
+colorMode.rssifillbgcolor = C.line
+colorMode.txbgfillcolor = C.line
+colorMode.txfillcolor = C.green or C.emerald
+
+local function getThemeValue(key)
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
+
+    return value or DEFAULTS[key]
+end
+
+local function fmt(value, decimals, suffix, missing)
+    if value == nil then return missing or "--" end
+    local text
+    if decimals == 1 then
+        text = format("%.1f", value)
+    elseif decimals == 2 then
+        text = format("%.2f", value)
+    else
+        text = tostring(floor(value + 0.5))
+    end
+    return text .. (suffix or "")
+end
+
+local function stat(telemetry, source, statType, alias)
+    local stats = telemetry and telemetry.sensorStats
+    local data = stats and stats[source]
+    local value = tonumber(data and data[statType])
+    if value == nil and alias then
+        data = stats and stats[alias]
+        value = tonumber(data and data[statType])
+    end
+    return value
+end
+
+local function updateMetric(metric, value, decimals, suffix, color)
+    if metric.value ~= value or metric.suffix ~= suffix or metric.text == nil then
+        metric.value, metric.suffix = value, suffix
+        metric.text = fmt(value, decimals, suffix)
+    end
+    metric.color = value == nil and C.muted or color
+end
+
+local function duration(seconds, total)
+    if seconds == nil or seconds < 0 then return "--:--" end
+    seconds = floor(seconds)
+    if total then
+        return format("%02d:%02d:%02d", floor(seconds / 3600), floor(seconds / 60) % 60, seconds % 60)
+    end
+    return format("%02d:%02d", floor(seconds / 60), seconds % 60)
+end
+
+local function postflightWakeup(box, telemetry)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    local c = box._cache
+    if not c then
+        c = {metrics = {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}}}
+        box._cache = c
+    end
+    local m = c.metrics
+    local rpm = stat(telemetry, "rpm", "max", "headspeed")
+    local rpmAvg = stat(telemetry, "rpm", "avg", "headspeed")
+    local current = stat(telemetry, "current", "max")
+    local currentAvg = stat(telemetry, "current", "avg")
+    local bec = stat(telemetry, "bec_voltage", "min", "bec")
+    -- Keep the same percentage source priority as the live flight screens.
+    local link = stat(telemetry, "vfr", "min")
+    if link == nil or link < 0 or link > 100 then link = stat(telemetry, "rssi", "min") end
+    if link ~= nil and (link < 0 or link > 100) then link = nil end
+    local used = stat(telemetry, "consumption", "max", "smartconsumption")
+    -- A recorded per-cell sample never depends on today's pack voltage/cell count.
+    local cell = stat(telemetry, "cell_voltage", "min")
+    local fuel = stat(telemetry, "smartfuel", "min", "fuel")
+    if fuel ~= nil and (fuel < 0 or fuel > 100) then fuel = nil end
+    local watts = stat(telemetry, "watts", "max")
+    local thermal = telemetry and telemetry.getSensorStats and telemetry.getSensorStats("temp_esc")
+    local esc = tonumber(thermal and thermal.max)
+    local escWarn, escMax = getThemeValue("esc_warn"), getThemeValue("esc_max")
+    local escUnit = "°C"
+    if telemetry and telemetry.getSensor then
+        local value, precision, unit, warning, maximum = telemetry.getSensor("temp_esc", escWarn, escMax)
+        escUnit = unit or escUnit
+        escWarn, escMax = tonumber(warning) or escWarn, tonumber(maximum) or escMax
+    end
+    local rpmColor = rpm and rpm > getThemeValue("rpm_max") and C.amber or C.cyan
+    local escColor = esc and (esc >= escMax and C.red or (esc >= escWarn and C.amber or C.white)) or C.muted
+    local becColor = bec and (bec < getThemeValue("bec_min") and C.red or (bec < getThemeValue("bec_warn") and C.amber or C.white)) or C.muted
+    local linkColor = link and link < getThemeValue("link_warn") and C.amber or C.white
+    local fuelColor = fuel and fuel <= getThemeValue("fuel_warn") and C.amber or C.white
+    updateMetric(m[1], rpm, 0, "", rpmColor)
+    updateMetric(m[2], rpmAvg, 0, " RPM", C.white)
+    updateMetric(m[3], current, 1, " A", C.white)
+    updateMetric(m[4], currentAvg, 1, " A", C.muted)
+    updateMetric(m[5], esc, 0, escUnit, escColor)
+    updateMetric(m[6], bec, 2, " V", becColor)
+    updateMetric(m[7], link, 0, "%", linkColor)
+    updateMetric(m[8], used, 0, " mAh", C.white)
+    updateMetric(m[9], cell, 2, " V", C.white)
+    updateMetric(m[10], fuel, 0, "%", fuelColor)
+    updateMetric(m[11], watts, 0, " W", C.white)
+
+    local session = rfsuite.session or {}
+    local general = session.modelPreferences and session.modelPreferences.general
+    local modelName = model and model.name and model.name() or ""
+    if c._summaryModel ~= modelName then
+        -- A different radio model must not inherit retained flight summaries.
+        c._summaryModel = modelName
+        c._lastSeconds, c._lastCount, c._lastTotal = nil, nil, nil
+    end
+    local connected = session.isConnected and session.telemetryState
+    local rawTime = session.timer and session.timer.live
+    local seconds = tonumber(rawTime)
+    if not connected and (rawTime == nil or rawTime == 0) then
+        seconds = c._lastSeconds
+        if seconds == nil then seconds = tonumber(general and general.lastflighttime) end
+    end
+    if seconds and seconds < 0 then seconds = nil end
+    c._lastSeconds = seconds
+    if c._seconds ~= seconds or c.time == nil then
+        c._seconds, c.time = seconds, duration(seconds, false)
+    end
+    local count = tonumber(general and general.flightcount)
+    if not connected and (count == nil or count == 0) and c._lastCount ~= nil then count = c._lastCount end
+    if count and count < 0 then count = nil end
+    c._lastCount = count
+    if c._count ~= count or c.count == nil then
+        c._count, c.count = count, fmt(count, 0)
+    end
+    local total = tonumber(general and general.totalflighttime)
+    if not connected and (total == nil or total == 0) and c._lastTotal ~= nil then total = c._lastTotal end
+    if total and total < 0 then total = nil end
+    c._lastTotal = total
+    if c._total ~= total or c.total == nil then
+        c._total, c.total = total, duration(total, true)
+    end
+    c.recorded = false
+    for i = 1, #m do
+        if m[i].value ~= nil then c.recorded = true; break end
+    end
+    return c
+end
+
+local function postflightPaint(x, y, w, h, box, c)
+    c = c or box._cache or {}
+    box._cache = c
+    panels.postflight(x, y, w, h, c)
+end
+
+local boxes_cache
+local function boxes()
+    if not boxes_cache then
+        boxes_cache = {{col = 1, row = 1, colspan = 12, rowspan = 12,
+            type = "func", subtype = "func", wakeup = postflightWakeup,
+            paint = postflightPaint, bgcolor = "transparent"}}
+    end
+    return boxes_cache
+end
+
+return {layout = {cols = 12, rows = 12, padding = 0}, boxes = boxes,
+    header_boxes = header_boxes, header_layout = header_layout,
+    screenBorderStyle = {enabled = false},
+    scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.85}}

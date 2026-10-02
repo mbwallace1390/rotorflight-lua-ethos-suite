@@ -36,12 +36,21 @@
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local bus = requireModule("lib/bus.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
+local themeBridge = nil
 
 local navigation = nil
 local menuContainer = nil
 local escProtocolGuard = nil
 local servoBusGuard = nil
 local memstats = nil
+
+-- Bridge owns tool-only colors and geometry, so follow the deferred UI lifecycle.
+local function ensureThemeBridge()
+  if not themeBridge then
+    themeBridge = requireModule("app/theme_bridge.lua")
+  end
+  return themeBridge
+end
 
 local function ensureNavigation()
   if not navigation then
@@ -497,7 +506,9 @@ bus.subscribe("session.update", function(session)
 end)
 
 local function updateDeveloperMode(settings)
-  developerModeEnabled = settingsStore.developerModeEnabled(settings or settingsStore.load())
+  settings = settings or settingsStore.load()
+  developerModeEnabled = settingsStore.developerModeEnabled(settings)
+  return settings
 end
 
 bus.subscribe("settings.update", updateDeveloperMode)
@@ -523,7 +534,8 @@ local function create()
   taskAlertPending = false
   taskAlertOpen = false
   taskAlertShown = false
-  updateDeveloperMode()
+  local appSettings = updateDeveloperMode()
+  ensureThemeBridge().open(appSettings)
   ensureMemstats()
   -- Guards first: menu_container consults them while building the first
   -- screen, so they have to be in place before openRoot() runs.
@@ -540,13 +552,16 @@ local function wakeup(state)
   if currentWakeupHandler then
     currentWakeupHandler()
   end
+  if themeBridge then themeBridge.wakeup() end
   showBackgroundTaskAlert()
 end
 
 local function paint(state)
+  if themeBridge then themeBridge.paintBackground() end
   if currentPaintHandler then
     currentPaintHandler()
   end
+  if themeBridge then themeBridge.paintChrome() end
 end
 
 -- Forwards the physical Back/Close key to whatever screen is currently
@@ -587,6 +602,7 @@ local function close(state)
   setEventHandler(nil)
   setWakeupHandler(nil)
   setPaintHandler(nil)
+  if themeBridge then themeBridge.clearCache() end
   bus.publish("app.state", {running = false})
   for _, key in ipairs(APP_SESSION_PACKAGE_KEYS) do
     package.loaded[key] = nil

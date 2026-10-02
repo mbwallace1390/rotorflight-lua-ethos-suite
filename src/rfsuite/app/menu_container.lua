@@ -62,6 +62,7 @@
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local closeKey = requireModule("app/close_key.lua")
 local header = requireModule("app/header.lua")
+local themeBridge = requireModule("app/theme_bridge.lua")
 local tileGrid = requireModule("app/tile_grid.lua")
 
 local menu_container = {}
@@ -261,10 +262,10 @@ local function openScreen(nav, menus, rootEntries, screen, setEventHandler, setW
     end
 
     if isEntryVisible(entry) then
-      -- Keep tile labels explicit; pre-truncate with ellipsis so long
-      -- titles never collide with or spill over the button border (Issue #2299).
+      -- Keep upstream's fitted labels and reuse each tile's bounds for Bridge chrome.
       local label = tileGrid.fitLabel(entry.title, tileW, tileFont)
-      tileButtons[i] = form.addButton(nil, {x = x, y = y, w = tileW, h = tileH}, {
+      local tileRect = {x = x, y = y, w = tileW, h = tileH}
+      tileButtons[i] = form.addButton(nil, tileRect, {
         text = label,
         icon = entry.icon,
         options = tileFont,
@@ -293,6 +294,7 @@ local function openScreen(nav, menus, rootEntries, screen, setEventHandler, setW
           end
         end,
       })
+      themeBridge.registerChromeRect(tileRect, "tile")
 
       col = col + 1
       if col >= numPerRow then

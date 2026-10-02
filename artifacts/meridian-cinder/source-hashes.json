@@ -1,0 +1,18 @@
+{
+  "src/rfsuite/widgets/dashboard/themes/cinder/common.lua": "1d6399c7c033810280135c432431b39f561e9d25a2333c6c7dc0fe98d5a4e1a1",
+  "src/rfsuite/widgets/dashboard/themes/cinder/configure.lua": "f6046ed60d2e4aeef30242ff2c9de7f96061907cc8884325d370b36ec0c2b306",
+  "src/rfsuite/widgets/dashboard/themes/cinder/header.lua": "e953dcfd28c0cabae32b782c878fcc8b8c677d983c7f759f51f91b7b94af7c5c",
+  "src/rfsuite/widgets/dashboard/themes/cinder/inflight.lua": "e93950c37999eb446c0c8b2886f40045155329ee90e0440478175e08724ab2da",
+  "src/rfsuite/widgets/dashboard/themes/cinder/init.lua": "861cc026890c0671136fe5ee195627a3decd7b7253ece6bab97afb9409b61660",
+  "src/rfsuite/widgets/dashboard/themes/cinder/layout.lua": "5f6304ec17b18640eb36461c18202274284bfdf809fa3e6a8863e3bbcc1efe4f",
+  "src/rfsuite/widgets/dashboard/themes/cinder/postflight.lua": "60bfbda00872eafeb64c639e289a14e7ca86658b8e80815d55218ff7b05ae60c",
+  "src/rfsuite/widgets/dashboard/themes/cinder/preflight.lua": "2b4576bc855440947c2d25718b4edb1727dfb5c0cc4f94bed65d5882e47510ad",
+  "src/rfsuite/widgets/dashboard/themes/cinder/state.lua": "b21ba297c5093f41218852c9ad0b02c9cbfede02493dbe8487349c008755be28",
+  "src/rfsuite/widgets/dashboard/themes/meridian/common.lua": "a274f0bcbf5e36bd5d715ab65d7a9f13f7644242b03784af9a8a3a9e0c4904c3",
+  "src/rfsuite/widgets/dashboard/themes/meridian/configure.lua": "16a1eb7bda33c7430a4abd5456ae2f4ecd4f9c311aac4832e1beedf44978e594",
+  "src/rfsuite/widgets/dashboard/themes/meridian/inflight.lua": "ad74d132c5e852785ed6b414e34318fe81b0f29b566a74b7af463cc6394aa9c1",
+  "src/rfsuite/widgets/dashboard/themes/meridian/init.lua": "43aaf0d78e66a73ce413ffd834e030c7d2c90ae40d6515659ed6f0ee5b674e81",
+  "src/rfsuite/widgets/dashboard/themes/meridian/layout.lua": "5778b374f599c20c131e74b25806f98434efc83fefd27e1011f6379a80ca8502",
+  "src/rfsuite/widgets/dashboard/themes/meridian/postflight.lua": "6f21815e92aa7e8f3ce8cdd6dd03771c911fcdbcf1669ff141d03abfcceddc86",
+  "src/rfsuite/widgets/dashboard/themes/meridian/preflight.lua": "f9dda804f850ccc59f7f22a2eb1d7b8d89e69066cd93b973c2329b8fe6d9ec4b"
+}

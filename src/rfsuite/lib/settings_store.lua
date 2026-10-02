@@ -12,6 +12,7 @@ local ini = requireModule("lib/ini.lua")
 local activelookConfig = requireModule("lib/activelook_config.lua")
 local mspApiVersion = requireModule("lib/msp_api_version.lua")
 local tableClone = requireModule("lib/table_clone.lua")
+local themeCatalog = requireModule("lib/dashboard_themes.lua")
 
 local SETTINGS_DIR = "SCRIPTS:/rfsuite.user"
 local SETTINGS_PATH = SETTINGS_DIR .. "/settings.ini"
@@ -28,6 +29,9 @@ local DEFAULTS = {
     -- change what a pilot who never opens Settings sees.
     save_confirm = true,
     reload_confirm = true,
+    -- Follow the selected dashboard theme in the full-screen configurator.
+    -- Default-on preserves the original Theme Bridge behavior.
+    follow_dashboard_theme = true,
     -- Default true, matching master's own default (main.lua) -- the
     -- battery-profile chooser auto-prompts on connect when more than one
     -- profile is configured, same as master's showBatteryTypeStartup.
@@ -91,21 +95,6 @@ local DEFAULTS = {
   activelook = activelookConfig.DEFAULTS,
 }
 
-local DASHBOARD_THEMES = {
-  ["aerc-n"] = true,
-  aerc = true,
-  claude = true,
-  danielrc = true,
-  default = true,
-  gismo = true,
-  helihud = true,
-  kevd = true,
-  rfstatus = true,
-  ["rt-rc-n"] = true,
-  ["rt-rc"] = true,
-  ["srb-rc"] = true,
-  timer = true,
-}
 
 local function normalizeDashboardTheme(value, allowDisabled, default)
   if allowDisabled and (value == nil or value == "" or value == "nil" or value == 0 or value == "0") then
@@ -116,23 +105,11 @@ local function normalizeDashboardTheme(value, allowDisabled, default)
   value = tostring(value or "")
   if value == "" or value == "nil" then value = default end
 
-  local source, folder = value:match("^([^/]+)/(.+)$")
-  if source == "system" then
-    if type(folder) == "string" and folder:sub(1, 1) == "@" then folder = folder:sub(2) end
-    if DASHBOARD_THEMES[folder] then return "system/" .. folder end
-  elseif DASHBOARD_THEMES[value] then
-    return "system/" .. value
-  end
-
-  return default
+  return themeCatalog.normalize(value) or default
 end
 
 local function dashboardThemeKey(value)
-  if type(value) ~= "string" then return DEFAULTS.dashboard.theme end
-  local folder = value:match("^system/(.+)$") or value
-  if folder:sub(1, 1) == "@" then folder = folder:sub(2) end
-  if DASHBOARD_THEMES[folder] then return folder end
-  return DEFAULTS.dashboard.theme
+  return themeCatalog.key(value) or DEFAULTS.dashboard.theme
 end
 
 local settings_store = {
@@ -218,6 +195,7 @@ local function normalize(settings)
   settings.general.temperature_unit = clampNumber(settings.general.temperature_unit, DEFAULTS.general.temperature_unit, 0, 1)
   settings.general.save_confirm = coerceBool(settings.general.save_confirm, DEFAULTS.general.save_confirm)
   settings.general.reload_confirm = coerceBool(settings.general.reload_confirm, DEFAULTS.general.reload_confirm)
+  settings.general.follow_dashboard_theme = coerceBool(settings.general.follow_dashboard_theme, DEFAULTS.general.follow_dashboard_theme)
   settings.general.battery_profile_startup = coerceBool(settings.general.battery_profile_startup, DEFAULTS.general.battery_profile_startup)
   settings.general.syncname = coerceBool(settings.general.syncname, DEFAULTS.general.syncname)
 
@@ -326,6 +304,11 @@ function settings_store.reloadConfirmEnabled(settings)
   return coerceBool(fieldValue(general, "reload_confirm"), DEFAULTS.general.reload_confirm) == true
 end
 
+function settings_store.followDashboardThemeEnabled(settings)
+  local general = type(settings) == "table" and settings.general or nil
+  return coerceBool(fieldValue(general, "follow_dashboard_theme"), DEFAULTS.general.follow_dashboard_theme) == true
+end
+
 function settings_store.batteryProfileStartupEnabled(settings)
   local general = type(settings) == "table" and settings.general or nil
   return coerceBool(fieldValue(general, "battery_profile_startup"), DEFAULTS.general.battery_profile_startup) == true
@@ -382,12 +365,12 @@ end
 
 function settings_store.dashboardTheme(settings, theme)
   settings = settings_store.withDefaults(settings)
-  return tableClone.shallow(settings["dashboard." .. tostring(theme or "")])
+  return tableClone.shallow(settings["dashboard." .. tostring(themeCatalog.key(theme) or theme or "")])
 end
 
 function settings_store.setDashboardTheme(settings, theme, values)
   if type(settings) ~= "table" then return end
-  local section = "dashboard." .. tostring(theme or "")
+  local section = "dashboard." .. tostring(themeCatalog.key(theme) or theme or "")
   settings[section] = tableClone.shallow(values)
 end
 

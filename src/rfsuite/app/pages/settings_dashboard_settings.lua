@@ -10,29 +10,17 @@ local closeKey = requireModule("app/close_key.lua")
 local header = requireModule("app/header.lua")
 local tileGrid = requireModule("app/tile_grid.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
+local themeCatalog = requireModule("lib/dashboard_themes.lua")
 local dashboardContext = requireModule("widgets/dashboard/context.lua")
+local themeBridge = requireModule("app/theme_bridge.lua")
 
 local PAGE_TITLE = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settings.dashboard)@ / @i18n(app.modules.settings.dashboard_settings)@"
 local NO_THEMES = "@i18n(app.modules.settings.no_themes_available_to_configure)@"
+local LOAD_FAILED = "@i18n(app.msg_load_failed_title)@"
 
-local THEME_DEFS = {
-  {label = "@i18n(app.modules.settings.dashboard_theme_aerc)@", folder = "aerc"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_aerc_n)@", folder = "aerc-n"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_claude)@", folder = "claude"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_default)@", folder = "default"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_gismo)@", folder = "gismo"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", folder = "kevd", minResolution = {x = 784, y = 294}},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", folder = "rfstatus"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", folder = "rt-rc"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", folder = "rt-rc-n"},
-  {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", folder = "srb-rc"},
-}
 
 local lastSelected
 
-local function themeDir(folder)
-  return "widgets/dashboard/themes/" .. folder
-end
 
 local function themeVisible(theme)
   local minRes = theme and theme.minResolution
@@ -41,35 +29,25 @@ local function themeVisible(theme)
   return not (w and h and (w < (minRes.x or 0) or h < (minRes.y or 0)))
 end
 
--- Session-cached (mirrors objects/dial/image.lua's rfsuite.session.dialImageCache):
--- this page module is loadfile()'d fresh on every visit (no require()-style
--- caching -- see docs/memory-and-module-lifecycle.md), so a plain local
--- wouldn't survive a second open(). Which themes ship a configure.lua and
--- which are hidden by minResolution can't change while the script is
--- running, so probing that via loadfile() (a full compile of each theme's
--- configure.lua, thrown away immediately after) on every single page visit
--- was pure repeat waste -- a real, previously observed contributor to
--- Ethos's "Max instructions count reached" on dashboard-theme navigation.
+-- Cache the small visible tile list for this window; the shared catalog has
+-- already checked file availability without compiling every configure.lua.
 local function configuredThemes()
-  local cached = dashboardContext.session.dashboardConfiguredThemes
-  if cached then return cached end
+  local w, h = lcd.getWindowSize()
+  local session = dashboardContext.session
+  if session.dashboardConfiguredThemes and session.dashboardConfiguredWidth == w
+    and session.dashboardConfiguredHeight == h then return session.dashboardConfiguredThemes end
 
   local themes = {}
-  for _, theme in ipairs(THEME_DEFS) do
-    if themeVisible(theme) then
-      local dir = themeDir(theme.folder)
-      local ok = pcall(function() return assert(loadfile(dir .. "/configure.lua")) end)
-      if ok then
-        themes[#themes + 1] = {
-          label = theme.label,
-          folder = theme.folder,
-          configure = dir .. "/configure.lua",
-          icon = dir .. "/icon.png",
-        }
-      end
+  for _, theme in ipairs(themeCatalog.list()) do
+    if theme.configure and themeVisible(theme) then
+      themes[#themes + 1] = {
+        label = theme.label, folder = themeCatalog.key(theme.path),
+        configure = theme.configure, icon = theme.icon,
+      }
     end
   end
-  dashboardContext.session.dashboardConfiguredThemes = themes
+  session.dashboardConfiguredThemes = themes
+  session.dashboardConfiguredWidth, session.dashboardConfiguredHeight = w, h
   return themes
 end
 
@@ -100,8 +78,16 @@ local function open(opts)
     if opts.onBack then opts.onBack() end
   end
 
+  local openThemeGrid
   local function openTheme(theme)
-    local themeModule = assert(loadfile(theme.configure))()
+    local okLoad, chunk = pcall(loadfile, theme.configure)
+    local okRun, themeModule
+    if okLoad and type(chunk) == "function" then okRun, themeModule = pcall(chunk) end
+    if not okRun or type(themeModule) ~= "table"
+      or (themeModule.configure ~= nil and type(themeModule.configure) ~= "function") then
+      openThemeGrid(true)
+      return
+    end
 
     form.clear()
     dashboardContext.widgets.dashboard.setPreferences(settingsStore.dashboardTheme(settings, theme.folder))
@@ -134,7 +120,14 @@ local function open(opts)
       end)
     end
 
-    if themeModule.configure then themeModule.configure() end
+    if themeModule.configure then
+      local configured = pcall(themeModule.configure)
+      if not configured then
+        -- Discard a partially built form and its page handlers/preferences.
+        openThemeGrid(true)
+        return
+      end
+    end
     if headerHandle then
       headerHandle.setSaveEnabled(true)
       headerHandle.setReloadEnabled(true)
@@ -142,7 +135,7 @@ local function open(opts)
     end
   end
 
-  local function openThemeGrid()
+  openThemeGrid = function(loadFailed)
     form.clear()
     clearHandlers()
     dashboardContext.widgets.dashboard.setPreferences(nil)
@@ -161,6 +154,10 @@ local function open(opts)
     local windowWidth, windowHeight = lcd.getWindowSize()
     local numPerRow, tileW, tileH, tilePadding, tileFont = tileGrid.metrics(windowWidth, windowHeight)
     local x, y = 0, form.height() + tilePadding
+    if loadFailed then
+      form.addStaticText(nil, {x = tilePadding, y = y, w = windowWidth - (2 * tilePadding), h = 32}, LOAD_FAILED, CENTERED)
+      y = y + 36
+    end
     local col = 0
     local buttons = {}
 
@@ -177,7 +174,8 @@ local function open(opts)
         iconCache[theme.icon] = icon
       end
       local label = tileGrid.fitLabel(theme.label, tileW, tileFont)
-      buttons[i] = form.addButton(nil, {x = x, y = y, w = tileW, h = tileH}, {
+      local tileRect = {x = x, y = y, w = tileW, h = tileH}
+      buttons[i] = form.addButton(nil, tileRect, {
         text = label,
         icon = icon or nil,
         options = tileFont,
@@ -186,6 +184,7 @@ local function open(opts)
           openTheme(theme)
         end,
       })
+      themeBridge.registerChromeRect(tileRect, "tile")
 
       col = col + 1
       if col >= numPerRow then

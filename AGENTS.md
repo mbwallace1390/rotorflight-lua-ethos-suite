@@ -132,3 +132,21 @@ If the repository is already dirty:
 - Do not modify unrelated files.
 - Touch only files needed for the requested task.
 
+## 11) Custom Theme Submission Standard
+
+- Follow `docs/theme-submissions.md` for every new custom theme and individual PR.
+- Keep the theme folder, saved selection, and settings section consistent. Preserve
+  existing published IDs and preferences when renaming; do not silently reset them.
+- Verify selection, configuration, all three phases, persistence and minimum-size
+  hiding through the actual target Suite loader and pages. Folder presence is not
+  proof that a stock Suite can select it.
+- Use source locale keys for picker/settings names and regenerate runtime locales.
+  All Themes keeps theme metadata readable for folder copying and localizes its
+  system labels in the discovery catalog.
+- Include accurate pilot docs, three labeled phase previews, and theme-scoped test
+  evidence. Dashboard settings save on the radio, not to flight-controller EEPROM.
+- Individual upstream themes omit inactive Bridge metadata; retain metadata with
+  a real consumer in All Themes and Studio. Bridge implementation is out of scope.
+- Preserve visual identity, telemetry freshness, valid zero readings and warning
+  choices. Meridian and Cinder must not gain RPM limits or redlines.
+
