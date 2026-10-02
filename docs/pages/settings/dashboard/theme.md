@@ -7,7 +7,8 @@ sidebar_position: 10
 # Themes
 
 Choose the dashboard appearance for all models or override it for the connected
-flight controller. A separate choice can be saved for each flight phase.
+flight controller. A separate choice can be saved for each flight phase. In
+the All Themes build, compatible installed folders appear automatically.
 
 ## Where to find it
 
@@ -17,6 +18,8 @@ Global controls are available offline while the Suite background task is
 running. The **Optional theme for this model** controls are enabled only when
 a flight controller is connected and its MCU ID is known. Theme choices that
 need a larger screen are hidden; Meridian and Cinder require at least 784 × 294.
+System and user folders are separate choices. User themes are marked **(User)**
+and do not replace same-name system themes automatically.
 
 ## Settings
 
@@ -33,10 +36,23 @@ need a larger screen are hidden; Meridian and Cinder require at least 784 × 294
 
 ## Notes
 
+- Install the complete All Themes package with folder discovery once. Then copy
+  each complete theme folder into its supported location:
+  `SCRIPTS:/rfsuite/widgets/dashboard/themes/<folder>/` for system themes, or
+  `SCRIPTS:/rfsuite.user/dashboard/<folder>/` for location-compatible user themes.
+  Fully restart the radio or Suite Lua session after adding, updating or removing
+  a folder, then choose the theme and Save. Reopening this page alone does not
+  refresh the catalog. See the [theme installation guide](../../../dashboard-themes.md).
+- A folder needs valid metadata and the phase modules it references. Invalid
+  entries are omitted. Discovery does not prove that a theme's rendering code
+  works on the radio; use themes compatible with this Suite version and screen.
+- If a selected theme is missing, the dashboard renders Default. The stored
+  selection is retained until changed, so restoring the folder and restarting
+  can restore the theme.
 - Save confirms and stores global choices in `SCRIPTS:/rfsuite.user/settings.ini`
   and model overrides in `SCRIPTS:/rfsuite.user/models/<MCU ID>.ini` on the radio.
   It does not write flight-controller EEPROM.
-- Meridian and Cinder are registered in the current All Themes source changes.
+- Meridian and Cinder are included in the All Themes package.
   Both provide all three phases and show live numeric headspeed without an RPM
   limit, redline, comparison scale, or RPM threshold setting.
 - Use [Dashboard Settings](settings.md) to change a theme's instrument warnings.
@@ -48,4 +64,4 @@ need a larger screen are hidden; Meridian and Cinder require at least 784 × 294
 - [Meridian](../../../dashboard/meridian.md)
 - [Cinder](../../../dashboard/cinder.md)
 
-*Documented against RFSuite Ethos 2.3.1, All Themes source, 2026-09-30.*
+*Documented against RFSuite Ethos 2.3.1, All Themes source, 2026-10-02.*

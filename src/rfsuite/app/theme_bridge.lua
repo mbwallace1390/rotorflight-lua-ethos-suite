@@ -17,6 +17,7 @@ local flightmode = requireModule("widgets/dashboard/flightmode.lua")
 local modelPreferences = requireModule("lib/model_preferences.lua")
 local paletteRegistry = requireModule("app/theme_palettes.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
+local themeCatalog = requireModule("lib/dashboard_themes.lua")
 
 local clock = os.clock
 local floor = math.floor
@@ -38,7 +39,6 @@ local tracker = flightmode.new()
 -- bus snapshots are retained and shared with other subscribers.
 local phaseInput = {}
 local paletteCache = {}
-local metadataCache = {}
 local chromeRects = {}
 local titleFields = {}
 local railSegments = {}
@@ -72,43 +72,6 @@ local MODEL_RETRY_INTERVAL = 5.0
 local NATIVE_SIGNATURE_INTERVAL = 1.0
 local FADE_STEPS = 12
 local GRADIENT_STEPS = 32
-
--- The separately maintained theme branches keep appTheme in their small
--- init.lua. Prefer that installed metadata so a theme author can edit their
--- own branch without also changing this bridge. Master's built-ins use the
--- registry directly: some of their init.lua files load the full dashboard
--- context and are too expensive to probe just for a palette.
-local EDITABLE_THEME_METADATA = {
-  aegis = true,
-  america250 = true,
-  cinder = true,
-  libertyops250 = true,
-  meridian = true,
-  mwrc = true,
-  singularity = true,
-  zafira = true,
-}
-
--- Keep selection behavior aligned with widgets/dashboard.lua. These themes
--- are always part of the current suite; separately maintained themes are
--- available only when their branch has installed a valid appTheme metadata
--- table. Unsupported and user paths must resolve to Default, just as the
--- dashboard does, so the configurator never claims to follow an absent theme.
-local BUILTIN_DASHBOARD_THEMES = {
-  ["aerc-n"] = true,
-  aerc = true,
-  claude = true,
-  danielrc = true,
-  default = true,
-  gismo = true,
-  helihud = true,
-  kevd = true,
-  rfstatus = true,
-  ["rt-rc-n"] = true,
-  ["rt-rc"] = true,
-  ["srb-rc"] = true,
-  timer = true,
-}
 
 local NATIVE_THEME_KEYS = {
   "THEME_PAGE_BGCOLOR",
@@ -217,14 +180,7 @@ local function nativePalette(isDark)
 end
 
 local function normalizeThemePath(value)
-  if type(value) ~= "string" or value == "" or value == "nil" then return "system/default" end
-  local source, folder = value:match("^([^/]+)/(.+)$")
-  if source == "system" or source == "user" then
-    if folder:sub(1, 1) == "@" then folder = folder:sub(2) end
-    if folder ~= "" then return source .. "/" .. folder end
-  end
-  if value:sub(1, 1) == "@" then value = value:sub(2) end
-  return "system/" .. value
+  return themeCatalog.normalize(value) or "system/default"
 end
 
 local function phaseTheme(dashboard, phase)
@@ -244,54 +200,18 @@ local function rawValue(raw, phaseRaw, key)
   return type(raw) == "table" and raw[key] or nil
 end
 
-local function loadThemeMetadata(path, folder)
-  local source = path:match("^([^/]+)/")
-  local initPath
-  if source == "user" then
-    initPath = "SCRIPTS:/rfsuite.user/dashboard/" .. folder .. "/init.lua"
-  else
-    -- Saved system/aegis selections now read Bastion's installed metadata.
-    local directory = folder == "aegis" and "bastion" or folder
-    initPath = "widgets/dashboard/themes/" .. directory .. "/init.lua"
-  end
-
-  local okLoad, chunk = pcall(loadfile, initPath)
-  -- A standalone Bridge update must also support older Aegis-folder installs.
-  if (not okLoad or type(chunk) ~= "function") and source == "system" and folder == "aegis" then
-    okLoad, chunk = pcall(loadfile, "widgets/dashboard/themes/aegis/init.lua")
-  end
-  if not okLoad or type(chunk) ~= "function" then return nil end
-  local okRun, metadata = pcall(chunk)
-  if not okRun or type(metadata) ~= "table" or type(metadata.appTheme) ~= "table" then return nil end
-  local appTheme = metadata.appTheme
-  if appTheme.name == nil and metadata.name ~= nil then appTheme.name = metadata.name end
-  return appTheme
-end
-
-local function installedThemeMetadata(path, folder)
-  local cached = metadataCache[path]
-  if cached == nil then
-    cached = loadThemeMetadata(path, folder) or false
-    metadataCache[path] = cached
-  end
-  if cached ~= false then return cached end
-  return nil
-end
-
 local function resolveThemeMetadata(path, folder)
-  local registered = paletteRegistry.get(folder)
-  if EDITABLE_THEME_METADATA[folder] == true then
-    return installedThemeMetadata(path, folder) or registered
-  end
-  return registered
+  local theme = themeCatalog.get(path)
+  if not theme then return nil end
+  -- Stock palettes avoid importing their full dashboard context. Discovered
+  -- add-ons may supply appTheme; absent metadata follows native ETHOS colors.
+  if theme.builtin then return paletteRegistry.get(folder) end
+  return theme.appTheme
 end
 
 local function availableThemePath(path)
-  local source, folder = path:match("^([^/]+)/(.+)$")
-  if source ~= "system" or not folder then return "system/default" end
-  if BUILTIN_DASHBOARD_THEMES[folder] then return path end
-  if EDITABLE_THEME_METADATA[folder] and installedThemeMetadata(path, folder) then return path end
-  return "system/default"
+  local theme = themeCatalog.get(path)
+  return theme and theme.path or "system/default"
 end
 
 local function selectedThemePath(phase)
@@ -573,6 +493,7 @@ local function onSettings(snapshot)
 end
 
 function bridge.open(initialSettings)
+  themeCatalog.list()
   if opened then bridge.clearCache() end
   opened = true
   tracker:reset()
@@ -704,7 +625,6 @@ function bridge.clearCache()
   end
   opened = false
   wipe(paletteCache)
-  wipe(metadataCache)
   bridge.clearPage()
   wipe(railSegments)
   tracker:reset()

@@ -7,6 +7,7 @@ local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("
 local bus = requireModule("lib/bus.lua")
 local modelPreferences = requireModule("lib/model_preferences.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
+local themeCatalog = requireModule("lib/dashboard_themes.lua")
 local flightmode = requireModule("widgets/dashboard/flightmode.lua")
 local dataflashErase = requireModule("lib/msp_dataflash_erase.lua")
 local dataflashSummary = requireModule("lib/msp_dataflash_summary.lua")
@@ -15,30 +16,6 @@ local batteryProfileIndex = requireModule("lib/battery_profile_index.lua")
 local ethosVersion = requireModule("lib/ethos_version.lua")
 local mspApiVersion = requireModule("lib/msp_api_version.lua")
 
-local THEME_DIRS = {
-  -- Keep saved Aegis selections while loading the renamed Bastion folder.
-  aegis = "widgets/dashboard/themes/bastion",
-  ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
-  aerc = "widgets/dashboard/themes/aerc",
-  america250 = "widgets/dashboard/themes/america250",
-  cinder = "widgets/dashboard/themes/cinder",
-  claude = "widgets/dashboard/themes/claude",
-  danielrc = "widgets/dashboard/themes/danielrc",
-  default = "widgets/dashboard/themes/default",
-  gismo = "widgets/dashboard/themes/gismo",
-  helihud = "widgets/dashboard/themes/helihud",
-  kevd = "widgets/dashboard/themes/kevd",
-  libertyops250 = "widgets/dashboard/themes/libertyops250",
-  meridian = "widgets/dashboard/themes/meridian",
-  mwrc = "widgets/dashboard/themes/mwrc",
-  rfstatus = "widgets/dashboard/themes/rfstatus",
-  ["rt-rc-n"] = "widgets/dashboard/themes/rt-rc-n",
-  ["rt-rc"] = "widgets/dashboard/themes/rt-rc",
-  singularity = "widgets/dashboard/themes/singularity",
-  ["srb-rc"] = "widgets/dashboard/themes/srb-rc",
-  timer = "widgets/dashboard/themes/timer",
-  zafira = "widgets/dashboard/themes/zafira",
-}
 
 local DEFAULT_DASHBOARD_SETTINGS = {
   theme = "default",
@@ -51,6 +28,7 @@ local themeDef = nil
 local stateDef = nil
 local themeDefs = {}
 local stateDefs = {}
+local failedThemes = {}
 local dashboardContext = nil
 local dashboardEngine = nil
 local loadedTheme = nil
@@ -161,6 +139,7 @@ local function clearThemeCache()
   stateDef = nil
   for key in pairs(themeDefs) do themeDefs[key] = nil end
   for key in pairs(stateDefs) do stateDefs[key] = nil end
+  for key in pairs(failedThemes) do failedThemes[key] = nil end
   loadedTheme = nil
   loadedState = nil
 end
@@ -189,10 +168,8 @@ local function ensureDashboardEngine()
 end
 
 local function themeKey(value)
-  if type(value) ~= "string" then return "default" end
-  local folder = value:match("^system/(.+)$") or value
-  if folder:sub(1, 1) == "@" then folder = folder:sub(2) end
-  if THEME_DIRS[folder] then return folder end
+  local key = themeCatalog.key(value)
+  if key and not failedThemes[key] and themeCatalog.get(key) then return key end
   return "default"
 end
 
@@ -217,29 +194,56 @@ local function ensureDashboardSettings(widget)
   return widget.dashboardSettings or DEFAULT_DASHBOARD_SETTINGS
 end
 
+local function setDashboardPreferences(widget, theme)
+  ensureDashboardSettings(widget)
+  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
+end
+
 local function selectedThemeForState(widget, state)
   local modelTheme = phaseTheme(widget and widget.modelDashboard, state)
   if modelTheme and modelTheme ~= "nil" then return themeKey(modelTheme) end
   return themeKey(phaseTheme(ensureDashboardSettings(widget), state))
 end
 
-local function loadThemeDef(theme)
+local function loadThemeChunk(path)
+  local okLoad, chunk, loadError = pcall(loadfile, path)
+  if not okLoad or type(chunk) ~= "function" then return nil, loadError or chunk end
+  local okRun, definition = pcall(chunk)
+  if okRun and type(definition) == "table" then return definition end
+  return nil, definition
+end
+
+local function loadThemeDef(theme, widget)
   theme = themeKey(theme)
   if themeDefs[theme] then
     themeDef = themeDefs[theme]
     loadedTheme = theme
     return themeDef
   end
-  local dir = THEME_DIRS[theme] or THEME_DIRS.default
-  themeDef = assert(loadfile(dir .. "/init.lua"))()
-  themeDef.dir = dir
+  local entry = themeCatalog.get(theme) or themeCatalog.get("default")
+  local definition = loadThemeChunk(entry.init)
+  if not definition then
+    -- An edited optional theme must not prevent the fallback dashboard loading.
+    if theme ~= "default" then
+      -- Remember the failure until an explicit theme reload/script restart.
+      failedThemes[theme] = true
+      setDashboardPreferences(widget, "default")
+      return loadThemeDef("default", widget)
+    end
+    error("Unable to load the default dashboard theme")
+  end
+  themeDef = definition
+  themeDef.dir = entry.directory
+  -- Use actual discovered filenames, including compiled-only installations.
+  themeDef.preflight, themeDef.inflight, themeDef.postflight = entry.preflight, entry.inflight, entry.postflight
   themeDefs[theme] = themeDef
   loadedTheme = theme
   return themeDef
 end
 
-local function loadStateDef(theme, state)
-  local def = loadThemeDef(theme)
+local function loadStateDef(theme, state, widget)
+  theme = themeKey(theme)
+  local def = loadThemeDef(theme, widget)
   local key = themeKey(theme) .. ":" .. tostring(state)
   if stateDefs[key] then
     stateDef = stateDefs[key]
@@ -247,7 +251,15 @@ local function loadStateDef(theme, state)
     return stateDef
   end
   local file = def[state] or (state .. ".lua")
-  stateDef = assert(loadfile(def.dir .. "/" .. file))()
+  stateDef = loadThemeChunk(def.dir .. "/" .. file)
+  if not stateDef then
+    if theme ~= "default" then
+      failedThemes[theme] = true
+      setDashboardPreferences(widget, "default")
+      return loadStateDef("default", state, widget)
+    end
+    error("Unable to load the default dashboard phase")
+  end
   stateDefs[key] = stateDef
   loadedState = state
   return stateDef
@@ -972,6 +984,8 @@ local function roundSigned(value)
 end
 
 local function create()
+  -- Discover outside paint/wakeup; every consumer shares this session cache.
+  themeCatalog.list()
   return {
     connected = false,
     isArmed = nil,
@@ -1193,19 +1207,15 @@ local function dashboardState(widget)
   return widget.flightmodeState or "preflight"
 end
 
-local function setDashboardPreferences(widget, theme)
-  ensureDashboardSettings(widget)
-  ensureDashboardContext().widgets.dashboard.setPreferences(settingsStore.dashboardTheme(widget.settingsSnapshot, theme))
-end
-
 local function prepareDashboard(widget)
   local w, h = lcd.getWindowSize()
   local state = dashboardState(widget)
   local theme = selectedThemeForState(widget, state)
   setDashboardPreferences(widget, theme)
+  local definition = loadStateDef(theme, state, widget)
   local engine = ensureDashboardEngine()
   if engine.wakeup then
-    return engine.wakeup(widget, loadStateDef(theme, state), w, h)
+    return engine.wakeup(widget, definition, w, h)
   end
   return true
 end
@@ -1232,7 +1242,9 @@ local function paintDashboard(widget, w, h)
   local state = dashboardState(widget)
   local theme = selectedThemeForState(widget, state)
   setDashboardPreferences(widget, theme)
-  local ok, result = pcall(ensureDashboardEngine().paint, widget, loadThemeDef(theme), loadStateDef(theme, state), state, w, h)
+  local definition = loadStateDef(theme, state, widget)
+  theme = themeKey(theme)
+  local ok, result = pcall(ensureDashboardEngine().paint, widget, loadThemeDef(theme, widget), definition, state, w, h)
   if not ok then
     if isInstructionBudgetError(result) then
       if widget and widget.dashboardInstructionBudgetRetryLogged ~= true then
@@ -1272,8 +1284,9 @@ local function prewarmDashboardState(widget)
   if widget.dashboardPrewarmed[key] then return end
 
   setDashboardPreferences(widget, theme)
+  local definition = loadStateDef(theme, state, widget)
   local engine = ensureDashboardEngine()
-  if engine.preload then engine.preload(widget, loadStateDef(theme, state)) end
+  if engine.preload then engine.preload(widget, definition) end
   widget.dashboardPrewarmed[key] = true
 end
 

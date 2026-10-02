@@ -28,6 +28,7 @@ THEMES = tuple(filter(None, os.environ.get("RFSUITE_TEST_THEMES", "").split(",")
     if (SOURCE / "widgets" / "dashboard" / "themes" / name / "init.lua").is_file()
 )
 HAS_BRIDGE = (SOURCE / "app" / "theme_bridge.lua").is_file()
+HAS_DISCOVERY = (SOURCE / "lib" / "dashboard_themes.lua").is_file()
 
 
 class RadioUI:
@@ -35,6 +36,8 @@ class RadioUI:
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.g = self.lua.globals()
         self.g.readSource = self.read
+        self.g.listDirectory = self.list_directory
+        self.g.hasDiscovery = HAS_DISCOVERY
         self.g.width, self.g.height = width, height
         self.lua.execute(r'''
             now, phaseStubs = 0, false
@@ -64,6 +67,7 @@ class RadioUI:
                 loadMask=function() return nil end, isVisible=function() return true end,
             }
             system = {
+                listFiles=function(path) return listDirectory(path) end,
                 getSource=function() return {value=function() return 0 end} end,
                 getMemoryUsage=function() return {mainStackAvailable=9000} end,
                 registerWidget=function(value) registeredWidget=value end,
@@ -176,6 +180,10 @@ class RadioUI:
         target = SOURCE / path
         return target.read_text(encoding="utf-8") if target.is_file() else None
 
+    def list_directory(self, path):
+        target = SOURCE / path
+        return self.lua.table_from(sorted(p.name for p in target.iterdir()) if target.is_dir() else [])
+
     def run(self, source):
         return self.lua.execute(source)
 
@@ -208,7 +216,8 @@ class RegistrationTests(unittest.TestCase):
                     local settings=store.withDefaults({dashboard={theme_preflight=theme,use_same_theme=true}})
                     assert(settings.dashboard.theme_inflight=="system/"..theme)
                     assert(settings.dashboard.theme_postflight=="system/"..theme)
-                    assert(store.withDefaults({dashboard={theme="does-not-exist"}}).dashboard.theme=="default")
+                    local absent=store.withDefaults({dashboard={theme_preflight="system/does-not-exist"}}).dashboard.theme
+                    assert(absent==(hasDiscovery and "does-not-exist" or "default"))
                 ''')
 
     def test_picker_and_tiles_apply_names_and_minimum_resolution(self):
@@ -357,7 +366,7 @@ class RegistrationTests(unittest.TestCase):
                     local settings=store.withDefaults({dashboard={theme_preflight=theme}})
                     bridge.open(settings)
                     local init="widgets/dashboard/themes/"..theme.."/init.lua"
-                    assert(loads[init]==nil,"metadata loaded eagerly during open")
+                    assert(loads[init]==(hasDiscovery and 1 or nil),"unexpected metadata discovery count during open")
                     flushBridge()
                     local expected=assert(load(readSource(init)))().appTheme
                     local palette=bridge.getPalette()
@@ -376,7 +385,7 @@ class RegistrationTests(unittest.TestCase):
                     bus.publish("session.update",{connected=false}); bus.publish("settings.update",settings)
                     flushBridge(); assert(bridge.getPalette()==nil and loads[init]==count)
                     bridge.open(settings); flushBridge()
-                    assert(loads[init]==count+1,"reopen retained stale metadata cache")
+                    assert(loads[init]==count+(hasDiscovery and 0 or 1),"unexpected metadata reload on reopen")
                     bridge.clearCache(); assert(activeSubscriptions==0)
                 ''')
 

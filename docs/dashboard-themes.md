@@ -1,6 +1,6 @@
 # Dashboard Themes Developer Guide — Comprehensive Reference
 
-This document provides a complete technical reference for creating, customizing, and extending dashboard themes in Rotorflight. It covers theme structure, lifecycle hooks, box definitions, object types and subtypes (from the `objects` library), common properties, positioning/sizing, styling, interactivity, and examples.
+This document describes installing and creating dashboard themes in Rotorflight. The folder-discovery behavior below applies to the `radio-all-themes` build; older releases and individual theme branches may still use fixed theme lists. Object examples must be checked against the `widgets/dashboard/objects/` implementation in the Suite version being targeted.
 
 ---
 
@@ -67,7 +67,62 @@ Rotorflight dashboard themes and objects are organized under:
 * **System**: `SCRIPTS:/rfsuite/widgets/dashboard/themes/<themename>/`
 * **User**:   `SCRIPTS:/rfsuite.user/dashboard/<themename>/`
 
-User themes override system themes of the same name and are safe from package updates.
+The All Themes build discovers installed folders through `lib/dashboard_themes.lua`.
+System and user themes are separate choices: `system/<folder>` and
+`user/<folder>`. User choices have **(User)** added to their display name. A user
+theme does not automatically override a system theme with the same folder name;
+their selections and saved instrument settings remain independent. The user
+root is outside the Suite package's `rfsuite` installation folder.
+
+### Installing another theme
+
+1. Install a complete, properly localized All Themes package containing folder
+   discovery once. Keep the package's Suite and Theme Bridge dependencies
+   together; copying just the discovery module into an older release is not a
+   supported installation.
+2. Copy the theme's complete folder, including `init.lua`, phase modules,
+   configuration module, helper modules and assets, into its documented system
+   or user location. For example, a system theme's metadata would be at
+   `SCRIPTS:/rfsuite/widgets/dashboard/themes/example/init.lua`.
+3. Fully restart the radio or restart the Suite's Lua session. Opening and
+   closing a settings page does not refresh the cached catalog. A full restart
+   is also required after updating or removing a theme folder.
+4. Open **System → Settings → Dashboard → Themes**, choose the theme and Save.
+   Use **Dashboard → Settings** for its optional instrument controls.
+
+Do not rename or move a supplied theme without checking its module paths.
+Several bundled themes load helpers from a fixed
+`widgets/dashboard/themes/<folder>/` path. Installing one solely in the user
+root requires code that supports that location.
+
+A missing selected theme renders Default while preserving the saved selection
+until it is changed. A theme hidden by its minimum resolution will not appear
+in the choices for that window. Missing or invalid metadata is skipped; folder
+discovery is not a full execution test of the phase scripts. An optional theme whose initialization or phase module fails during loading uses Default for the rest of that theme-cache session, avoiding repeated file reads. A settings update or script restart clears that failure cache. A configuration-load or form-build failure returns to its tile grid with **Loading failed**.
+If the radio cannot list theme folders, the Suite retains its stock choices;
+additional folders require working directory listing support.
+
+### Packaging and verification
+
+New system theme folders under `src/rfsuite/widgets/dashboard/themes/` are
+included recursively by the normal Suite package builder. They need no theme
+allowlist or package file-list edit in this All Themes build. The package's
+manifest selects `rfsuite/**`; it does not include the sibling
+`rfsuite.user/dashboard/` directory.
+
+```text
+python bin/package/build_package.py --lang en --artifact-version theme-check --output-dir build/theme-package
+python bin/package/validate_ethos_manifest_zip.py build/theme-package/rotorflight-lua-ethos-suite-theme-check-en.zip
+```
+
+The builder resolves `@i18n(...)@` tokens for the selected language. A separately
+distributed theme must also have its tokens resolved before it is copied to the
+radio; discovery does not translate raw source tokens. Keep helpers and assets
+at the paths the theme actually loads.
+
+Desktop Lua tests, layout previews and package validation can check discovery,
+saved choices and module loading. They do not establish physical-radio font,
+key-dispatch, memory or instruction-budget acceptance.
 
 ---
 
@@ -75,11 +130,31 @@ User themes override system themes of the same name and are safe from package up
 
 Each theme may implement the following Lua modules:
 
-* **`init.lua`** (required): returns theme metadata (e.g., `name`, `preflight`, `inflight`, `postflight`, optional `configure`, and scheduling hints).
-* **`preflight.lua`** (optional): returns a layout table for preflight.
-* **`inflight.lua`** (optional): returns a layout table for inflight.
-* **`postflight.lua`** (optional): returns a layout table for postflight.
+* **`init.lua`** (required): returns a metadata table with a display `name`, phase filenames, optional `configure`, `minResolution` and `appTheme`.
+* **`preflight.lua`**: returns a layout table for preflight.
+* **`inflight.lua`**: returns a layout table for inflight.
+* **`postflight.lua`**: returns a layout table for postflight.
 * **`configure.lua`** (optional): exposes a configuration UI and saves preferences.
+
+Compiled `.luac` files can be supplied in place of matching `.lua` files,
+including `init.luac`; use bytecode compatible with the target radio firmware.
+
+Keep `init.lua` lightweight and free of display or telemetry side effects: it
+can execute during discovery. Its load and execution are protected with
+`pcall`; missing, invalid or failing metadata is skipped. Phase and
+configuration filenames must be safe local basenames ending in `.lua` or
+`.luac`, not arbitrary paths. Omitted phase filenames use the corresponding
+`preflight.lua`, `inflight.lua` and `postflight.lua` names. All three phase files
+must be present. Discovery does not execute them, so a valid catalog entry can
+still contain runtime errors that require testing. Configuration files are
+also checked for presence, not executed during the scan.
+
+`minResolution = {x = 784, y = 294}` restricts the choices to a sufficiently
+large window. Optional `appTheme` supplies the Theme Bridge palette; without
+it, the Bridge uses the native radio colors. Existing built-in labels and
+compatibility aliases are retained: Bastion's `bastion` folder still uses the
+saved `system/aegis` choice and `dashboard.aegis` settings, and
+`system/bastion` resolves to that same choice.
 
 Example **`init.lua`**:
 
@@ -90,6 +165,7 @@ return {
   inflight = "inflight.lua",
   postflight = "postflight.lua",
   configure = "configure.lua",
+  minResolution = {x = 784, y = 294},
   standalone = false
 }
 ```
@@ -320,4 +396,6 @@ end }
 
 ---
 
-*This guide reflects the latest objects library (2024–2025) and should serve as the definitive reference for dashboard theme development.*
+*Folder discovery and installation documented against RFSuite Ethos 2.3.1,
+All Themes source, 2026-10-02. Check object properties and callbacks against the
+target Suite source before using the older object examples above.*

@@ -17,6 +17,8 @@ class ThemeBridgeTests(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.globals().suite_root = (ROOT / "src" / "rfsuite").as_posix()
+        self.lua.globals().listDirectory = self.list_directory
+        self.lua.globals().hasDiscovery = (ROOT / "src/rfsuite/lib/dashboard_themes.lua").is_file()
         self.lua.execute(r'''
             now, width, height, sourceReads = 0, 800, 480, 0
             loads, drawCalls, modelPrefs, missingFiles = {}, {}, {}, {}
@@ -28,7 +30,7 @@ class ThemeBridgeTests(unittest.TestCase):
             end
             os.clock = function() return now end
             CATEGORY_CHANNEL = 1
-            system = {getSource = function()
+            system = {listFiles=function(path) return listDirectory(path) end,getSource = function()
                 sourceReads = sourceReads + 1
                 return {value = function() return 0 end}
             end}
@@ -95,6 +97,10 @@ class ThemeBridgeTests(unittest.TestCase):
 
     def run_lua(self, code):
         self.lua.execute(code)
+
+    def list_directory(self, path):
+        target = ROOT / "src/rfsuite" / path
+        return self.lua.table_from(sorted(p.name for p in target.iterdir()) if target.is_dir() else [])
 
     def test_all_six_installed_palettes_and_paint_are_cached(self):
         self.run_lua('''
@@ -270,7 +276,8 @@ class ThemeBridgeTests(unittest.TestCase):
             missingFiles["widgets/dashboard/themes/bastion/init.lua"] = nil
             bridge.open(initialSettings)
             flush()
-            assert(palettePath() == "system/aegis", "stale missing-theme cache survived reopen")
+            assert(palettePath() == (hasDiscovery and "system/default" or "system/aegis"),
+                "unexpected installed-theme refresh without script restart")
             bridge.clearCache()
         ''')
 

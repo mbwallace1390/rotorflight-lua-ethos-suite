@@ -13,6 +13,7 @@ import unittest
 HERE = Path(__file__).resolve().parents[2]
 ROOT = Path(os.environ.get("RFSUITE_TEST_ROOT", HERE)).resolve()
 SOURCE = ROOT / "src/rfsuite"
+HAS_DISCOVERY = (SOURCE / "lib/dashboard_themes.lua").is_file()
 sys.path.insert(0, str(HERE / "build/test-deps"))
 from lupa.lua54 import LuaRuntime
 
@@ -22,6 +23,7 @@ class Radio:
         self.loads = []
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.globals().readSource = self.read
+        self.lua.globals().listDirectory = self.list_directory
         self.lua.execute(r'''
             now, stubPhases = 0, false
             os.clock=function() return now end
@@ -43,6 +45,7 @@ class Radio:
                 getWindowSize=function() return 800,480 end,getTextSize=function(t) return #t*6,12 end,
                 loadMask=function() return nil end,darkMode=function() return true end,invalidate=noop}
             system={getSource=function() return {value=function() return 0 end} end,
+                listFiles=function(path) return listDirectory(path) end,
                 registerWidget=function(w) widgetModule=w end,
                 getMemoryUsage=function() return {mainStackAvailable=9000} end}
             settingsFile={dashboard={use_same_theme=true,theme_preflight="system/aegis"},
@@ -109,6 +112,10 @@ class Radio:
 
     def run(self, code):
         return self.lua.execute(code)
+
+    def list_directory(self, path):
+        target = SOURCE / path
+        return self.lua.table_from(sorted(p.name for p in target.iterdir()) if target.is_dir() else [])
 
 
 class BastionFolderTests(unittest.TestCase):
@@ -200,7 +207,7 @@ class BastionFolderTests(unittest.TestCase):
             assert(bridge.getPalette().path=="system/aegis")
             bridge.clearCache()
         ''')
-        self.assertEqual(radio.loads.count(metadata), before + 1)
+        self.assertEqual(radio.loads.count(metadata), before + (0 if HAS_DISCOVERY else 1))
         self.assert_no_old_folder_reads(radio)
 
     @unittest.skipUnless((SOURCE / "app/theme_bridge.lua").is_file(), "Standalone branch has no Theme Bridge")
@@ -226,6 +233,20 @@ class BastionFolderTests(unittest.TestCase):
                     return original(path)
 
                 radio.lua.globals().readSource = read_fixture
+                if HAS_DISCOVERY:
+                    original_listing = radio.list_directory
+
+                    def list_fixture(path):
+                        if path == "widgets/dashboard/themes":
+                            entries = list(original_listing(path).values())
+                            if legacy_present:
+                                entries.append("aegis")
+                            return radio.lua.table_from(entries)
+                        if path == "widgets/dashboard/themes/aegis" and legacy_present:
+                            return radio.lua.table_from(["init.lua", "preflight.lua", "inflight.lua", "postflight.lua"])
+                        return original_listing(path)
+
+                    radio.lua.globals().listDirectory = list_fixture
                 palette = radio.run('''
                     bridge=requireModule("app/theme_bridge.lua")
                     bridge.open(store.load())
