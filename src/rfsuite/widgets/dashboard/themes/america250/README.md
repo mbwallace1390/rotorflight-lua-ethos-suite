@@ -1,7 +1,5 @@
 # America 250 — Liberty Flight Edition
 
-**Version:** v2.7 Aegis telemetry radio-test build
-
 America 250 is an original commemorative Rotorflight ETHOS dashboard theme celebrating the United States semiquincentennial, **1776–2026**. It combines classic American aerospace instrumentation with Revolutionary-era shield, star, parchment, navy, red, and gold details.
 
 ## Screens
@@ -19,10 +17,18 @@ America 250 is an original commemorative Rotorflight ETHOS dashboard theme celeb
 - Uses the normal Rotorflight dashboard telemetry aliases and configurable warning thresholds.
 - Uses drawn separator dots instead of unsupported UTF-8 bullet glyphs on ETHOS fonts.
 
-## Installation
 
-Copy the complete `america250` folder into:
+## Compatible installation
 
-`scripts/rfsuite/widgets/dashboard/themes/`
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `america250` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **America 250** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → America 250**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
 
-Then select **America 250** from the Rotorflight dashboard theme settings.
+All Themes uses `system/america250` and `dashboard.america250`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/america250.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).

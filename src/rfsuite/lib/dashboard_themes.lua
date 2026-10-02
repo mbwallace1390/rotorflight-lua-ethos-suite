@@ -13,6 +13,22 @@ local normalized = {}
 local keys = {}
 local PHASES = {"preflight", "inflight", "postflight"}
 
+-- Packaged system add-ons use the Suite's locale catalog. Keep metadata plain
+-- so a complete theme folder can also be copied into a compatible installation.
+-- This map changes labels only; discovery still reads each add-on's metadata.
+local SYSTEM_LABELS = {
+  bastion = "@i18n(app.modules.settings.dashboard_theme_bastion)@",
+  america250 = "@i18n(app.modules.settings.dashboard_theme_america250)@",
+  libertyops250 = "@i18n(app.modules.settings.dashboard_theme_libertyops250)@",
+  mwrc = "@i18n(app.modules.settings.dashboard_theme_mwrc)@",
+  singularity = "@i18n(app.modules.settings.dashboard_theme_singularity)@",
+  zafira = "@i18n(app.modules.settings.dashboard_theme_zafira)@",
+  vantage = "@i18n(app.modules.settings.dashboard_theme_vantage)@",
+  inkhalo = "@i18n(app.modules.settings.dashboard_theme_inkhalo)@",
+  meridian = "@i18n(app.modules.settings.dashboard_theme_meridian)@",
+  cinder = "@i18n(app.modules.settings.dashboard_theme_cinder)@",
+}
+
 -- Stock init files can require the dashboard context (and settings store).
 -- Keep their small UI descriptors here instead of starting every dashboard
 -- subsystem just to show a picker. Add-on themes need no registration here.
@@ -132,7 +148,8 @@ local function descriptor(source, folder, directory, present)
   if entry.configure then entry.configure = directory .. "/" .. entry.configure end
   entry.minResolution = minimum(metadata.minResolution)
   entry.appTheme = type(metadata.appTheme) == "table" and metadata.appTheme or nil
-  local label = metadata.label or (entry.appTheme and entry.appTheme.name) or metadata.name
+  local label = metadata.label or (source == "system" and SYSTEM_LABELS[folder])
+    or (entry.appTheme and entry.appTheme.name) or metadata.name
   entry.label = type(label) == "string" and label ~= "" and label or folder
   if source == "user" then entry.label = entry.label .. " (User)" end
   return entry

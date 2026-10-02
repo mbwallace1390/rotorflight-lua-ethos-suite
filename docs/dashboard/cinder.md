@@ -47,11 +47,11 @@ to all three phases, or select each phase separately.
 
 ## Package and validation
 
-The theme is self-contained under `widgets/dashboard/themes/cinder/`. Its
-individual branch scope includes four existing loader/settings registrations;
-`init.lua` also supplies metadata for a compatible optional Theme Bridge.
-Cinder does not require Bridge. This theme work leaves `main`/`master` unchanged;
-registration in source does not itself establish publication.
+The theme is self-contained under `widgets/dashboard/themes/cinder/`. The
+All Themes package discovers it automatically. Keep its complete folder and
+helpers together when updating a compatible installation, then restart the
+Suite Lua session or radio. Its palette metadata is retained for the existing
+All Themes integration; the dashboard does not require a separate Bridge install.
 
 Desktop tests use the actual Suite engine with approximate LCD fonts. Real-radio
 font fitting, telemetry transitions, and memory/instruction budgets remain
@@ -59,4 +59,4 @@ unverified. Preflight status describes telemetry checks, not aircraft safety.
 
 Source: `src/rfsuite/widgets/dashboard/themes/cinder/`.
 Related controller documentation: [Rotorflight](https://www.rotorflight.org/docs/).
-Documented against RFSuite Ethos 2.3.1 theme source on 2026-09-30.
+Documented against RFSuite Ethos 2.3.1 theme source on 2026-10-02.

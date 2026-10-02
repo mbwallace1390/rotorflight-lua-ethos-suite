@@ -9,6 +9,23 @@ Ink-black surfaces, pale-blue elliptical halo, soft-white telemetry, and restrai
 - Full 800 x 480 views reserve the native 44-pixel header, including the dynamic model name. Compact 784 x 294 views omit that header.
 - Threshold settings use the Suite's active `inkhalo` dashboard preference scope. Temperature settings respect Celsius/Fahrenheit display units.
 
-This folder contains the theme only. The Suite's explicit theme picker must register `inkhalo` before normal radio selection is available; no Suite core or picker changes are included here. Theme Bridge palette metadata is supplied in `init.lua`.
+Ink & Halo is available through automatic discovery in All Themes and through
+the supplied registrations in its individual Suite package. All Themes retains
+the palette metadata used by its existing integration.
 
 Desktop Lua-rendered previews approximate the radio's fonts. Physical-radio visual and instruction-budget acceptance is still required.
+
+## Compatible installation
+
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `inkhalo` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **Ink & Halo** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → Ink & Halo**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
+
+All Themes uses `system/inkhalo` and `dashboard.inkhalo`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/inkhalo.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).

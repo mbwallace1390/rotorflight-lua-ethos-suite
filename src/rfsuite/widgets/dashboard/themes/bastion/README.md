@@ -1,14 +1,24 @@
 # Bastion
 
-Bastion is the new name of this Rotorflight ETHOS dashboard theme, preserving its technical cyan identity and existing telemetry behavior.
+A graphite and cyan Rotorflight dashboard with a restrained technical layout.
 
-The current source folder is `src/rfsuite/widgets/dashboard/themes/bastion`.
-The legacy internal ID `aegis`, selection `system/aegis`, and settings section
-`dashboard.aegis` remain unchanged, preserving existing selections and saved
-thresholds without a settings migration.
+The physical folder is `bastion`. All Themes preserves `system/aegis` and
+`dashboard.aegis` so existing saved selections and warning settings survive.
+The upstream Bastion submission uses the canonical `bastion` identity; those
+saved sections are distinct.
 
-Install the complete, matching Suite files from `radio-theme-bastion` or
-`radio-all-themes`, then restart the scripts or radio. Those branches include the
-dashboard, settings-page, and optional Theme Bridge routing for the `bastion`
-folder. Copying this folder alone onto an older installation does not provide
-that routing. Preserve the radio's existing user settings when updating.
+
+## Compatible installation
+
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `bastion` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **Bastion** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → Bastion**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
+
+All Themes uses `system/aegis` and `dashboard.aegis`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/bastion.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).

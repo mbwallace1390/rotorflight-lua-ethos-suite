@@ -17,7 +17,8 @@ the All Themes build, compatible installed folders appear automatically.
 Global controls are available offline while the Suite background task is
 running. The **Optional theme for this model** controls are enabled only when
 a flight controller is connected and its MCU ID is known. Theme choices that
-need a larger screen are hidden; Meridian and Cinder require at least 784 × 294.
+need a larger screen are hidden. All ten MWRC themes require at least 784 × 294;
+480 × 320 and 472 × 191 windows hide them.
 System and user folders are separate choices. User themes are marked **(User)**
 and do not replace same-name system themes automatically.
 
@@ -35,6 +36,10 @@ and do not replace same-name system themes automatically.
 | Optional theme for this model — Postflight Theme | Overrides the global postflight theme when the model's Use same theme is disabled. Disabled uses the global choice. |
 
 ## Notes
+
+- Packaged custom theme names use the Suite's locale catalog, including proper
+  names that stay unchanged across languages. Existing selections and warning
+  sections are preserved.
 
 - Install the complete All Themes package with folder discovery once. Then copy
   each complete theme folder into its supported location:
@@ -63,5 +68,21 @@ and do not replace same-name system themes automatically.
 - [Rotorflight documentation](https://www.rotorflight.org/docs/)
 - [Meridian](../../../dashboard/meridian.md)
 - [Cinder](../../../dashboard/cinder.md)
+
+- [Bastion](../../../dashboard/bastion.md)
+
+- [America 250](../../../dashboard/america250.md)
+
+- [Liberty Ops 250](../../../dashboard/libertyops250.md)
+
+- [MWRC](../../../dashboard/mwrc.md)
+
+- [Singularity](../../../dashboard/singularity.md)
+
+- [Zafira](../../../dashboard/zafira.md)
+
+- [Vantage](../../../dashboard/vantage.md)
+
+- [Ink & Halo](../../../dashboard/inkhalo.md)
 
 *Documented against RFSuite Ethos 2.3.1, All Themes source, 2026-10-02.*

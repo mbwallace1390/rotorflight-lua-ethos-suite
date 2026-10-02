@@ -17,7 +17,7 @@ the [Themes](theme.md) page.
 Available offline while the Suite background task is running. A theme tile
 appears only if the installed theme is discovered, its metadata identifies a
 present configuration module, and the available window meets its minimum size.
-Meridian and Cinder require at least 784 × 294. A theme without configuration
+All ten MWRC themes require at least 784 × 294; 480 × 320 and 472 × 191 windows hide them. A theme without configuration
 controls can still appear on the Themes page.
 
 ## Settings
@@ -34,6 +34,10 @@ The controls depend on the selected theme. Meridian and Cinder provide:
 | Link warning | Cautions when the valid percentage link reading falls below this threshold. Range: 1–99%; default: 50%. |
 
 ## Notes
+
+- Packaged custom theme names use the Suite's locale catalog, including proper
+  names that stay unchanged across languages. Existing selections and warning
+  sections are preserved.
 
 - This All Themes build discovers system themes under
   `SCRIPTS:/rfsuite/widgets/dashboard/themes/` and user themes under
@@ -65,6 +69,22 @@ The controls depend on the selected theme. Meridian and Cinder provide:
 - [Rotorflight documentation](https://www.rotorflight.org/docs/)
 - [Meridian](../../../dashboard/meridian.md)
 - [Cinder](../../../dashboard/cinder.md)
+
+- [Bastion](../../../dashboard/bastion.md)
+
+- [America 250](../../../dashboard/america250.md)
+
+- [Liberty Ops 250](../../../dashboard/libertyops250.md)
+
+- [MWRC](../../../dashboard/mwrc.md)
+
+- [Singularity](../../../dashboard/singularity.md)
+
+- [Zafira](../../../dashboard/zafira.md)
+
+- [Vantage](../../../dashboard/vantage.md)
+
+- [Ink & Halo](../../../dashboard/inkhalo.md)
 
 *Documented against RFSuite Ethos 2.3.1, All Themes source, 2026-10-02.*
 

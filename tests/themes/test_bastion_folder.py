@@ -16,6 +16,7 @@ SOURCE = ROOT / "src/rfsuite"
 HAS_DISCOVERY = (SOURCE / "lib/dashboard_themes.lua").is_file()
 sys.path.insert(0, str(HERE / "build/test-deps"))
 from lupa.lua54 import LuaRuntime
+from i18n_fixture import resolve_source
 
 
 class Radio:
@@ -108,7 +109,7 @@ class Radio:
     def read(self, path):
         self.loads.append(path)
         target = SOURCE / path
-        return target.read_text(encoding="utf-8") if target.is_file() else None
+        return resolve_source(target.read_text(encoding="utf-8"), SOURCE) if target.is_file() else None
 
     def run(self, code):
         return self.lua.execute(code)

@@ -33,12 +33,19 @@ apply to models using this theme. A per-model theme selection is separate and
 requires a connected flight controller with a known MCU ID. These display
 settings do not write flight-controller EEPROM.
 
-The separate Cinder branch scope is this theme plus the four existing
-loader/settings registrations. Its `appTheme` metadata is available to an
-optional compatible Theme Bridge; the theme does not require or install Bridge.
-This work targets the theme branches and leaves `main`/`master` unchanged.
-Registration in source does not itself indicate that a release was published.
 
-Desktop validation uses the actual Suite Lua engine with approximate LCD font
-metrics. Native font fitting, real sensor transitions, and memory/instruction
-budgets still require physical-radio checks. GPLv3, consistent with the Suite.
+
+## Compatible installation
+
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `cinder` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **Cinder** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → Cinder**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
+
+All Themes uses `system/cinder` and `dashboard.cinder`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/cinder.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).

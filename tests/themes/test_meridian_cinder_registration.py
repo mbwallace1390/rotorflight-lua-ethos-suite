@@ -22,6 +22,7 @@ ROOT = Path(os.environ.get("RFSUITE_TEST_ROOT", HERE_ROOT)).resolve()
 SOURCE = ROOT / "src" / "rfsuite"
 sys.path.insert(0, str(HERE_ROOT / "build" / "test-deps"))
 from lupa.lua54 import LuaRuntime
+from i18n_fixture import resolve_source
 
 THEMES = tuple(filter(None, os.environ.get("RFSUITE_TEST_THEMES", "").split(","))) or tuple(
     name for name in ("meridian", "cinder")
@@ -178,7 +179,7 @@ class RadioUI:
     @staticmethod
     def read(path):
         target = SOURCE / path
-        return target.read_text(encoding="utf-8") if target.is_file() else None
+        return resolve_source(target.read_text(encoding="utf-8"), SOURCE) if target.is_file() else None
 
     def list_directory(self, path):
         target = SOURCE / path

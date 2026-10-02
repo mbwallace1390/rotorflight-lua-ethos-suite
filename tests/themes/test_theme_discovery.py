@@ -9,6 +9,7 @@ These are desktop integration checks, not physical-radio acceptance.
 import unittest
 
 from test_meridian_cinder_registration import RadioUI, SOURCE
+from i18n_fixture import resolve_source
 
 
 SYSTEM_ROOT = "widgets/dashboard/themes"
@@ -51,7 +52,7 @@ class DiscoveryRadio(RadioUI):
         if path.startswith("SCRIPTS:"):
             return None
         target = SOURCE / path
-        return target.read_text(encoding="utf-8") if target.is_file() else None
+        return resolve_source(target.read_text(encoding="utf-8"), SOURCE) if target.is_file() else None
 
     def list_directory(self, path):
         path = path.rstrip("/")
@@ -526,6 +527,7 @@ class ThemeDiscoveryTests(unittest.TestCase):
                 directory = radio.add_theme("user", "brokenconfig", "Broken Config")
                 radio.add_theme("user", "workingconfig", "Working Config")
                 radio.sources[directory + "/configure.lua"] = broken
+                radio.g.loadFailedMessage = resolve_source("@i18n(app.msg_load_failed_title)@", SOURCE)
                 radio.run('''
                     messages={}
                     form.addStaticText=function(line,rect,text) messages[#messages+1]=text end
@@ -546,7 +548,7 @@ class ThemeDiscoveryTests(unittest.TestCase):
                     assert(headerCallbacks.onSave==nil,"failed page retained its Save action")
                     local reported=false
                     for _,text in ipairs(messages) do
-                        if text=="@i18n(app.msg_load_failed_title)@" then reported=true end
+                        if text==loadFailedMessage then reported=true end
                     end
                     assert(reported,"configuration failure was hidden without a message")
                     assert(settingsFile["dashboard.user/brokenconfig"].fixture_value==41)

@@ -29,12 +29,21 @@ apply to models using this theme. Selecting a per-model theme is a separate
 option; it requires a connected flight controller with a known MCU ID. These
 display settings do not write flight-controller EEPROM.
 
-The separate Meridian branch scope is this theme plus the four existing
-loader/settings registrations. Its `appTheme` metadata is available to an
-optional compatible Theme Bridge; the theme does not require or install Bridge.
-This work targets the theme branches and leaves `main`/`master` unchanged.
-Registration in source does not itself indicate that a release was published.
-
 Validation uses the actual Suite Lua engine with desktop LCD metrics. Physical
 radio checks remain necessary for native fonts and memory/instruction budgets.
 GPLv3, consistent with the Suite and the maintained theme telemetry foundation.
+
+## Compatible installation
+
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `meridian` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **Meridian** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → Meridian**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
+
+All Themes uses `system/meridian` and `dashboard.meridian`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/meridian.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).
