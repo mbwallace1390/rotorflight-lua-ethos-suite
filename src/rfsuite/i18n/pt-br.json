@@ -6867,6 +6867,12 @@
           "reverse_text": false,
           "translation": "Use o mesmo tema"
         },
+        "dashboard_theme_zafira": {
+          "english": "Zafira",
+          "max_length": 6,
+          "needs_translation": false,
+          "translation": "Zafira"
+        },
         "debug_logs": {
           "english": "Debug logs",
           "max_length": 10,

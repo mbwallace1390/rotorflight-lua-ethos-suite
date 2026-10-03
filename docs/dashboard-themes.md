@@ -321,3 +321,9 @@ end }
 ---
 
 *This guide reflects the latest objects library (2024–2025) and should serve as the definitive reference for dashboard theme development.*
+
+## Zafira
+
+Zafira requires at least 784 × 294 pixels. It supports full 800 × 480 and
+compact 784 × 294 layouts. See the [theme guide](dashboard/zafira.md) for
+selection, local settings, installation, and all three phase previews.

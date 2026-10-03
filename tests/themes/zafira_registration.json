@@ -1,0 +1,11 @@
+{
+  "folder": "zafira",
+  "name": "Zafira",
+  "selectionId": "system/zafira",
+  "settingsSection": "dashboard.zafira",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution"
+}

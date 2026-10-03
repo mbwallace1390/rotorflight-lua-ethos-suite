@@ -26,7 +26,7 @@ local THEME_DEFS = {
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", folder = "rt-rc"},
   {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", folder = "rt-rc-n"},
   {label = "@i18n(app.modules.settings.dashboard_theme_srb_rc)@", folder = "srb-rc"},
-  {label = "Zafira", folder = "zafira", minResolution = {x = 784, y = 294}},
+  {label = "@i18n(app.modules.settings.dashboard_theme_zafira)@", folder = "zafira", minResolution = {x = 784, y = 294}},
 }
 
 local lastSelected

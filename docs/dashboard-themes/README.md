@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## Zafira
+
+Desktop preview, not radio capture. [Details and limits](Zafira/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![Zafira preflight](Zafira/preflight.png) | ![Zafira inflight](Zafira/inflight.png) | ![Zafira postflight](Zafira/postflight.png) |
