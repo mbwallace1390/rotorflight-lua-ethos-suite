@@ -1,0 +1,30 @@
+{
+  "kind": "Desktop preview, not radio capture",
+  "size": {
+    "width": 800,
+    "height": 480
+  },
+  "palette": "ETHOS 26 dark fixture",
+  "telemetry": "simulated connected fixture",
+  "font": "Arial",
+  "renderer": "MWRC Theme Studio tests/themes/render_themes.py",
+  "rendererSha256": "5f86203d67ea276f8f9e9ab6522487e6da782f993684018f76b9d8f9baadf08f",
+  "suiteCommit": "baf846bd79ea1c4d572376524359d7aaab7cba4f",
+  "sourceState": "PR preparation working tree; hashes identify the rendered theme and principal engine inputs",
+  "inputs": {
+    "src/rfsuite/lib/require.lua": "09374652f87ebf7d881c74f75a78f22c54f38d183d314915f8c4507f8fe01a3d",
+    "src/rfsuite/widgets/dashboard/context.lua": "aeedb5230a67627527e736965c167144584258ae1ba48aaccf9d3968ae974fc9",
+    "src/rfsuite/widgets/dashboard/engine.lua": "ba80ef8d7fa7407ab58e30abc5783e420569fac018be4a368407874417078775",
+    "src/rfsuite/widgets/dashboard/themes/libertyops250/configure.lua": "47f8b1443f732e2eee5c3cdaed985112831c2c2be4e00320deec8a517f6ceb54",
+    "src/rfsuite/widgets/dashboard/themes/libertyops250/inflight.lua": "8ffd84d846b85476cd3910dd3375eb1d2db20e2d645d033e2f58b00f7de172f0",
+    "src/rfsuite/widgets/dashboard/themes/libertyops250/init.lua": "dcb9feb3076e0c4391e1f682ef0ec4a339313e539df788578f962f0bcea53612",
+    "src/rfsuite/widgets/dashboard/themes/libertyops250/postflight.lua": "e8f6115a7bc9e4acd89c7adc07f30231075f690d586635a381fc4b7ba0b969d5",
+    "src/rfsuite/widgets/dashboard/themes/libertyops250/preflight.lua": "ceb677d7c4e63867a92d9590a0c339050e3014f9b10aaf3e8c567bb91f33ad20"
+  },
+  "previews": {
+    "preflight.png": "73f8b253d901b5ce82000446b5fe17cd3bc69e0521c3e540c36c847342bcb90b",
+    "inflight.png": "c728c101df17180dd4d7e5463eb189230129d00cad0c7a4febaa9d31267d12f0",
+    "postflight.png": "c3cd135a7361e92c0baab7c9183a0e4b81db86b5779fe3f9a1ddc8667a541c42"
+  },
+  "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
+}

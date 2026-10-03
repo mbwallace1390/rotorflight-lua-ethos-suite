@@ -6790,6 +6790,12 @@
           "reverse_text": true,
           "translation": "קבד"
         },
+        "dashboard_theme_libertyops250": {
+          "english": "Liberty Ops 250",
+          "max_length": 15,
+          "needs_translation": false,
+          "translation": "Liberty Ops 250"
+        },
         "dashboard_theme_panel_global": {
           "english": "Default theme for all models",
           "max_length": 28,

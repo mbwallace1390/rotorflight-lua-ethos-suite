@@ -1,0 +1,13 @@
+{
+  "folder": "libertyops250",
+  "name": "Liberty Ops 250",
+  "metadataName": "libertyops250",
+  "selectionId": "system/libertyops250",
+  "settingsSection": "dashboard.libertyops250",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "Warning",
+  "becPanel": "BEC Voltage"
+}
