@@ -1,28 +1,34 @@
-# America 250 — Liberty Flight Edition
+# America 250
 
-**Version:** v2.7 Aegis telemetry radio-test build
+A navy, red, and ivory commemorative dashboard celebrating 1776–2026.
 
-America 250 is an original commemorative Rotorflight ETHOS dashboard theme celebrating the United States semiquincentennial, **1776–2026**. It combines classic American aerospace instrumentation with Revolutionary-era shield, star, parchment, navy, red, and gold details.
+- **Preflight:** current telemetry and setup/status information before flight.
+- **Inflight:** live flight instruments, timing, and warning presentation.
+- **Postflight:** recorded flight results; unavailable readings remain marked.
 
-## Screens
+Full 800 × 480 and compact 784 × 294 layouts are supported. The theme and its
+configuration tile require at least 784 × 294 pixels; smaller windows hide
+both choices. The current model name and native transmitter header remain
+visible in full screen, with a smaller MWRC signature beside the centered title.
 
-- **Liberty Readiness:** preflight readiness shield surrounded by 13 stars, plus Smart Fuel, BEC, ESC temperature, radio link, profiles, pack voltage, and arm/governor state.
-- **Freedom Flight:** central headspeed instrument with a 13-star anniversary ring, flight timer, throttle, ESC temperature, Smart Fuel, current, BEC, link quality, consumed capacity, and governor state.
-- **Mission Debrief:** automatic mission grade and nine-stat postflight report with a 250 / 1776–2026 anniversary crest.
+## Installation and settings
 
-## Design notes
+Install the complete matching Suite build with this theme's registrations,
+preserve `rfsuite.user`, and restart scripts or the radio. Copying this folder
+alone onto a stock build that does not register it is insufficient. Select
+**System → Settings → Dashboard → Themes → America 250** and configure display
+limits under **Dashboard → Settings → America 250**.
 
-- Built for the FrSky X20 Pro at 800×480.
-- Vector dashboard graphics; the included 70×70 `icon.png` is used only by the theme selector.
-- Original commemorative artwork rather than an official America250 campaign logo.
-- Includes the **MWRC** author watermark in the common header on every screen.
-- Uses the normal Rotorflight dashboard telemetry aliases and configurable warning thresholds.
-- Uses drawn separator dots instead of unsupported UTF-8 bullet glyphs on ETHOS fonts.
+The folder and internal ID are `america250`; the saved selection is
+`system/america250`. Instrument settings use `dashboard.america250` in the radio's
+`SCRIPTS:/rfsuite.user/settings.ini`. Save does not write flight-controller
+EEPROM. Temperature thresholds remain stored in Celsius and display in the
+selected Celsius/Fahrenheit units.
 
-## Installation
+See the [theme guide](../../../../../../docs/dashboard/america250.md) for
+model overrides, installation details, and previews. Desktop previews use
+simulated telemetry and approximate fonts; physical-radio acceptance is separate.
 
-Copy the complete `america250` folder into:
-
-`scripts/rfsuite/widgets/dashboard/themes/`
-
-Then select **America 250** from the Rotorflight dashboard theme settings.
+Original commemorative artwork, not an official America250 campaign logo.
+Preserve the included WATERMARK.txt, CHANGELOG.md, and source notices. GPLv3,
+consistent with the Suite.

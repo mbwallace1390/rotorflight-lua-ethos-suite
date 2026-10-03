@@ -2330,6 +2330,12 @@
           "reverse_text": false,
           "max_length": 11
         },
+        "dashboard_theme_america250": {
+          "english": "America 250",
+          "translation": "America 250",
+          "needs_translation": false,
+          "max_length": 11
+        },
         "dashboard_theme_aerc": {
           "english": "AERC",
           "translation": "AERC",

@@ -1,0 +1,11 @@
+{
+  "folder": "america250",
+  "name": "America 250",
+  "selectionId": "system/america250",
+  "settingsSection": "dashboard.america250",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution below"
+}

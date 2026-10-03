@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## America 250
+
+Desktop preview, not radio capture. [Details and limits](America%20250/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![America 250 preflight](America%20250/preflight.png) | ![America 250 inflight](America%20250/inflight.png) | ![America 250 postflight](America%20250/postflight.png) |
