@@ -1,14 +1,33 @@
 # Ink & Halo
 
-Rotorflight dashboard companion to the native Ink & Halo ETHOS radio theme.
-Ink-black surfaces, pale-blue elliptical halo, soft-white telemetry, and restrained outlined panels.
+An ink-black dashboard with a pale elliptical halo and restrained outlined panels.
 
-- Preflight shows five required telemetry checks. Missing readings prevent READY.
-- Inflight places headspeed beneath the halo, with fuel, ESC temperature, current, and pack voltage below.
-- Postflight presents recorded peaks and minima; it does not calculate a health score.
-- Full 800 x 480 views reserve the native 44-pixel header, including the dynamic model name. Compact 784 x 294 views omit that header.
-- Threshold settings use the Suite's active `inkhalo` dashboard preference scope. Temperature settings respect Celsius/Fahrenheit display units.
+- **Preflight:** current telemetry and setup/status information before flight.
+- **Inflight:** live flight instruments, timing, and warning presentation.
+- **Postflight:** recorded flight results; unavailable readings remain marked.
 
-This folder contains the theme only. The Suite's explicit theme picker must register `inkhalo` before normal radio selection is available; no Suite core or picker changes are included here. Theme Bridge palette metadata is supplied in `init.lua`.
+Full 800 × 480 and compact 784 × 294 layouts are supported. The theme and its
+configuration tile require at least 784 × 294 pixels; smaller windows hide
+both choices. The current model name and native transmitter header remain
+visible in full screen, with a smaller MWRC signature beside the centered title.
 
-Desktop Lua-rendered previews approximate the radio's fonts. Physical-radio visual and instruction-budget acceptance is still required.
+## Installation and settings
+
+Install the complete matching Suite build with this theme's registrations,
+preserve `rfsuite.user`, and restart scripts or the radio. Copying this folder
+alone onto a stock build that does not register it is insufficient. Select
+**System → Settings → Dashboard → Themes → Ink & Halo** and configure display
+limits under **Dashboard → Settings → Ink & Halo**.
+
+The folder and internal ID are `inkhalo`; the saved selection is
+`system/inkhalo`. Instrument settings use `dashboard.inkhalo` in the radio's
+`SCRIPTS:/rfsuite.user/settings.ini`. Save does not write flight-controller
+EEPROM. Temperature thresholds remain stored in Celsius and display in the
+selected Celsius/Fahrenheit units.
+
+See the [theme guide](../../../../../../docs/dashboard/inkhalo.md) for
+model overrides, installation details, and previews. Desktop previews use
+simulated telemetry and approximate fonts; physical-radio acceptance is separate.
+
+Dashboard companion to the native Ink & Halo ETHOS radio theme. Preserve
+source notices. GPLv3, consistent with the Suite.

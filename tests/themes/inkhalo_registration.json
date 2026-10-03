@@ -1,0 +1,11 @@
+{
+  "folder": "inkhalo",
+  "name": "Ink & Halo",
+  "selectionId": "system/inkhalo",
+  "settingsSection": "dashboard.inkhalo",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution below"
+}

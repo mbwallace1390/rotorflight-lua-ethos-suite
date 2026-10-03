@@ -1,0 +1,32 @@
+{
+  "kind": "Desktop preview, not radio capture",
+  "size": {
+    "width": 800,
+    "height": 480
+  },
+  "palette": "ETHOS 26 dark fixture",
+  "telemetry": "simulated connected fixture",
+  "font": "Arial",
+  "renderer": "MWRC Theme Studio tests/themes/render_themes.py",
+  "rendererSha256": "5f86203d67ea276f8f9e9ab6522487e6da782f993684018f76b9d8f9baadf08f",
+  "suiteCommit": "c126548621d09c6bcba911c7315b863df8e0f729",
+  "sourceState": "PR preparation working tree; hashes identify the rendered theme and principal engine inputs",
+  "inputs": {
+    "src/rfsuite/lib/require.lua": "09374652f87ebf7d881c74f75a78f22c54f38d183d314915f8c4507f8fe01a3d",
+    "src/rfsuite/widgets/dashboard/context.lua": "aeedb5230a67627527e736965c167144584258ae1ba48aaccf9d3968ae974fc9",
+    "src/rfsuite/widgets/dashboard/engine.lua": "ba80ef8d7fa7407ab58e30abc5783e420569fac018be4a368407874417078775",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/common.lua": "749fecd4ddbbaab658860ac981d545d76b4c65ab0f11467c5a1cc4c88bbabb85",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/configure.lua": "d12e164a0cdd35463dbcf8c243f02a72809cff826a65f01aa41314d62b52aaa5",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/inflight.lua": "7d97913bd14811426168419c19854af59c6c21eff64f61770fd1c91343c7b61c",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/init.lua": "37d6e72ae192fea41b72096300c9eb9ef18b451e27ca9b0c27723390769d9cd7",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/layout.lua": "20fe9e81898ff6dad325b3ef99994f587b1fd1c381697b58b53ec8d34b278fca",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/postflight.lua": "0c91732f87b9f5f3fe1ed18b7a77e677e4009b71b17f89f1d3701c6e3e8fd074",
+    "src/rfsuite/widgets/dashboard/themes/inkhalo/preflight.lua": "16074333130b842e53f47213ef464ceda8259de22344c0611f932b2bf48e83a3"
+  },
+  "previews": {
+    "preflight.png": "ac4553d34f242dcb678bfccdfd34654b6eb19ec1bb9bc907b9e6390e32eb324a",
+    "inflight.png": "b815c8009839e0d2f544807d0dbc9ba784262332219504a82b4bd282943478ac",
+    "postflight.png": "8cd8d5f2f4d709c66083a25ed1f7c5fa295b84d9d0f02897a20720280a6524d6"
+  },
+  "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
+}

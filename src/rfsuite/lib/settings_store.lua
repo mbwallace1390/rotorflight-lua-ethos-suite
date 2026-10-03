@@ -92,6 +92,7 @@ local DEFAULTS = {
 }
 
 local DASHBOARD_THEMES = {
+  inkhalo = true,
   ["aerc-n"] = true,
   aerc = true,
   claude = true,

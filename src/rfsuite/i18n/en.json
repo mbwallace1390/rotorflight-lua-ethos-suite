@@ -5832,6 +5832,12 @@
           "needs_translation": false,
           "translation": "Inflight Theme"
         },
+        "dashboard_theme_inkhalo": {
+          "english": "Ink & Halo",
+          "max_length": 10,
+          "needs_translation": false,
+          "translation": "Ink & Halo"
+        },
         "dashboard_theme_kevd": {
           "english": "Kevd",
           "max_length": 4,
