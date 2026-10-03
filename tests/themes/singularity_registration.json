@@ -1,0 +1,11 @@
+{
+  "folder": "singularity",
+  "name": "Singularity",
+  "selectionId": "system/singularity",
+  "settingsSection": "dashboard.singularity",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution"
+}

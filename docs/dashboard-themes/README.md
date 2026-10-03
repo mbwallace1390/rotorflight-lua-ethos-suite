@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## Singularity
+
+Desktop preview, not radio capture. [Details and limits](Singularity/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![Singularity preflight](Singularity/preflight.png) | ![Singularity inflight](Singularity/inflight.png) | ![Singularity postflight](Singularity/postflight.png) |
