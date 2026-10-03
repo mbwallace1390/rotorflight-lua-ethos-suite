@@ -6,45 +6,36 @@ sidebar_position: 10
 
 # Themes
 
-Choose the dashboard appearance for all models or override it for the connected
-flight controller. A separate choice can be saved for each flight phase.
+Choose the dashboard appearance globally or override each flight phase for a
+connected controller under **System → Settings → Dashboard → Themes**.
 
-## Where to find it
+Global choices work offline while the Suite background task runs. Model
+overrides require a connected controller with a known MCU ID. **Use same
+theme** copies the preflight choice to inflight and postflight; otherwise each
+phase can be selected separately. **Disabled** on a model field uses the
+corresponding global selection.
 
-*System* → *Settings* → *Dashboard* → *Themes*
+## Cinder
 
-Global controls are available offline while the Suite background task is
-running. The **Optional theme for this model** controls are enabled only when
-a flight controller is connected and its MCU ID is known. Theme choices that
-need a larger screen are hidden; Cinder require at least 784 × 294.
+This package registers **Cinder** as `system/cinder`. It supports 800 × 480
+full-screen and 784 × 294 compact layouts, and is hidden below 784 × 294 in
+both the theme picker and configuration grid. See the
+[Cinder guide](../../../dashboard/cinder.md) and
+[phase previews](../../../dashboard-themes/Cinder/README.md).
 
-## Settings
+Headspeed is a live numeric reading; this theme has no RPM limit, redline,
+comparison scale, or RPM threshold setting.
 
-| Setting | What it does |
-| --- | --- |
-| Default theme for all models — Use same theme | When enabled, copies the preflight choice to inflight and postflight and disables those two fields. Enabled by default. |
-| Default theme for all models — Preflight Theme | The global theme before flight; also supplies all phases when Use same theme is enabled. Default: Default. |
-| Default theme for all models — Inflight Theme | The global theme during flight. Editable when Use same theme is disabled. |
-| Default theme for all models — Postflight Theme | The global theme for recorded flight results. Editable when Use same theme is disabled. |
-| Optional theme for this model — Use same theme | Copies this model's preflight choice to its other phases. Requires a connected controller with a known MCU ID. |
-| Optional theme for this model — Preflight Theme | Overrides the global preflight theme for this controller. Disabled uses the global choice. |
-| Optional theme for this model — Inflight Theme | Overrides the global inflight theme when the model's Use same theme is disabled. Disabled uses the global choice. |
-| Optional theme for this model — Postflight Theme | Overrides the global postflight theme when the model's Use same theme is disabled. Disabled uses the global choice. |
+## Save and reload
 
-## Notes
+Save confirms and writes global choices to `SCRIPTS:/rfsuite.user/settings.ini`
+and model overrides to `SCRIPTS:/rfsuite.user/models/<MCU ID>.ini`. These are
+local radio files; no flight-controller EEPROM write is made. Reload discards
+unsaved selection changes.
 
-- Save confirms and stores global choices in `SCRIPTS:/rfsuite.user/settings.ini`
-  and model overrides in `SCRIPTS:/rfsuite.user/models/<MCU ID>.ini` on the radio.
-  It does not write flight-controller EEPROM.
-- Cinder are registered in the current Cinder branch source changes.
-  The theme provides all three phases and show live numeric headspeed without an RPM
-  limit, redline, comparison scale, or RPM threshold setting.
-- Use [Dashboard Settings](settings.md) to change a theme's instrument warnings.
-  Selecting a per-model theme does not create separate per-model thresholds.
+Use [Dashboard Settings](settings.md) for the theme's instrument thresholds.
+A per-model appearance does not create separate per-model thresholds.
 
-## Related
-
-- [Rotorflight documentation](https://www.rotorflight.org/docs/)
-- [Cinder](../../../dashboard/cinder.md)
-
-*Documented against RFSuite Ethos 2.3.1, Cinder branch source, 2026-09-30.*
+Install the complete matching Suite build containing this theme's registrations,
+then restart scripts or the radio. This explicitly registered package does not
+assume the automatic discovery available separately in `radio-all-themes`.

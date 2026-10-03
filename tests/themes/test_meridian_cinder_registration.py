@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import sys
 import unittest
+from theme_registration import translate_tags
 
 HERE_ROOT = Path(__file__).resolve().parents[2]
 ROOT = Path(os.environ.get("RFSUITE_TEST_ROOT", HERE_ROOT)).resolve()
@@ -174,7 +175,7 @@ class RadioUI:
     @staticmethod
     def read(path):
         target = SOURCE / path
-        return target.read_text(encoding="utf-8") if target.is_file() else None
+        return translate_tags(target.read_text(encoding="utf-8")) if target.is_file() else None
 
     def run(self, source):
         return self.lua.execute(source)

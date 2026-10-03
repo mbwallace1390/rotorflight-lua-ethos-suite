@@ -1,44 +1,35 @@
 # Cinder
 
-A matte charcoal Rotorflight dashboard with warm cream readings, thin copper
-frames, and a sage fuel bar. The asymmetric inflight layout places headspeed
-and flight time on the left, with fuel, ESC temperature, current, and pack
-voltage stacked on the right.
+A charcoal dashboard with cream readings, copper framing, and an asymmetric instrument layout.
 
-- Preflight distinguishes complete, incomplete, disconnected, and warning
-  telemetry checks. Missing readings do not produce a ready indication.
-- Inflight headspeed is a live number only. There is no RPM limit, redline,
-  comparison, gauge scale, or RPM threshold setting.
-- Postflight explicitly presents recorded duration, capacity used, fuel,
-  temperature, current, cell voltage, BEC, and link results. Missing history
-  remains unavailable; valid zero history is retained. Changing models clears
-  the previous aircraft's retained results.
-- Full 800 × 480 screens have the native 44-pixel header at the top edge,
-  a dynamic model name, and centered `Rotorflight // Ethos | MWRC` branding
-  with the MWRC signature smaller. Compact 784 × 294 widgets omit that header.
-- Configuration uses Cinder's own active dashboard preferences. Fuel, BEC,
-  temperature, and link warnings are configurable. Temperature thresholds
-  remain stored in Celsius while respecting the chosen display unit.
+- **Preflight:** current telemetry and setup/status information before flight.
+- **Inflight:** live flight instruments, timing, and warning presentation.
+- **Postflight:** recorded flight results; unavailable readings remain marked.
 
-All helpers belong to this folder; it has no dependency on another custom
-theme. Its `init.lua` includes Theme Bridge palette metadata.
+Headspeed is a live numeric reading; this theme has no RPM limit, redline,
+comparison scale, or RPM threshold setting.
 
-Cinder registration is included in the current `radio-all-themes` source
-changes. Select **System > Settings > Dashboard > Themes**, then configure its
-warnings under **Dashboard > Settings > Cinder**. Both choices are hidden when
-the available screen is smaller than 784x294.
+Full 800 × 480 and compact 784 × 294 layouts are supported. The theme and its
+configuration tile require at least 784 × 294 pixels; smaller windows hide
+both choices. The current model name and native transmitter header remain
+visible in full screen, with a smaller MWRC signature beside the centered title.
 
-Thresholds are saved locally on the radio in Cinder's settings section and
-apply to models using this theme. A per-model theme selection is separate and
-requires a connected flight controller with a known MCU ID. These display
-settings do not write flight-controller EEPROM.
+## Installation and settings
 
-The separate Cinder branch scope is this theme plus the four existing
-loader/settings registrations. Its `appTheme` metadata is available to an
-optional compatible Theme Bridge; the theme does not require or install Bridge.
-This work targets the theme branches and leaves `main`/`master` unchanged.
-Registration in source does not itself indicate that a release was published.
+Install the complete matching Suite build with this theme's registrations,
+preserve `rfsuite.user`, and restart scripts or the radio. Copying this folder
+alone onto a stock build that does not register it is insufficient. Select
+**System → Settings → Dashboard → Themes → Cinder** and configure display
+limits under **Dashboard → Settings → Cinder**.
 
-Desktop validation uses the actual Suite Lua engine with approximate LCD font
-metrics. Native font fitting, real sensor transitions, and memory/instruction
-budgets still require physical-radio checks. GPLv3, consistent with the Suite.
+The folder and internal ID are `cinder`; the saved selection is
+`system/cinder`. Instrument settings use `dashboard.cinder` in the radio's
+`SCRIPTS:/rfsuite.user/settings.ini`. Save does not write flight-controller
+EEPROM. Temperature thresholds remain stored in Celsius and display in the
+selected Celsius/Fahrenheit units.
+
+See the [theme guide](../../../../../../docs/dashboard/cinder.md) for
+model overrides, installation details, and previews. Desktop previews use
+simulated telemetry and approximate fonts; physical-radio acceptance is separate.
+
+GPLv3, consistent with the Suite. Preserve source notices and included artwork attribution.

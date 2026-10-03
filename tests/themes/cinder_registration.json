@@ -1,0 +1,11 @@
+{
+  "folder": "cinder",
+  "name": "Cinder",
+  "selectionId": "system/cinder",
+  "settingsSection": "dashboard.cinder",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution below"
+}

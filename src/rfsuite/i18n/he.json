@@ -6741,6 +6741,12 @@
           "reverse_text": false,
           "translation": "AERC Nitro"
         },
+        "dashboard_theme_cinder": {
+          "english": "Cinder",
+          "max_length": 6,
+          "needs_translation": false,
+          "translation": "Cinder"
+        },
         "dashboard_theme_claude": {
           "english": "Claude",
           "max_length": 6,
