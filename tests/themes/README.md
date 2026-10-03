@@ -41,3 +41,17 @@ the theme being submitted, and run its own registration tests and three phase
 previews. The private Theme Studio repository enforces the future authoring
 checklist and keeps portable ten-theme behavior/render tools. Main/master and
 Bridge implementation are outside theme submission work.
+
+## All Themes automation
+
+**All Themes behavior and locales** runs the existing complete theme test suite
+and checks translation tags in all twelve locales on relevant pull requests and
+pushes targeting `radio-all-themes`; it can also be run manually. It uses Windows
+2022 and Python 3.12 because these fixtures use Windows Arial for text fitting.
+Install its pinned desktop dependencies with
+`python -m pip install -r tests/themes/requirements.txt`.
+
+Push packaging now covers `radio-all-themes` in addition to its existing branches.
+It produces checked locale ZIP artifacts; no release is published by that push.
+The tests do not establish physical-radio operation, hardware font fitting,
+or transmitter performance. Suite core and theme sources are unchanged.

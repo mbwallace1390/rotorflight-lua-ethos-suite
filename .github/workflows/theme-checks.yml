@@ -1,0 +1,68 @@
+name: All Themes behavior and locales
+
+on:
+  pull_request:
+    branches: [radio-all-themes]
+    paths:
+      - 'src/rfsuite/widgets/dashboard.lua'
+      - 'src/rfsuite/widgets/dashboard/**'
+      - 'src/rfsuite/lib/dashboard_themes.lua'
+      - 'src/rfsuite/lib/settings_store.lua'
+      - 'src/rfsuite/app/pages/settings_dashboard_*.lua'
+      - 'src/rfsuite/i18n/**'
+      - 'bin/i18n/**'
+      - '.vscode/scripts/resolve_i18n_tags.py'
+      - 'tests/themes/**'
+      - 'docs/dashboard-themes/**'
+      - '.github/workflows/theme-checks.yml'
+  push:
+    branches: [radio-all-themes]
+    paths:
+      - 'src/rfsuite/widgets/dashboard.lua'
+      - 'src/rfsuite/widgets/dashboard/**'
+      - 'src/rfsuite/lib/dashboard_themes.lua'
+      - 'src/rfsuite/lib/settings_store.lua'
+      - 'src/rfsuite/app/pages/settings_dashboard_*.lua'
+      - 'src/rfsuite/i18n/**'
+      - 'bin/i18n/**'
+      - '.vscode/scripts/resolve_i18n_tags.py'
+      - 'tests/themes/**'
+      - 'docs/dashboard-themes/**'
+      - '.github/workflows/theme-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: all-themes-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  theme-checks:
+    name: Theme behavior, discovery, settings, and translations
+    # Existing full-theme fixtures use Windows Arial for text fitting.
+    runs-on: windows-2022
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tests/themes/requirements.txt
+      - name: Install existing desktop theme test dependencies
+        run: python -m pip install -r tests/themes/requirements.txt
+      - name: Check real Lua theme behavior, discovery, and settings
+        run: python -m unittest discover -s tests/themes -p 'test_*.py' -v
+      - name: Check translation tags in every locale
+        shell: bash
+        run: |
+          for locale_file in bin/i18n/json/*.json; do
+            locale_name="${locale_file##*/}"
+            python bin/i18n/check-tags.py --lang "${locale_name%.json}"
+          done
