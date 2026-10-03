@@ -1,60 +1,61 @@
 # Meridian
 
-A navy-black Rotorflight dashboard with cyan clipped frames, mint fuel and
-ice-blue ESC-temperature rails, and a large central headspeed readout.
+A navy-black dashboard with clipped cyan frames, vertical fuel and temperature rails, and central headspeed.
 
-## Where to find it
+## Select and configure
 
-Select **System → Settings → Dashboard → Themes → Meridian**. Configure its
-warnings under **System → Settings → Dashboard → Settings → Meridian**.
-The registered selection and settings tile require an available window of at
-least 784 × 294. Global choices and warning settings work offline while the
-Suite background task runs. A model-specific theme override requires a
-connected controller with a known MCU ID.
+Select **System → Settings → Dashboard → Themes → Meridian**. Open
+**System → Settings → Dashboard → Settings → Meridian** to adjust its display
+limits. Global choices and theme settings work offline while the Suite
+background task runs. A model-specific selection requires a connected flight
+controller with a known MCU ID.
+
+This theme supports full 800 × 480 and compact 784 × 294 layouts. Both the theme
+choice and configuration tile are hidden below 784 × 294, including 480 × 320
+and 472 × 191 windows. The compact layout omits the native header; full screen
+retains the dynamic model name, transmitter battery/RSSI, and centered title.
 
 ## Screens
 
-- Preflight checks pack voltage, fuel, BEC supply, ESC temperature, and link.
-  Missing readings prevent telemetry-ready status; warnings remain explicit.
-- Inflight shows live headspeed between the fuel and thermal rails. Flight
-  time, current, BEC, and link share a continuous lower strip. There is no RPM
-  threshold, redline, comparison, or RPM scale.
-- Postflight labels recorded results and retained duration. Missing history
-  remains unavailable; changing models clears the previous flight summary.
+- **Preflight:** current telemetry and setup/status information before flight.
+- **Inflight:** live flight instruments, timing, and warning presentation.
+- **Postflight:** recorded flight results; unavailable readings remain marked.
 
-800 × 480 views retain the native 44-pixel header with the current model,
-transmitter battery/RSSI, centered Rotorflight // Ethos title, and smaller MWRC
-signature. The 784 × 294 compact layout omits the native header.
+Headspeed is a live numeric reading; this theme has no RPM limit, redline,
+comparison scale, or RPM threshold setting.
 
-## Settings
+See the [three phase previews](../dashboard-themes/Meridian/README.md).
+They use simulated telemetry and desktop fonts: **Desktop preview, not radio capture**.
 
-| Setting | Meaning and default |
-| --- | --- |
-| BEC critical | Flags voltage below the threshold; 2.0–14.8 V, default 6.5 V. |
-| BEC caution below | Cautions below the threshold; default 7.0 V, above BEC critical. |
-| Fuel warning | Flags remaining fuel at or below the threshold; 1–99%, default 25%. |
-| ESC warning | Cautions at or above the threshold; default 110°C / 230°F. |
-| ESC maximum | Flags at or above the threshold; default 120°C / 248°F, above ESC warning. |
-| Link warning | Cautions below the valid percentage threshold; 1–99%, default 50%. |
+## Saved settings
 
-Save writes Meridian's theme settings locally on the radio. They apply to
-models using Meridian and do not write FC EEPROM or change FC protection
-settings. Temperatures display in the chosen units and are stored in Celsius.
-Use the theme-selection page's **Use same theme** control to apply the preflight
-selection to all three phases, or select each phase separately.
+The selection ID is `system/meridian`. Theme instrument settings are stored in
+`dashboard.meridian` within `SCRIPTS:/rfsuite.user/settings.ini`. They are shared
+by models using this theme. Global phase choices are saved in the same file;
+model overrides are saved in `SCRIPTS:/rfsuite.user/models/<MCU ID>.ini`.
 
-## Package and validation
+Save changes local radio files, not flight-controller EEPROM or controller
+protection settings. Temperature fields use the selected display unit while
+stored thresholds remain Celsius. Reload restores the form's loaded or last
+saved values. Selecting a per-model appearance does not create per-model
+instrument thresholds.
 
-The theme is self-contained under `widgets/dashboard/themes/meridian/`. Its
-individual branch scope includes four existing loader/settings registrations;
-`init.lua` also supplies metadata for a compatible optional Theme Bridge.
-Meridian does not require Bridge. This theme work leaves `main`/`master` unchanged;
-registration in source does not itself establish publication.
+## Installation and verification
 
-Desktop tests use the actual Suite engine with approximate LCD fonts. Real-radio
-font fitting, telemetry transitions, and memory/instruction budgets remain
-unverified. Preflight status describes telemetry checks, not aircraft safety.
+Install the complete matching Suite build containing this theme and its loader,
+theme-picker, settings-tile, and settings-store registrations. Preserve the
+radio's `rfsuite.user` directory and restart scripts or the radio after updating.
+Copying the theme folder alone onto a stock build that does not register it is
+insufficient. These instructions describe this explicitly registered theme
+package; automatic discovery in `radio-all-themes` is a separate installation
+path and is not assumed here.
+
+The portable checks in `tests/themes/test_meridian_registration.py` exercise
+selection, save/reopen, model overrides, and minimum-size visibility against
+production Suite modules. See `tests/themes/README.md` for commands and evidence
+limits. Native font appearance, real telemetry transitions, and radio
+instruction/memory behavior still need physical-radio verification.
 
 Source: `src/rfsuite/widgets/dashboard/themes/meridian/`.
-Related controller documentation: [Rotorflight](https://www.rotorflight.org/docs/).
-Documented against RFSuite Ethos 2.3.1 theme source on 2026-09-30.
+
+GPLv3, consistent with the Suite and the maintained theme telemetry foundation.

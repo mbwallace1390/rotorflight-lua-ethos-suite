@@ -6790,6 +6790,12 @@
           "reverse_text": false,
           "translation": "凯夫德"
         },
+        "dashboard_theme_meridian": {
+          "english": "Meridian",
+          "max_length": 8,
+          "needs_translation": false,
+          "translation": "Meridian"
+        },
         "dashboard_theme_panel_global": {
           "english": "Default theme for all models",
           "max_length": 28,

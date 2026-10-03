@@ -1,0 +1,32 @@
+{
+  "kind": "Desktop preview, not radio capture",
+  "size": {
+    "width": 800,
+    "height": 480
+  },
+  "palette": "ETHOS 26 dark fixture",
+  "telemetry": "simulated connected fixture",
+  "font": "Arial",
+  "renderer": "MWRC Theme Studio tests/themes/render_themes.py",
+  "rendererSha256": "5f86203d67ea276f8f9e9ab6522487e6da782f993684018f76b9d8f9baadf08f",
+  "suiteCommit": "e9af620b2bdbc796c5730e596f95ed24d7b9b868",
+  "sourceState": "PR preparation working tree; hashes identify the rendered theme and principal engine inputs",
+  "inputs": {
+    "src/rfsuite/lib/require.lua": "09374652f87ebf7d881c74f75a78f22c54f38d183d314915f8c4507f8fe01a3d",
+    "src/rfsuite/widgets/dashboard/context.lua": "aeedb5230a67627527e736965c167144584258ae1ba48aaccf9d3968ae974fc9",
+    "src/rfsuite/widgets/dashboard/engine.lua": "ba80ef8d7fa7407ab58e30abc5783e420569fac018be4a368407874417078775",
+    "src/rfsuite/widgets/dashboard/themes/meridian/common.lua": "a274f0bcbf5e36bd5d715ab65d7a9f13f7644242b03784af9a8a3a9e0c4904c3",
+    "src/rfsuite/widgets/dashboard/themes/meridian/configure.lua": "5cf13c0ac11b7fc54f6a92c78c4eedc7e751e45870989d41054edb01128ebd22",
+    "src/rfsuite/widgets/dashboard/themes/meridian/inflight.lua": "5a32142a134eb8ff0c3e20532edfe6790dd767d8008602cf69bb9e0a03437114",
+    "src/rfsuite/widgets/dashboard/themes/meridian/init.lua": "de6d19791f55c130d19ab9767e2f7f7d7054a37fdb2783839f7c4f6c30d42d06",
+    "src/rfsuite/widgets/dashboard/themes/meridian/layout.lua": "5778b374f599c20c131e74b25806f98434efc83fefd27e1011f6379a80ca8502",
+    "src/rfsuite/widgets/dashboard/themes/meridian/postflight.lua": "45790a27d16bd3bef27d0144dd37b4a325b0293cf8c1254eb4b56d775c5260ca",
+    "src/rfsuite/widgets/dashboard/themes/meridian/preflight.lua": "2dccd4944abeeab2176505db36045943e731f21edfaebe3622812023992ea36d"
+  },
+  "previews": {
+    "preflight.png": "3c05a991df3f53f4ef7f7a5bddf0a33e71864e0d34f15bea71616eaab72ee927",
+    "inflight.png": "e7b3687694e7ef0622ae39f46aeccd5de66c593043e0c70dca5fd2e80c8ee80e",
+    "postflight.png": "233ba78f3fb5e2a2e7ba3cf412459697d3d2ebe68edd57e6a983d70405527611"
+  },
+  "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
+}

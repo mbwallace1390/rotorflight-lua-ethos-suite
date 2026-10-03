@@ -2002,6 +2002,12 @@
           "needs_translation": false,
           "max_length": 11
         },
+        "dashboard_theme_meridian": {
+          "english": "Meridian",
+          "translation": "Meridian",
+          "needs_translation": false,
+          "max_length": 8
+        },
         "dashboard_theme_aerc": {
           "english": "AERC",
           "translation": "AERC",

@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## Meridian
+
+Desktop preview, not radio capture. [Details and limits](Meridian/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![Meridian preflight](Meridian/preflight.png) | ![Meridian inflight](Meridian/inflight.png) | ![Meridian postflight](Meridian/postflight.png) |

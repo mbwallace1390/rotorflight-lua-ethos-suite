@@ -1,0 +1,11 @@
+{
+  "folder": "meridian",
+  "name": "Meridian",
+  "selectionId": "system/meridian",
+  "settingsSection": "dashboard.meridian",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution below"
+}
