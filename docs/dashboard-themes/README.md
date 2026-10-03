@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## MWRC
+
+Desktop preview, not radio capture. [Details and limits](MWRC/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![MWRC preflight](MWRC/preflight.png) | ![MWRC inflight](MWRC/inflight.png) | ![MWRC postflight](MWRC/postflight.png) |

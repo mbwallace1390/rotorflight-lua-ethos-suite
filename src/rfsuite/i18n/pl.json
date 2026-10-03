@@ -6790,6 +6790,12 @@
           "reverse_text": false,
           "translation": "Kevd"
         },
+        "dashboard_theme_mwrc": {
+          "english": "MWRC",
+          "max_length": 4,
+          "needs_translation": false,
+          "translation": "MWRC"
+        },
         "dashboard_theme_panel_global": {
           "english": "Default theme for all models",
           "max_length": 28,

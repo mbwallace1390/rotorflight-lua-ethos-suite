@@ -2002,6 +2002,12 @@
           "needs_translation": false,
           "max_length": 11
         },
+        "dashboard_theme_mwrc": {
+          "english": "MWRC",
+          "translation": "MWRC",
+          "needs_translation": false,
+          "max_length": 4
+        },
         "dashboard_theme_aerc": {
           "english": "AERC",
           "translation": "AERC",

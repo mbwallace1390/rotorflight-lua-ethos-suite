@@ -1,0 +1,13 @@
+{
+  "folder": "mwrc",
+  "name": "MWRC",
+  "metadataName": "mwrc",
+  "selectionId": "system/mwrc",
+  "settingsSection": "dashboard.mwrc",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "Warning",
+  "becPanel": "BEC Voltage"
+}
