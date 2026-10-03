@@ -74,3 +74,11 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## Vantage
+
+Desktop preview, not radio capture. [Details and limits](Vantage/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![Vantage preflight](Vantage/preflight.png) | ![Vantage inflight](Vantage/inflight.png) | ![Vantage postflight](Vantage/postflight.png) |

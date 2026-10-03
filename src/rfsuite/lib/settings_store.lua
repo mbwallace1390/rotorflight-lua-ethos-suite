@@ -92,6 +92,7 @@ local DEFAULTS = {
 }
 
 local DASHBOARD_THEMES = {
+  vantage = true,
   ["aerc-n"] = true,
   aerc = true,
   claude = true,

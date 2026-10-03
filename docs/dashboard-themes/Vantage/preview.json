@@ -1,0 +1,30 @@
+{
+  "kind": "Desktop preview, not radio capture",
+  "size": {
+    "width": 800,
+    "height": 480
+  },
+  "palette": "ETHOS 26 dark fixture",
+  "telemetry": "simulated connected fixture",
+  "font": "Arial",
+  "renderer": "MWRC Theme Studio tests/themes/render_themes.py",
+  "rendererSha256": "5f86203d67ea276f8f9e9ab6522487e6da782f993684018f76b9d8f9baadf08f",
+  "suiteCommit": "c1d810aed4d3a1080b80b18cb61c85da7e6ba4d1",
+  "sourceState": "PR preparation working tree; hashes identify the rendered theme and principal engine inputs",
+  "inputs": {
+    "src/rfsuite/lib/require.lua": "09374652f87ebf7d881c74f75a78f22c54f38d183d314915f8c4507f8fe01a3d",
+    "src/rfsuite/widgets/dashboard/context.lua": "aeedb5230a67627527e736965c167144584258ae1ba48aaccf9d3968ae974fc9",
+    "src/rfsuite/widgets/dashboard/engine.lua": "ba80ef8d7fa7407ab58e30abc5783e420569fac018be4a368407874417078775",
+    "src/rfsuite/widgets/dashboard/themes/vantage/configure.lua": "cc12db7c57d6921dd8f817344bbafd33d565b1d3e04c7453740b34a3cdb5433e",
+    "src/rfsuite/widgets/dashboard/themes/vantage/inflight.lua": "1fd82e27ebcd50a6addaade5003fd850888f480713d1bc6c6e6fe2fede017213",
+    "src/rfsuite/widgets/dashboard/themes/vantage/init.lua": "dc9f132b96876bad4811ada473d9a65c3e7f247e3b355a8013556df075337db5",
+    "src/rfsuite/widgets/dashboard/themes/vantage/postflight.lua": "65bdd82cb39566925c9dc449f998f95f4f6429169f2b101aea48be28b7c25443",
+    "src/rfsuite/widgets/dashboard/themes/vantage/preflight.lua": "f6236ba1fd40f09c54e17b664522cfec7790ee50b43ce655e7388c061d99026b"
+  },
+  "previews": {
+    "preflight.png": "4b3b28c6d92148328eef8965faf81f092a10e9b7a4c05ce76f7bb0cc08701ff2",
+    "inflight.png": "3af6a55610c41594ed29399a05601a83b06df7a1ed3a0b6a49a3f8725e684599",
+    "postflight.png": "fddaf8519b172dad21db89c2cfc6e366953a659ae2f10f162d481003ed669357"
+  },
+  "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
+}

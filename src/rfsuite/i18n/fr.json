@@ -6867,6 +6867,12 @@
           "reverse_text": false,
           "translation": "Utiliser le même thème"
         },
+        "dashboard_theme_vantage": {
+          "english": "Vantage",
+          "max_length": 7,
+          "needs_translation": false,
+          "translation": "Vantage"
+        },
         "debug_logs": {
           "english": "Debug logs",
           "max_length": 10,

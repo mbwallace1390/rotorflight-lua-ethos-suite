@@ -1,0 +1,11 @@
+{
+  "folder": "vantage",
+  "name": "Vantage",
+  "selectionId": "system/vantage",
+  "settingsSection": "dashboard.vantage",
+  "minResolution": {
+    "x": 784,
+    "y": 294
+  },
+  "becLabel": "BEC caution below"
+}

@@ -1,29 +1,33 @@
 # Vantage
 
-A graphite and ice-blue cockpit theme created for MWRC's Rotorflight Ethos collection.
+A graphite and ice-blue cockpit dashboard with a compact launch checklist.
 
-- **Preflight:** a five-signal launch checklist with prominent pack/fuel readings.
-- **Inflight:** a sweeping headspeed instrument with compact fuel, thermal, power,
-  and radio-health readings.
-- **Postflight:** recorded flight duration and peak/minimum telemetry in a flight report.
+- **Preflight:** current telemetry and setup/status information before flight.
+- **Inflight:** live flight instruments, timing, and warning presentation.
+- **Postflight:** recorded flight results; unavailable readings remain marked.
 
-The header retains the automatic craft/model name, transmitter battery, and radio
-signal. `Rotorflight // Ethos` is followed by a smaller, muted `MWRC` signature.
-Native Ethos fonts and LCD drawing keep the theme independent of large bitmap assets.
+Full 800 × 480 and compact 784 × 294 layouts are supported. The theme and its
+configuration tile require at least 784 × 294 pixels; smaller windows hide
+both choices. The current model name and native transmitter header remain
+visible in full screen, with a smaller MWRC signature beside the centered title.
 
-## Target
+## Installation and settings
 
-Rewritten `radio-all-themes` suite; 800×480 full screen and 784×294 compact widget.
-The theme exports the existing `init`, `configure`, and three phase modules.
-Configuration uses the current dashboard preference interface, with temperature
-limits stored in Celsius and displayed in the radio's selected units.
+Install the complete matching Suite build with this theme's registrations,
+preserve `rfsuite.user`, and restart scripts or the radio. Copying this folder
+alone onto a stock build that does not register it is insufficient. Select
+**System → Settings → Dashboard → Themes → Vantage** and configure display
+limits under **Dashboard → Settings → Vantage**.
 
-This is a new theme folder only. The suite's fixed theme-picker registrations
-have not been changed, so Vantage is not yet a separate menu selection.
+The folder and internal ID are `vantage`; the saved selection is
+`system/vantage`. Instrument settings use `dashboard.vantage` in the radio's
+`SCRIPTS:/rfsuite.user/settings.ini`. Save does not write flight-controller
+EEPROM. Temperature thresholds remain stored in Celsius and display in the
+selected Celsius/Fahrenheit units.
 
-Desktop rendering uses the real suite engine/context with simulated telemetry.
-Physical-radio checks remain for final font appearance, phase transitions,
-connection changes, and instruction/memory limits.
+See the [theme guide](../../../../../../docs/dashboard/vantage.md) for
+model overrides, installation details, and previews. Desktop previews use
+simulated telemetry and approximate fonts; physical-radio acceptance is separate.
 
 Original Vantage visual design; telemetry/configuration foundation derived from
-the maintained Aegis theme. GPLv3, consistent with the suite.
+the maintained Bastion theme (formerly Aegis). GPLv3, consistent with the Suite.
