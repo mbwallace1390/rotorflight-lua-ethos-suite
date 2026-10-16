@@ -2,8 +2,8 @@
 --
 -- Run it:
 --
---     lua5.3 bin/dashboard/verify_image_caches.lua
---     (or from src/rfsuite: lua5.3 ../../bin/dashboard/verify_image_caches.lua)
+--     lua5.4 bin/dashboard/verify_image_caches.lua
+--     (or from src/rfsuite: lua5.4 ../../bin/dashboard/verify_image_caches.lua)
 --
 -- What it drives, and why:
 --   * The claim is about *retention*, not about a return value. A decoded
@@ -145,7 +145,13 @@ os.stat = function(path)
   return nil
 end
 
-system = {registerWidget = function(w) _G.__widget = w end}
+system = {
+  registerWidget = function(w) _G.__widget = w end,
+  getVersion = function() return {simulation = false} end,
+  voltageRange = function() return 7.2, 8.4 end,
+  getSource = function() return nil end,
+  killEvents = function() end,
+}
 model = {bitmap = function() return nil end}
 form = setmetatable({}, {__index = function() return function() end end})
 

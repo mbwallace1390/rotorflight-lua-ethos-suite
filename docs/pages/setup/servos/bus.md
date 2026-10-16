@@ -30,9 +30,11 @@ Greyed out until the flight controller answers. Read-only while the model is arm
 ## Notes
 
 - Changes are written to the flight controller EEPROM upon Save.
+- The Tool button's servo override is switched on only after the page has read the servo's values. Until then, confirming the override dialog does nothing.
+- The list behind the page has its own Tool button, which switches the override on for all servos at once. It exists only after the status and mixer read has answered; on a failed read the page shows the load error instead and no Tool button.
 
 ## Related
 
-- [Rotorflight documentation](https://www.rotorflight.org/docs/)
+- [Rotorflight documentation](https://doc.rotorflight.org/)
 
 *Documented against RFSuite Ethos 2.3.1.*

@@ -1,4 +1,15 @@
 -- Scorpion forward-programming payload (MSP 217 read / 218 write).
+--
+-- The block is 84 bytes, and the length is not cosmetic (#2457). The flight
+-- controller treats MSP_SET_ESC_PARAMETERS as an opaque move of
+-- escGetParamBufferLength() bytes: for a Scorpion (ESC_SIG_TRIB, 0x53) that is
+-- PARAM_HEADER_SIZE + tribCalcParamBufferLength(), and tribParamAddrLen sums to
+-- 82, so 2 + 82 = 84 (rotorflight-firmware src/main/sensors/esc_sensor.c:
+-- tribParamAddrLen, tribCalcParamBufferLength(), escGetParamBufferLength()).
+-- sbufReadData copies that many bytes out of the received frame with no bounds
+-- check and no comparison against what actually arrived, and the destination is
+-- a persistent static buffer, so a payload shorter than 84 leaves the tail to be
+-- filled from past the end of the frame. This codec used to send 76.
 
 if package.loaded["rfsuite.lib.msp_esc_parameters_scorpion"] then
   return package.loaded["rfsuite.lib.msp_esc_parameters_scorpion"]
@@ -54,14 +65,31 @@ local REST_FIELDS = {
   {"cutoff_handling", "u16"},
   {"max_used", "u16"},
   {"motor_startup_sound", "u16"},
-  {"padding_1", "u16"},
-  {"padding_2", "u16"},
-  {"padding_3", "u16"},
+  -- Bytes 57..62, and they are not padding. The sibling suite's field list for
+  -- this block names them, and the widths add up exactly: 4 + 2 = the 6 bytes
+  -- these three U16s used to occupy, and soft_start_time lands on byte 63 either
+  -- way -- so this renames, it does not move anything.
+  --   rotorflight-lua-edgetx-suite src/rfsuite/tasks/msp/api/esc_parameters_scorpion.lua
+  --   ... {"serial_number","U32"}, {"firmware_version","U16"}, {"soft_start_time","U16"},
+  -- The page reads those two out of the block with no header compensation
+  -- (.../escmfg/scorp/init.lua getEscVersion/getEscFirmware), so its byte numbers
+  -- and these are the same numbers.
+  {"serial_number", "u32"},
+  {"firmware_version", "u16"},
   {"soft_start_time", "u16"},
   {"runup_time", "u16"},
   {"bailout", "u16"},
   {"gov_proportional", "u32"},
   {"gov_integral", "u32"},
+  -- The block does not end at gov_integral. Bytes 77..84 are two U32s the sibling
+  -- suite names stick_max and stick_zero; its field list carries both after
+  -- gov_integral (rotorflight-lua-edgetx-suite src/rfsuite/tasks/msp/api/
+  -- esc_parameters_scorpion.lua), and the width that closes the gap is the 84 the
+  -- flight controller asks for. The page builds no row for either, so they are
+  -- never edited -- they are decoded and written back verbatim, because the
+  -- firmware commits all 84 bytes whether or not the tool sent them (#2457).
+  {"stick_max", "u32"},
+  {"stick_zero", "u32"},
 }
 for i = 1, #REST_FIELDS do WIRE_FIELDS[#WIRE_FIELDS + 1] = REST_FIELDS[i] end
 
@@ -89,7 +117,13 @@ local SIMULATOR_RESPONSE = {
   64, 31, -- runup_time
   208, 7, -- bailout
   100, 0, 0, 0, -- gov_proportional
-  200, 0, 0, 0 -- gov_integral
+  200, 0, 0, 0, -- gov_integral
+  -- The last eight bytes, taken verbatim from the sibling suite's SIM_RESPONSE
+  -- (rotorflight-lua-edgetx-suite .../msp/api/esc_parameters_scorpion.lua), which
+  -- carries the same 84 bytes and describes the same ESC. Without them this fixture
+  -- -- and so every save -- is 76 bytes where the ESC's block is 84 (#2457).
+  1, 0, 0, 0, -- stick_max
+  200, 250, 0, 0 -- stick_zero
 }
 
 local function readValue(buf, wireType)
@@ -139,14 +173,11 @@ local function textFromInfo(data)
   return table.concat(out)
 end
 
-local function uintFromRaw(data, positions)
-  local raw = data and data._raw or {}
-  local value = 0
-  for i = 1, #positions do
-    value = value + (raw[positions[i]] or 0) * (256 ^ (i - 1))
-  end
-  return value
-end
+-- uintFromRaw() used to live here and had no caller left after summaryFor stopped
+-- reading the block by byte offset. Removed rather than left defined: an unused
+-- helper in a codec is an invitation to the next reader to reach for byte offsets
+-- again, which is how the FW word below came to be labelled wrong in the first
+-- place.
 
 local msp = {
   READ_COMMAND = READ_COMMAND,
@@ -156,13 +187,35 @@ local msp = {
   TITLE = "Scorpion",
 }
 
+-- The line the pilot reads. The version comes from firmware_version, which used to
+-- be read as raw bytes 61-62 and is a named field now.
+--
+-- What used to sit in the middle is gone, and it should be: "FW %08X" was assembled
+-- from bytes 55-58, which the field list above calls motor_startup_sound (55-56) and
+-- the low half of serial_number (57-58). It was a number with no name behind it.
+-- The version was already on the line as "v%d" from bytes 61-62, so nothing that
+-- meant anything disappeared with it.
+--
+-- The serial is placed after the version because that is the order the sibling suite
+-- builds its subheader in (firmware, then S/N), and it is decimal because
+-- .../escmfg/scorp/init.lua prints it with tostring():
+--
+--   local sn = getUInt(buffer, {57, 58, 59, 60})
+--   return sn ~= 0 and tostring(sn) or ""
+--
+-- A serial of 0 is left out, which is the same rule and for the same reason.
 function msp.summaryFor(data)
   local model = textFromInfo(data)
   if model == "" then model = msp.TITLE end
-  return string.format("%s / FW %08X / v%d",
+  local parts = {
     model,
-    uintFromRaw(data, {55, 56, 57, 58}),
-    uintFromRaw(data, {61, 62}))
+    string.format("v%d", tonumber(data and data.firmware_version) or 0),
+  }
+  local serial = tonumber(data and data.serial_number)
+  if serial and serial > 0 then
+    parts[#parts + 1] = string.format("S/N %d", serial)
+  end
+  return table.concat(parts, " / ")
 end
 
 function msp.beforeSave(runtime)

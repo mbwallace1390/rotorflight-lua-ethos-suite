@@ -6,7 +6,7 @@ sidebar_position: 20
 
 # Geometry
 
-Mixer -> Geometry page. Ports the API >= 12.0.9 swash geometry page, including Swash Setup Mode: the Tool button toggles passthrough mixer override and live-writes edits without EEPROM while it is enabled.
+Mixer -> Geometry page. Ports the API >= 12.0.9 swash geometry page, including Swash Setup Mode: the Tool button toggles passthrough mixer override and live-writes edits without EEPROM while it is enabled. The override is switched on only after the page has read its values; until then, confirming the override dialog does nothing.
 
 ## Where to find it
 
@@ -27,6 +27,6 @@ Greyed out until the flight controller answers. Read-only while the model is arm
 
 ## Related
 
-- [Rotorflight documentation](https://www.rotorflight.org/docs/)
+- [Rotorflight documentation](https://doc.rotorflight.org/)
 
 *Documented against RFSuite Ethos 2.3.1.*
