@@ -10,7 +10,7 @@ PID Controller profile editor page. Loaded on demand (plain loadfile) only when 
 
 ## Where to find it
 
-*Configuration* → *Flight Tuning* → *Advanced* → *PID Controller*
+*Configuration* → *Flight Tuning* → *PID Controller*
 
 Greyed out until the flight controller answers. Read-only while the model is armed.
 
@@ -38,6 +38,6 @@ Greyed out until the flight controller answers. Read-only while the model is arm
 
 ## Related
 
-- [Rotorflight documentation](https://www.rotorflight.org/docs/)
+- [Rotorflight documentation](https://doc.rotorflight.org/)
 
 *Documented against RFSuite Ethos 2.3.1.*

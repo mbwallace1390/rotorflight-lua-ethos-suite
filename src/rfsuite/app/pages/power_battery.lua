@@ -28,6 +28,33 @@ local function profileKey(profile)
   return "batteryCapacity_" .. tostring(profile)
 end
 
+-- Firmware with per-profile cell settings (rotorflight-firmware #508) reports
+-- cell count and the four cell voltages once per battery profile
+-- (<base>_0..5, see lib/msp_battery_config.lua); the un-suffixed legacy
+-- fields just mirror the active profile. Older firmware only has the legacy
+-- fields, which then apply to every profile.
+local CELL_FIELDS = {
+  "batteryCellCount",
+  "vbatmincellvoltage",
+  "vbatmaxcellvoltage",
+  "vbatfullcellvoltage",
+  "vbatwarningcellvoltage",
+}
+
+local CELL_KEYS = {}
+for _, base in ipairs(CELL_FIELDS) do
+  local keys = {}
+  for profile = 0, 5 do keys[profile] = base .. "_" .. profile end
+  CELL_KEYS[base] = keys
+end
+
+local function cellKey(battery, base, profile)
+  if battery and battery.hasProfileCells then
+    return CELL_KEYS[base][normalizeProfile(profile) or 0]
+  end
+  return base
+end
+
 local function clampCapacity(value)
   value = tonumber(value or 0) or 0
   if value < 0 then return 0 end
@@ -39,6 +66,9 @@ local function open(opts)
   local lastActiveProfile = nil
   local capacityField = nil
   local profileField = nil
+  local editProfileField = nil
+  -- The profile the capacity and cell rows show and edit (Issue #2502). nil follows the active profile.
+  local editProfile = nil
 
   local runtime
   runtime = pageRuntime.new({
@@ -62,6 +92,7 @@ local function open(opts)
         runtime.data.profile.batteryProfile = normalizeProfile(runtime.data.profile.batteryProfile) or 0
       end
       lastActiveProfile = active
+      editProfile = nil
       if form.invalidate then form.invalidate() end
     end,
     beforeSave = function(rt)
@@ -70,6 +101,14 @@ local function open(opts)
       if rt.data.battery then
         local key = profileKey(selected)
         rt.data.battery[key] = clampCapacity(rt.data.battery[key])
+        -- Legacy fields carry the active profile's values; the firmware
+        -- applies the per-profile arrays after them, so this is only for
+        -- consistency with what the configurator writes.
+        if rt.data.battery.hasProfileCells then
+          for _, base in ipairs(CELL_FIELDS) do
+            rt.data.battery[base] = rt.data.battery[CELL_KEYS[base][selected]]
+          end
+        end
       end
     end,
     -- tasks/session.lua reads BATTERY_CONFIG once at connect and caches it
@@ -84,9 +123,11 @@ local function open(opts)
       local active = normalizeProfile(rt.lastProfile)
       if active ~= lastActiveProfile then
         lastActiveProfile = active
+        editProfile = nil
         if active ~= nil and rt.data.profile then
           rt.data.profile.batteryProfile = active
           if profileField and profileField.value then profileField:value(active) end
+          if editProfileField and editProfileField.value then editProfileField:value(active) end
           if capacityField and form.invalidate then form.invalidate() end
         end
       end
@@ -129,28 +170,68 @@ local function open(opts)
     end)
   runtime:registerField("profile:batteryProfile", profileField)
 
+  -- Edit Battery (Issue #2502): capacity and the cell rows below follow this choice. It is not a
+  -- source and never reaches the board, so picking a profile here does not
+  -- activate it on save.
+  line = form.addLine("    @i18n(app.modules.power.edit_battery)@")
+  editProfileField = form.addChoiceField(line, nil, batteryProfile.PROFILE_CHOICES,
+    function()
+      if editProfile ~= nil then return editProfile end
+      return normalizeProfile(dataRef.data.profile and dataRef.data.profile.batteryProfile) or 0
+    end,
+    function(value)
+      editProfile = normalizeProfile(value) or 0
+      if form.invalidate then form.invalidate() end
+    end)
+  runtime:registerField("battery:editProfile", editProfileField)
+
+  -- The profile the capacity and cell rows show and edit (Issue #2502).
+  local function editedProfile()
+    if editProfile ~= nil then return editProfile end
+    return normalizeProfile(dataRef.data.profile and dataRef.data.profile.batteryProfile) or 0
+  end
   line = form.addLine("    @i18n(app.modules.power.capacity)@")
   capacityField = form.addNumberField(line, nil, 0, 40000,
     function()
-      local selected = normalizeProfile(dataRef.data.profile and dataRef.data.profile.batteryProfile) or 0
       local battery = dataRef.data.battery or {}
-      return battery[profileKey(selected)] or 0
+      return battery[profileKey(editedProfile())] or 0
     end,
     function(value)
       markDirty()
-      local selected = normalizeProfile(dataRef.data.profile and dataRef.data.profile.batteryProfile) or 0
-      dataRef.data.battery[profileKey(selected)] = clampCapacity(value)
+      dataRef.data.battery[profileKey(editedProfile())] = clampCapacity(value)
     end)
   capacityField:suffix("mAh")
   capacityField:default(0)
   runtime:registerField("battery:capacityActive", capacityField)
 
   form.addLine("@i18n(telemetry.group_battery)@")
-  fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.max_cell_voltage)@", {source = "battery", key = "vbatmaxcellvoltage"})
-  fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.full_cell_voltage)@", {source = "battery", key = "vbatfullcellvoltage"})
-  fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.warn_cell_voltage)@", {source = "battery", key = "vbatwarningcellvoltage"})
-  fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.min_cell_voltage)@", {source = "battery", key = "vbatmincellvoltage"})
-  fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.cell_count)@", {source = "battery", key = "batteryCellCount"})
+  -- Cell count and cell voltages follow the Edit Battery choice (Issue #2502), like the
+  -- capacity row above. They cannot go through fieldLayout's fixed-key buildSingle().
+  local function addCellField(label, base)
+    local meta = batteryConfig.FIELD_META[base]
+    line = form.addLine(label)
+    local field = form.addNumberField(line, nil, meta.min, meta.max,
+      function()
+        local selected = editedProfile()
+        local battery = dataRef.data.battery or {}
+        return battery[cellKey(battery, base, selected)] or 0
+      end,
+      function(value)
+        markDirty()
+        local selected = editedProfile()
+        local battery = dataRef.data.battery
+        battery[cellKey(battery, base, selected)] = value
+      end)
+    if meta.decimals then field:decimals(meta.decimals) end
+    if meta.suffix then field:suffix(meta.suffix) end
+    field:default(meta.default or 0)
+    runtime:registerField("battery:" .. base, field)
+  end
+  addCellField("    @i18n(app.modules.power.max_cell_voltage)@", "vbatmaxcellvoltage")
+  addCellField("    @i18n(app.modules.power.full_cell_voltage)@", "vbatfullcellvoltage")
+  addCellField("    @i18n(app.modules.power.warn_cell_voltage)@", "vbatwarningcellvoltage")
+  addCellField("    @i18n(app.modules.power.min_cell_voltage)@", "vbatmincellvoltage")
+  addCellField("    @i18n(app.modules.power.cell_count)@", "batteryCellCount")
   fieldLayout.buildSingle(runtime, "    @i18n(app.modules.power.consumption_warning_percentage)@", {
     source = "battery",
     key = "consumptionWarningPercentage",
