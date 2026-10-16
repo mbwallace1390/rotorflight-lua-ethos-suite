@@ -5910,6 +5910,12 @@
           "needs_translation": false,
           "translation": "Bastion"
         },
+        "dashboard_theme_carbonpulse": {
+          "english": "Carbon Pulse",
+          "max_length": 12,
+          "needs_translation": false,
+          "translation": "Carbon Pulse"
+        },
         "dashboard_theme_claude": {
           "english": "Claude",
           "max_length": 6,

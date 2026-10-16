@@ -338,3 +338,11 @@ selection is `system/bastion`; instrument thresholds use the `dashboard.bastion`
 section of `SCRIPTS:/rfsuite.user/settings.ini`.
 
 See the [complete theme guide](dashboard/bastion.md) and its three phase previews.
+
+## Carbon Pulse
+
+Carbon Pulse requires at least 784 × 294 pixels and is hidden in both theme
+pickers on smaller screens, including 480 × 320 and 472 × 191 radios. It supports
+full 800 × 480 and compact 784 × 294 layouts. Its lettering is drawn from glyph
+masks in the theme's `gfx/` folder. See the [theme guide](dashboard/carbonpulse.md)
+for selection, local settings, installation, and all three phase previews.

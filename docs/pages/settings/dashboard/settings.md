@@ -42,3 +42,17 @@ Values are stored in the `dashboard.kse5` section of `settings.ini`.
 
 See the [Bastion guide](../../../dashboard/bastion.md) for its appearance,
 installation, and [phase previews](../../../dashboard-themes/Bastion/README.md).
+
+## Carbon Pulse
+
+Open **System → Settings → Dashboard → Settings → Carbon Pulse** to configure its
+display limits. **Carbon Pulse** requires at least 784 × 294 pixels;
+800 × 480 full-screen and 784 × 294 compact layouts are supported.
+Values are stored in the `dashboard.carbonpulse` section of `settings.ini`.
+
+- **Headspeed arc → Arc maximum** — 500 to 6000 rpm, default 3000. The headspeed
+  at which the arc is full. It is a display scale, not a limit or warning.
+
+See the [Carbon Pulse guide](../../../dashboard/carbonpulse.md) for its other
+settings, appearance, installation, and
+[phase previews](../../../dashboard-themes/Carbon%20Pulse/README.md).

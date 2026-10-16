@@ -30,6 +30,7 @@ local THEME_DIRS = {
   bastion = "widgets/dashboard/themes/bastion",
   ["aerc-n"] = "widgets/dashboard/themes/aerc-n",
   aerc = "widgets/dashboard/themes/aerc",
+  carbonpulse = "widgets/dashboard/themes/carbonpulse",
   claude = "widgets/dashboard/themes/claude",
   danielrc = "widgets/dashboard/themes/danielrc",
   default = "widgets/dashboard/themes/default",

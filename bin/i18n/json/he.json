@@ -2435,6 +2435,13 @@
           "reverse_text": true,
           "max_length": 11
         },
+        "dashboard_theme_carbonpulse": {
+          "english": "Carbon Pulse",
+          "translation": "Carbon Pulse",
+          "needs_translation": false,
+          "reverse_text": false,
+          "max_length": 12
+        },
         "dashboard_theme_aerc": {
           "english": "AERC",
           "translation": "AERC",

@@ -61,6 +61,17 @@ been recorded.
 
 See the [phase previews](../../../dashboard-themes/README.md#kse4).
 
+## Carbon Pulse
+
+This package registers **Carbon Pulse** as `system/carbonpulse`. It supports
+800 × 480 full-screen and 784 × 294 compact layouts, and is hidden below
+784 × 294 in both the theme picker and configuration grid. See the
+[Carbon Pulse guide](../../../dashboard/carbonpulse.md) and
+[phase previews](../../../dashboard-themes/Carbon%20Pulse/README.md).
+
+Its headspeed arc is scaled by a display-only arc maximum set in
+[Dashboard Settings](settings.md).
+
 ## Save and reload
 
 Save confirms and writes global choices to `SCRIPTS:/rfsuite.user/settings.ini`

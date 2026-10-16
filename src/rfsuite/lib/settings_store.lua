@@ -118,6 +118,7 @@ local DASHBOARD_THEMES = {
   bastion = true,
   ["aerc-n"] = true,
   aerc = true,
+  carbonpulse = true,
   claude = true,
   danielrc = true,
   default = true,
