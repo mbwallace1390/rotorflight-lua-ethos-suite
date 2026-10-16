@@ -65,6 +65,26 @@ local SENSORS = {
   groundspeed      = {uid = 0x5025, name = "Ground Speed",     unit = UNIT_KNOT,          dec = 1,   min = -1800, max = 3600},
   battery_profile  = {uid = 0x5026, name = "Battery Profile",  unit = nil,                dec = 0,   min = 0,     max = 6},
   tailspeed        = {uid = 0x5027, name = "Tail Speed",       unit = UNIT_RPM,           dec = nil, min = 0,     max = 65535},
+  flight_mode      = {uid = 0x5028, name = "Flight Mode",      unit = nil,                dec = 0,   min = 0,     max = 65536},
+  gps_sats         = {uid = 0x5029, name = "GPS Sats",         unit = nil,                dec = 0,   min = 0,     max = 50},
+  system_status    = {uid = 0x5031, name = "System Status",    unit = nil,                dec = 0,   min = 0,     max = 2147483647},
+  system_config    = {uid = 0x5032, name = "System Config",    unit = nil,                dec = 0,   min = 0,     max = 2147483647},
+}
+
+-- The packed system_status/system_config words (lib/system_status.lua) are
+-- built from the editor's per-field sim/sensors/*.lua files, so the
+-- bin/sensors/ desktop editor keeps its simple arm/governor/profile controls.
+-- key -> function(read) returning the packed value.
+local PACKED = {
+  system_status = function(read)
+    local armed = math.floor(tonumber(read("armflags")) or 0) & 1
+    local governor = math.floor(tonumber(read("governor")) or 0) & 0xF
+    return armed | (governor << 25)
+  end,
+  system_config = function(read)
+    local function profile(key) return math.floor(tonumber(read(key)) or 1) & 0x7 end
+    return profile("pid_profile") | (profile("rate_profile") << 3) | (profile("battery_profile") << 6)
+  end,
 }
 
 -- key -> DiySensor instance, built once from SENSORS above. Module index
@@ -116,7 +136,9 @@ local function wakeup()
   readTelemetryStateOverride()
 
   for key, sensor in pairs(sensors) do
-    local value = readValue(key)
+    local pack = PACKED[key]
+    local value
+    if pack then value = pack(readValue) else value = readValue(key) end
     if value ~= nil then sensor:set(value, true) end
   end
 end

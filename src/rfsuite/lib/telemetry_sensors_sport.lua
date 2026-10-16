@@ -66,9 +66,25 @@ return {
   battery_profile = {
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5133},
   },
+  -- Packed status words, decoded by lib/system_status.lua -- the same
+  -- appIds lib/frsky_sensors.lua labels from TELEMETRY_CONFIG's slot
+  -- assignment.
+  system_status = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5140},
+  },
+  system_config = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5141},
+  },
   governor = {
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5125},
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5450},
+  },
+  -- rotorflight-firmware telemetry/smartport.c FLIGHT_MODE and GPS_SATS.
+  flight_mode = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5121},
+  },
+  gps_sats = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x0860},
   },
   adj_f = {
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5110},

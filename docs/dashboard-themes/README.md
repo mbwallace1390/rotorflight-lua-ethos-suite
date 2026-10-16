@@ -51,6 +51,18 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | --- | --- | --- |
 | ![Kevd preflight](Kevd/preflight.png) | ![Kevd inflight](Kevd/inflight.png) | ![Kevd postflight](Kevd/postflight.png) |
 
+## KSE4
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![KSE4 preflight](KSE4/preflight.png) | ![KSE4 inflight](KSE4/inflight.png) | ![KSE4 postflight](KSE4/postflight.png) |
+
+## KSE5
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![KSE5 preflight](KSE5/preflight.png) | ![KSE5 inflight](KSE5/inflight.png) | ![KSE5 postflight](KSE5/postflight.png) |
+
 ## RF Status
 
 | Preflight | Inflight | Postflight |
@@ -74,6 +86,14 @@ You can change them via the Suite Menu "Settings - Dashboard - Theme"
 | Preflight | Inflight | Postflight |
 | --- | --- | --- |
 | ![SRB-RC preflight](SRB-RC/preflight.png) | ![SRB-RC inflight](SRB-RC/inflight.png) | ![SRB-RC postflight](SRB-RC/postflight.png) |
+
+## Bastion
+
+Desktop preview, not radio capture. [Details and limits](Bastion/README.md).
+
+| Preflight | Inflight | Postflight |
+| --- | --- | --- |
+| ![Bastion preflight](Bastion/preflight.png) | ![Bastion inflight](Bastion/inflight.png) | ![Bastion postflight](Bastion/postflight.png) |
 
 ## Singularity
 
