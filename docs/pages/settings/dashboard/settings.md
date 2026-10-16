@@ -64,6 +64,18 @@ The controls depend on the selected theme. Meridian and Cinder provide:
   live numeric readout. Missing telemetry stays unavailable; completing the
   displayed preflight checks is not an aircraft safety certification.
 
+## KSE5
+
+**KSE5** sets the value at which each of its rings is full. A zero or missing
+value falls back to the default.
+
+- **Headspeed → Max** — 500 to 6000 rpm, default 3000.
+- **Current → Max** — 10 to 500 A, default 150. The ring turns to the warning
+  colour above 70 % of this value and to the critical colour above 90 %.
+- **ESC Temp → Max** — 40 to 150 °C, default 100, with the same colour steps.
+
+Values are stored in the `dashboard.kse5` section of `settings.ini`.
+
 ## Related
 
 - [Rotorflight documentation](https://www.rotorflight.org/docs/)

@@ -11,6 +11,7 @@ local header = requireModule("app/header.lua")
 local tileGrid = requireModule("app/tile_grid.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
 local themeCatalog = requireModule("lib/dashboard_themes.lua")
+local settingsSave = requireModule("app/settings_save.lua")
 local dashboardContext = requireModule("widgets/dashboard/context.lua")
 local themeBridge = requireModule("app/theme_bridge.lua")
 
@@ -54,7 +55,10 @@ end
 local function saveThemePrefs(settings, themeModule, folder)
   if themeModule and themeModule.write then themeModule.write() end
   settingsStore.setDashboardTheme(settings, folder, dashboardContext.widgets.dashboard.preferences())
-  settingsStore.save(settings)
+  if not settingsStore.save(settings) then
+    settingsSave.reportFailure()
+    return
+  end
   bus.publish("settings.update", settingsStore.clone(settings))
 end
 

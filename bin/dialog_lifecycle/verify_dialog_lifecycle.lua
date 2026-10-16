@@ -2,7 +2,7 @@
 -- (#2383).
 --
 -- Run it:
---     lua5.3 bin/dialog_lifecycle/verify_dialog_lifecycle.lua
+--     lua5.4 bin/dialog_lifecycle/verify_dialog_lifecycle.lua
 --
 -- What it drives, and why:
 --   * The real app/page_runtime.lua, app/pages/ports.lua and
@@ -314,6 +314,14 @@ package.loaded["rfsuite.lib.msp_rx_config"] = {
   buildReadMessage = function(onData, onError)
     return { onData = onData, onError = onError, data = { serialrx_provider = 0 } }
   end,
+}
+package.loaded["rfsuite.lib.msp_board_info"] = {
+  buildReadMessage = function(onData, onError)
+    return { onData = onData, onError = onError, data = {} }
+  end,
+}
+package.loaded["rfsuite.lib.port_labels"] = {
+  lookup = function() return nil end,
 }
 package.loaded["rfsuite.app.header"] = headerStub()
 

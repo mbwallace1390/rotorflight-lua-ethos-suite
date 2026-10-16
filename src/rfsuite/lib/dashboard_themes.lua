@@ -42,6 +42,8 @@ local BUILTINS = {
   helihud = {label = "@i18n(app.modules.settings.dashboard_theme_helihud)@"},
   kevd = {label = "@i18n(app.modules.settings.dashboard_theme_kevd)@", configure = true,
     minResolution = {x = 784, y = 294}},
+  kse4 = {label = "@i18n(app.modules.settings.dashboard_theme_kse4)@"},
+  kse5 = {label = "@i18n(app.modules.settings.dashboard_theme_kse5)@", configure = true},
   rfstatus = {label = "@i18n(app.modules.settings.dashboard_theme_rfstatus)@", configure = true},
   ["rt-rc"] = {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc)@", configure = true},
   ["rt-rc-n"] = {label = "@i18n(app.modules.settings.dashboard_theme_rt_rc_n)@", configure = true},

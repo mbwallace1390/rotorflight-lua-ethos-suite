@@ -276,6 +276,10 @@ Bar, ring, and arc gauges under `objects/gauge/`:
 | `ring`    | Ring gauge | Circular ring with fill `%`                                                            |
 | `arc`     | Arc gauge  | `startAngle`, `sweep`, `arcThickness`, `arcColor`, `arcBgColor`, `thresholds`          |
 
+A `bar` whose `source` drops out **before the flight** shows the loading dots (`.`, `..`, `...`), not its last value: on the bench a bar frozen at 85% is a wrong number, and the pilot has to see that the source is gone (#2534).
+
+Once a flight is under way the last reading is **held**, in flight as well as in postflight. A momentary telemetry gap -- one missed appId, one dropped frame behind an obstacle -- must not blank a gauge the pilot is flying on, and must not discard the reading it had. A disconnect during a flight counts as postflight (`flightmode.lua`), so the reading is held across the link going away and coming back.
+
 **Shared Gauge Parameters:**
 
 * `source` / `value`, `unit`, `transform`, `decimals`, `font`.
@@ -390,7 +394,7 @@ end }
 ## 6. Tips & Best Practices
 
 * **Responsive Layout:** prefer percent-based (`*_pct`) for cross-resolution.
-* **Performance:** minimize heavy custom `func` paint logic.
+* **Performance:** minimize heavy custom `func` paint logic. Ethos stops any Lua callback that runs 20000 instructions ("Max instructions count reached"); the dashboard then finishes the frame on the next tick, so the pilot sees a stalled or partial frame. A full paint costs roughly 2.5k fixed plus ~300 per box (more on the first paint after a connect, when every box is being set up), so a page past about 35 boxes runs close to the limit -- `kevd`'s postflight page, with 36, is the densest shipped. Check a new or changed theme with `lua5.4 bin/perf/measure_dashboard_instructions.lua <theme> <state>` (add a tick number to see where the instructions go); `bin/perf/verify_instruction_budget.lua` runs every theme in CI and fails any callback at or over the limit.
 * **Modularity:** reuse objects in `objects/`; contribute new subtypes by adding `.lua` in the appropriate folder.
 * **Defaults:** omit fields to pick theme or object defaults.
 

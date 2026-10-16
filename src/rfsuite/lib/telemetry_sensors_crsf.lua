@@ -59,6 +59,21 @@ return {
   governor = {
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1205},
   },
+  -- Packed status words, decoded by lib/system_status.lua. Same appIds
+  -- tasks/elrs_sensors.lua's DIY sensors use (lib/elrs_sensor_table.lua).
+  system_status = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1230},
+  },
+  system_config = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1231},
+  },
+  -- rotorflight-firmware telemetry/crsf.c FLIGHT_MODE and GPS_SATS.
+  flight_mode = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1201},
+  },
+  gps_sats = {
+    {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1121},
+  },
   adj_f = {
     {category = CATEGORY_TELEMETRY_SENSOR, appId = 0x1221},
   },
