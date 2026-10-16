@@ -20,6 +20,20 @@ local MSG_LOADING_TITLE = "@i18n(app.msg_loading)@"
 local MSG_LOADING_BODY = "@i18n(app.msg_loading_from_fbl)@"
 local RESET_TARGET = 100
 
+-- A field entry may carry a plain value or a function of `data` for anything
+-- that depends on which ESC answered -- `fieldLabel` below already resolves its
+-- label that way, and `min`/`max` are resolved the same way here for the same
+-- reason: a field's legal range is a property of the model, not of the field.
+-- app/field_layout.lua's buildField() has always honoured spec.min/spec.max
+-- (it falls back to the codec's FIELD_META only when the spec has none), so
+-- nothing there needed changing -- these two keys were simply dropped on the
+-- floor between the page and that call.
+local function specBound(field, name, data)
+  local value = field[name]
+  if type(value) == "function" then return value(data) end
+  return value
+end
+
 local function fieldSpec(mspModule, data, field)
   local key = field.key
   local meta = mspModule.FIELD_META and mspModule.FIELD_META[key] or {}
@@ -27,8 +41,8 @@ local function fieldSpec(mspModule, data, field)
     key = key,
     bit = field.bit,
     choices = field.choices or (mspModule.choicesFor and mspModule.choicesFor(data, key)) or meta.choices,
-    min = meta.min,
-    max = meta.max,
+    min = specBound(field, "min", data) or meta.min,
+    max = specBound(field, "max", data) or meta.max,
     default = meta.default,
     suffix = meta.suffix,
     decimals = meta.decimals,
@@ -181,6 +195,19 @@ function esc_forward_vendor.open(opts, config)
     if onBack then onBack() end
   end
 
+  -- The codec's signature check. The first read uses it below, and every later
+  -- read of the same page (Reload, profile switch) uses it through validateRead,
+  -- so no read can build the editor from another ESC's parameter block.
+  local function isCompatibleEsc(data)
+    if mspModule.isCompatible and not mspModule.isCompatible(data) then
+      return false
+    end
+
+    local expected = mspModule.EXPECTED_SIGNATURE
+    if expected == nil then return true end
+    return tonumber(data and data.esc_signature) == tonumber(expected)
+  end
+
   local function buildEditor(data)
     if disposed then return end
     closeDialog(false)
@@ -190,6 +217,10 @@ function esc_forward_vendor.open(opts, config)
       pageTitle = pageTitle,
       logTag = config.logTag or pageTitle,
       mspModule = mspModule,
+      validateRead = function(data)
+        if isCompatibleEsc(data) then return true end
+        return false, "ESC signature does not match the page"
+      end,
       opts = opts,
       profileField = "none",
       beforeSave = config.beforeSave,
@@ -208,7 +239,10 @@ function esc_forward_vendor.open(opts, config)
     form.clear()
     runtime:buildChrome()
     if mspModule.summaryFor then
-      form.addLine(mspModule.summaryFor(data, pageTitle))
+      local summary = mspModule.summaryFor(data, pageTitle)
+      if summary and summary ~= "" then
+        escError.addTextLine(summary)
+      end
     end
 
     local panel = nil
@@ -223,16 +257,6 @@ function esc_forward_vendor.open(opts, config)
     end
 
     runtime:loadInitial()
-  end
-
-  local function isCompatibleEsc(data)
-    if mspModule.isCompatible and not mspModule.isCompatible(data) then
-      return false
-    end
-
-    local expected = mspModule.EXPECTED_SIGNATURE
-    if expected == nil then return true end
-    return tonumber(data and data.esc_signature) == tonumber(expected)
   end
 
   form.clear()

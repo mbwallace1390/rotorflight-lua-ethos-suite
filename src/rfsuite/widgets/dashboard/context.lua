@@ -1313,10 +1313,8 @@ function utils.standardHeaderLayout(headeropts)
 end
 
 function utils.getTxBatteryVoltageRange()
-  if system and system.voltageRange then
-    local vmin, vmax = system.voltageRange()
-    if vmin and vmax and vmin < vmax then return vmin, vmax end
-  end
+  local vmin, vmax = system.voltageRange()
+  if vmin and vmax and vmin < vmax then return vmin, vmax end
   return 7.2, 8.4
 end
 
@@ -1496,6 +1494,15 @@ end
 function utils.getThemeSignature()
   local _, signature = getThemeStateInternal()
   return signature
+end
+
+-- The Ethos OS theme alone (light/dark, installed theme colors), for
+-- dashboard.lua's live theme-switch poll. getThemeSignature() also folds in
+-- window size and flight state (themeStateCache's key), so polling it made
+-- every preflight/inflight/postflight change look like an OS theme switch and
+-- forced a full theme reload a few seconds after each one.
+function utils.getOsThemeSignature()
+  return buildThemeColorSignature()
 end
 
 function utils.getBatteryVoltageBounds(defaultCells, defaultMin, defaultMax)
@@ -1686,11 +1693,11 @@ function utils.dirtyOnDisplayValueChange(box)
 end
 
 function utils.getFontListsForResolution()
-  local version = system and system.getVersion and system.getVersion() or {}
+  local version = system.getVersion()
   local liveW, liveH
   if lcd.getWindowSize then liveW, liveH = lcd.getWindowSize() end
-  local width = version.lcdWidth or liveW or 800
-  local height = version.lcdHeight or liveH or 480
+  local width = (version and version.lcdWidth) or liveW or 800
+  local height = (version and version.lcdHeight) or liveH or 480
   local resolution = tostring(width) .. "x" .. tostring(height)
   return FONT_LISTS_BY_RESOLUTION[resolution] or DEFAULT_FONT_LISTS
 end
@@ -2291,7 +2298,17 @@ function context.utils.getGovernorState(value)
     returnvalue = isArmed and "ARMED" or "DISARMED"
   else
     if isArmed == false then value = 101 end
-    returnvalue = GOVERNOR_LABELS[value] or "UNKNOWN"
+    -- Stateless governor modes (firmware gov_mode NONE=0 and LIMIT=1): the
+    -- state machine never leaves THROTTLE_OFF, so 0 there means "no governor
+    -- in the FC", not "off". Only when the mode was actually read (#2353).
+    local session = context.session
+    local stateless = session and session.governorModeKnown == true
+      and (session.governorMode == 0 or session.governorMode == 1)
+    if value == 0 and stateless then
+      returnvalue = "PASSTHRU"
+    else
+      returnvalue = GOVERNOR_LABELS[value] or "UNKNOWN"
+    end
   end
 
   local disableflags = telemetry and telemetry.getSensor and telemetry.getSensor("armdisableflags")
@@ -2547,6 +2564,8 @@ function context.setWidget(widget)
   context.session.bblSize = widget and widget.bblSize
   context.session.bblUsed = widget and widget.bblUsed
   context.session.headspeedVariancePct = widget and widget.headspeedVariancePct
+  context.session.governorMode = widget and widget.governorMode
+  context.session.governorModeKnown = widget and widget.governorModeKnown
   local modelPrefs = context.session.modelPreferences
   modelPrefs.general = modelPrefs.general or {}
   modelPrefs.battery = modelPrefs.battery or {}
@@ -2558,6 +2577,12 @@ function context.setWidget(widget)
 end
 
 context.widgets.dashboard.utils = utils
+
+-- A second load can start and finish while Ethos has this one paused (see
+-- lib/require.lua). The copy that finished first is already in use, so
+-- hand that back rather than replacing it with this one.
+local existing = package.loaded["rfsuite.dashboard.context"]
+if existing then return existing end
 
 package.loaded["rfsuite.dashboard.context"] = context
 return context
