@@ -146,26 +146,24 @@ local ROOT_ENTRIES = {
 -- {menuId -> {title=, entries={...}}} -- see app/menu_container.lua's
 -- menuId handling.
 local MENUS = {
-  -- Setup has started growing real entries (Configuration, Radio Config,
-  -- Telemetry, Accelerometer, Alignment, Ports, Mixer, Servos, Controls,
-  -- Power, ESC & Motors, Governor) -- see
-  -- ROOT_ENTRIES' own comment for why the other 4 root tiles
-  -- (Tools/Logs/Settings/Developer) stay empty placeholders for now too.
+  -- Setup is one screen of tiles sorted under group labels, the same way
+  -- ROOT_ENTRIES groups the root menu (see app/menu_container.lua). The
+  -- first group's label becomes the screen header in place of "Setup".
   setup_menu = {
     title = "@i18n(app.modules.hardware_setup.name)@",
     entries = {
-      {title = "@i18n(app.modules.configuration.name)@", icon = lcd.loadMask("app/gfx/configuration.png"), script = "app/pages/configuration.lua"},
-      {title = "@i18n(app.modules.radio_config.name)@", icon = lcd.loadMask("app/gfx/radio_config.png"), script = "app/pages/radio_config.lua"},
-      {title = "@i18n(app.modules.telemetry.name)@", icon = lcd.loadMask("app/gfx/telemetry.png"), script = "app/pages/telemetry.lua"},
-      {title = "@i18n(app.modules.accelerometer.name)@", icon = lcd.loadMask("app/gfx/accelerometer.png"), script = "app/pages/accelerometer.lua"},
-      {title = "@i18n(app.modules.alignment.name)@", icon = lcd.loadMask("app/gfx/alignment.png"), script = "app/pages/alignment.lua"},
-      {title = "@i18n(app.modules.ports.name)@", icon = lcd.loadMask("app/gfx/ports.png"), script = "app/pages/ports.lua"},
-      {title = "@i18n(app.modules.mixer.name)@", icon = lcd.loadMask("app/gfx/mixer.png"), menuId = "mixer_menu"},
-      {title = "@i18n(app.modules.servos.name)@", icon = lcd.loadMask("app/gfx/servos.png"), menuId = "servos_menu"},
-      {title = "@i18n(app.menu_section_controls)@", icon = lcd.loadMask("app/gfx/controls.png"), menuId = "controls_menu"},
-      {title = "@i18n(app.modules.power.name)@", icon = lcd.loadMask("app/gfx/power.png"), menuId = "power_menu"},
-      {title = "@i18n(app.modules.esc_motors.name)@", icon = lcd.loadMask("app/gfx/esc_motors.png"), menuId = "esc_motors_menu"},
-      {title = "@i18n(app.modules.governor.name)@", icon = lcd.loadMask("app/gfx/setup_governor.png"), menuId = "setup_governor_menu"},
+      {title = "@i18n(app.modules.configuration.name)@", icon = lcd.loadMask("app/gfx/configuration.png"), script = "app/pages/configuration.lua", group = "@i18n(app.menu_section_board_radio)@"},
+      {title = "@i18n(app.modules.ports.name)@", icon = lcd.loadMask("app/gfx/ports.png"), script = "app/pages/ports.lua", group = "@i18n(app.menu_section_board_radio)@"},
+      {title = "@i18n(app.modules.radio_config.name)@", icon = lcd.loadMask("app/gfx/radio_config.png"), script = "app/pages/radio_config.lua", group = "@i18n(app.menu_section_board_radio)@"},
+      {title = "@i18n(app.modules.telemetry.name)@", icon = lcd.loadMask("app/gfx/telemetry.png"), script = "app/pages/telemetry.lua", group = "@i18n(app.menu_section_board_radio)@"},
+      {title = "@i18n(app.menu_section_controls)@", icon = lcd.loadMask("app/gfx/controls.png"), menuId = "controls_menu", group = "@i18n(app.menu_section_board_radio)@"},
+      {title = "@i18n(app.modules.accelerometer.name)@", icon = lcd.loadMask("app/gfx/accelerometer.png"), script = "app/pages/accelerometer.lua", group = "@i18n(app.menu_section_sensors)@"},
+      {title = "@i18n(app.modules.alignment.name)@", icon = lcd.loadMask("app/gfx/alignment.png"), script = "app/pages/alignment.lua", group = "@i18n(app.menu_section_sensors)@"},
+      {title = "@i18n(app.modules.mixer.name)@", icon = lcd.loadMask("app/gfx/mixer.png"), menuId = "mixer_menu", group = "@i18n(app.menu_section_mixer_servos)@"},
+      {title = "@i18n(app.modules.servos.name)@", icon = lcd.loadMask("app/gfx/servos.png"), menuId = "servos_menu", group = "@i18n(app.menu_section_mixer_servos)@"},
+      {title = "@i18n(app.modules.power.name)@", icon = lcd.loadMask("app/gfx/power.png"), menuId = "power_menu", group = "@i18n(app.menu_section_power_motors)@"},
+      {title = "@i18n(app.modules.esc_motors.name)@", icon = lcd.loadMask("app/gfx/esc_motors.png"), menuId = "esc_motors_menu", group = "@i18n(app.menu_section_power_motors)@"},
+      {title = "@i18n(app.modules.governor.name)@", icon = lcd.loadMask("app/gfx/setup_governor.png"), menuId = "setup_governor_menu", group = "@i18n(app.menu_section_power_motors)@"},
     },
   },
   mixer_menu = {
@@ -222,6 +220,7 @@ local MENUS = {
   esc_motors_menu = {
     title = "@i18n(app.modules.esc_motors.name)@",
     entries = {
+      {title = "@i18n(app.modules.esc_motors.motor_override)@", icon = lcd.loadMask("app/gfx/esc_motors_motor_override.png"), script = "app/pages/motor_override.lua"},
       {title = "@i18n(app.modules.esc_motors.throttle)@", icon = lcd.loadMask("app/gfx/esc_motors_throttle.png"), script = "app/pages/esc_motors_throttle.lua"},
       {title = "@i18n(app.modules.esc_motors.telemetry)@", icon = lcd.loadMask("app/gfx/esc_motors_telemetry.png"), script = "app/pages/esc_motors_telemetry.lua"},
       {title = "@i18n(app.modules.esc_motors.rpm)@", icon = lcd.loadMask("app/gfx/esc_motors_rpm.png"), script = "app/pages/esc_motors_rpm.lua"},
@@ -300,9 +299,43 @@ local MENUS = {
   settings_audio_menu = {
     title = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settings.audio)@",
     entries = {
-      {title = "@i18n(app.modules.settings.txt_audio_events)@", icon = lcd.loadMask("app/gfx/settings_audio_events.png"), script = "app/pages/settings_audio_events.lua", offline = true},
+      {title = "@i18n(app.modules.settings.txt_audio_events)@", icon = lcd.loadMask("app/gfx/settings_audio_events.png"), menuId = "settings_audio_events_menu", offline = true},
       {title = "@i18n(app.modules.settings.txt_audio_switches)@", icon = lcd.loadMask("app/gfx/settings_audio_switches.png"), script = "app/pages/settings_audio_switches.lua", offline = true},
       {title = "@i18n(app.modules.settings.txt_audio_timer)@", icon = lcd.loadMask("app/gfx/settings_audio_timer.png"), script = "app/pages/settings_audio_timer.lua", offline = true},
+    },
+  },
+  -- Issue #2308. This was one page, settings_audio_events.lua, holding every
+  -- settings.events key as a run of expansion panels; on a 480x320 radio that
+  -- meant scrolling past every unrelated event to change one, and it built
+  -- every widget for every event at once. It is a menu of category pages now,
+  -- each of which builds only its own fields on open.
+  --
+  -- The FC status entry is PR #2488's "Status alerts" panel, kept as its own
+  -- tile for the reasons on settings_audio_events_status.lua: it is the only
+  -- category that needs a live flight controller, and #2488 drew that boundary
+  -- deliberately.
+  --
+  -- The Link entry is issue #2311's telemetry lost/recovered pair. A Link tile
+  -- used to be offered by nothing on purpose: settings.events had no link key
+  -- and tasks/audio_events.lua answered a down link by clearing its alert state
+  -- and returning -- it announced nothing about the link, so there was nothing
+  -- for a toggle to switch. That is no longer true, and the announcement is
+  -- gated on the model having been armed when the link went, which is what
+  -- keeps a bench power-down silent.
+  --
+  -- Every entry carries offline = true: the whole subtree is local settings
+  -- with no MSP read, which is why it was reachable without a flight
+  -- controller before and must stay reachable now.
+  settings_audio_events_menu = {
+    title = "@i18n(app.modules.settings.name)@ / @i18n(app.modules.settings.audio)@ / @i18n(app.modules.settings.txt_audio_events)@",
+    entries = {
+      {title = "@i18n(app.modules.settings.voltage)@", icon = lcd.loadMask("app/gfx/power_battery.png"), script = "app/pages/settings_audio_events_voltage.lua", offline = true},
+      {title = "@i18n(app.modules.settings.esc_temperature)@", icon = lcd.loadMask("app/gfx/esc_motors.png"), script = "app/pages/settings_audio_events_esc.lua", offline = true},
+      {title = "@i18n(app.modules.settings.fuel)@", icon = lcd.loadMask("app/gfx/power_smartfuel.png"), script = "app/pages/settings_audio_events_fuel.lua", offline = true},
+      {title = "@i18n(app.modules.settings.audio_event_state)@", icon = lcd.loadMask("app/gfx/governor.png"), script = "app/pages/settings_audio_events_state.lua", offline = true},
+      {title = "@i18n(app.modules.settings.status_alerts)@", icon = lcd.loadMask("app/gfx/diagnostics_info.png"), script = "app/pages/settings_audio_events_status.lua", offline = true},
+      {title = "@i18n(app.modules.settings.link)@", icon = lcd.loadMask("app/gfx/diagnostics_elrs_link.png"), script = "app/pages/settings_audio_events_link.lua", offline = true},
+      {title = "@i18n(app.modules.settings.model_announcement)@", icon = lcd.loadMask("app/gfx/beepers.png"), script = "app/pages/settings_audio_events_announcement.lua", offline = true},
     },
   },
   developer_menu = {
@@ -312,37 +345,28 @@ local MENUS = {
       {title = "@i18n(app.modules.msp_exp.name)@", icon = lcd.loadMask("app/gfx/developer_msp_exp.png"), script = "app/pages/developer_msp_exp.lua"},
     },
   },
-  -- Matches the original's own `flight_tuning_menu` manifest entry --
-  -- every entry now exists (PIDs, Rates, Governor, Advanced). This used
-  -- to be ROOT_ENTRIES itself, flattened onto the tool's true root --
-  -- see that variable's own comment above for why it moved one level
-  -- deeper. No `group` needed on these entries any more (unlike when
-  -- they lived at the root) -- this menu's own `title` below already
-  -- becomes the screen header when opened via `menuId`.
+  -- Matches the original's own `flight_tuning_menu` manifest entry. This
+  -- used to be ROOT_ENTRIES itself -- see that variable's own comment above
+  -- for why it moved one level deeper. Its entries carry `group` labels;
+  -- the first ("Flight Tuning") becomes the screen header. Advanced used to
+  -- be a submenu of its own (the original manifest's `advanced_menu`); it
+  -- is now a group here, so every tuning page is one tap from Flight Tuning.
   flight_tuning_menu = {
     title = "@i18n(app.menu_section_flight_tuning)@",
     entries = {
-      {title = "@i18n(app.modules.pids.name)@", icon = lcd.loadMask("app/gfx/pids.png"), script = "app/pages/pids.lua"},
-      {title = "@i18n(app.modules.rates.name)@", icon = lcd.loadMask("app/gfx/rates.png"), script = "app/pages/rates.lua"},
-      {title = "@i18n(app.modules.governor.name)@", icon = lcd.loadMask("app/gfx/governor.png"), menuId = "governor_menu"},
-      {title = "@i18n(app.menu_section_advanced)@", icon = lcd.loadMask("app/gfx/advanced.png"), menuId = "advanced_menu"},
-    },
-  },
-  -- Matches the original's own app/modules/manifest.lua `advanced_menu` --
-  -- every entry now exists (Filters, PID Controller, PID Bandwidth,
-  -- Autolevel, Main Rotor, Tail Rotor, Rescue, Rates Advanced). Relative
-  -- order still matches the manifest's own ordering.
-  advanced_menu = {
-    title = "@i18n(app.menu_section_advanced)@",
-    entries = {
-      {title = "@i18n(app.modules.filters.name)@", icon = lcd.loadMask("app/gfx/filters.png"), script = "app/pages/filters.lua"},
-      {title = "@i18n(app.modules.pid_controller.name)@", icon = lcd.loadMask("app/gfx/pid_controller.png"), script = "app/pages/pid_controller.lua"},
-      {title = "@i18n(app.modules.pid_bandwidth.name)@", icon = lcd.loadMask("app/gfx/pid_bandwidth.png"), script = "app/pages/pid_bandwidth.lua"},
-      {title = "@i18n(app.modules.autolevel.name)@", icon = lcd.loadMask("app/gfx/autolevel.png"), script = "app/pages/autolevel.lua"},
-      {title = "@i18n(app.modules.main_rotor.name)@", icon = lcd.loadMask("app/gfx/main_rotor.png"), script = "app/pages/main_rotor.lua"},
-      {title = "@i18n(app.modules.tail_rotor.name)@", icon = lcd.loadMask("app/gfx/tail_rotor.png"), script = "app/pages/tail_rotor.lua"},
-      {title = "@i18n(app.modules.rescue.name)@", icon = lcd.loadMask("app/gfx/rescue.png"), script = "app/pages/rescue.lua"},
-      {title = "@i18n(app.modules.rates_advanced.name)@", icon = lcd.loadMask("app/gfx/rates_advanced.png"), menuId = "rates_advanced_menu"},
+      {title = "@i18n(app.modules.pids.name)@", icon = lcd.loadMask("app/gfx/pids.png"), script = "app/pages/pids.lua", group = "@i18n(app.menu_section_flight_tuning)@"},
+      {title = "@i18n(app.modules.rates.name)@", icon = lcd.loadMask("app/gfx/rates.png"), script = "app/pages/rates.lua", group = "@i18n(app.menu_section_flight_tuning)@"},
+      -- Reads what the FC measured in flight and suggests changes to the pages around it.
+      {title = "@i18n(app.modules.tune_advisor.name)@", icon = lcd.loadMask("app/gfx/tune_advisor.png"), script = "app/pages/tune_advisor.lua", group = "@i18n(app.menu_section_flight_tuning)@"},
+      {title = "@i18n(app.modules.governor.name)@", icon = lcd.loadMask("app/gfx/governor.png"), menuId = "governor_menu", group = "@i18n(app.menu_section_flight_tuning)@"},
+      {title = "@i18n(app.modules.filters.name)@", icon = lcd.loadMask("app/gfx/filters.png"), script = "app/pages/filters.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.pid_controller.name)@", icon = lcd.loadMask("app/gfx/pid_controller.png"), script = "app/pages/pid_controller.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.pid_bandwidth.name)@", icon = lcd.loadMask("app/gfx/pid_bandwidth.png"), script = "app/pages/pid_bandwidth.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.autolevel.name)@", icon = lcd.loadMask("app/gfx/autolevel.png"), script = "app/pages/autolevel.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.main_rotor.name)@", icon = lcd.loadMask("app/gfx/main_rotor.png"), script = "app/pages/main_rotor.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.tail_rotor.name)@", icon = lcd.loadMask("app/gfx/tail_rotor.png"), script = "app/pages/tail_rotor.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.rescue.name)@", icon = lcd.loadMask("app/gfx/rescue.png"), script = "app/pages/rescue.lua", group = "@i18n(app.menu_section_advanced)@"},
+      {title = "@i18n(app.modules.rates_advanced.name)@", icon = lcd.loadMask("app/gfx/rates_advanced.png"), menuId = "rates_advanced_menu", group = "@i18n(app.menu_section_advanced)@"},
     },
   },
   -- Matches the original's own `profile_governor` manifest entry
