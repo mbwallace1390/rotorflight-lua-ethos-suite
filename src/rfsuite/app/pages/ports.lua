@@ -12,9 +12,10 @@ local closeKey = requireModule("app/close_key.lua")
 local memstats = requireModule("lib/memstats.lua")
 local progressDialog = requireModule("app/progress_dialog.lua")
 local serialConfig = requireModule("lib/msp_serial_config.lua")
-local rxConfig = requireModule("lib/msp_rx_config.lua")
 local eeprom = requireModule("lib/msp_eeprom.lua")
 local reboot = requireModule("lib/msp_reboot.lua")
+local boardInfo = requireModule("lib/msp_board_info.lua")
+local portLabels = requireModule("lib/port_labels.lua")
 
 local PAGE_TITLE = "@i18n(app.modules.ports.name)@"
 local MSG_SAVE_TITLE = "@i18n(app.msg_save_settings)@"
@@ -54,6 +55,7 @@ local PORT_FUNCTIONS = {
   {id = 262144, excl = 262144, name = "@i18n(app.modules.ports.function_sbus_out)@", type = PORT_TYPE_AUTO},
   {id = 524288, excl = 524288, name = "@i18n(app.modules.ports.function_fbus_out)@", type = PORT_TYPE_AUTO},
   {id = 1048576, excl = 1048576, name = "@i18n(app.modules.ports.function_sport_input)@", type = PORT_TYPE_AUTO},
+  {id = 4194304, excl = 4194304, name = "@i18n(app.modules.ports.function_crsf_sensors)@", type = PORT_TYPE_AUTO},
   {id = 4, excl = 4668, name = "@i18n(app.modules.ports.function_telem_frsky)@", type = PORT_TYPE_TELEM},
   {id = 32, excl = 4668, name = "@i18n(app.modules.ports.function_telem_smartport)@", type = PORT_TYPE_TELEM},
   {id = 4096, excl = 4668, name = "@i18n(app.modules.ports.function_telem_ibus)@", type = PORT_TYPE_TELEM},
@@ -90,16 +92,7 @@ local UART_NAMES = {
 }
 
 local function maskHasAny(mask, bits)
-  if bits == 0 then return false end
-  local bit = 1
-  while bits > 0 do
-    if bits % 2 == 1 and math.floor((mask or 0) / bit) % 2 == 1 then
-      return true
-    end
-    bits = math.floor(bits / 2)
-    bit = bit * 2
-  end
-  return false
+  return ((mask or 0) & bits) ~= 0
 end
 
 local function shallowCopy(tbl)
@@ -114,8 +107,13 @@ local function clonePorts(ports)
   return out
 end
 
-local function portLabel(identifier)
-  return UART_NAMES[identifier] or ("@i18n(app.modules.ports.port_prefix)@ " .. tostring(identifier))
+-- Silkscreen name with the UART in brackets ("Port Ⓐ [UART4]") when the board
+-- design has one; the plain UART name otherwise.
+local function portLabel(boardDesign, boardName, identifier)
+  local uart = UART_NAMES[identifier]
+  local silkscreen = portLabels.lookup(boardDesign, identifier, boardName)
+  if silkscreen and uart then return silkscreen .. " [" .. uart .. "]" end
+  return uart or ("@i18n(app.modules.ports.port_prefix)@ " .. tostring(identifier))
 end
 
 local function getPortFunctionById(functionMask)
@@ -181,25 +179,30 @@ local function buildBaudChoiceTable(port)
   return tableData
 end
 
-local function functionAllowedForPort(def, portIndex, ports)
-  if def.id == 0 then return true end
+-- The functions every OTHER port's current function excludes, as one mask.
+-- render() builds every port's choice list in a single wakeup, so this is
+-- computed once per port rather than once per port per function: checking
+-- each function against each other port bit by bit cost ~25k instructions
+-- with 4 ports and ~255k with 12, over Ethos's 20000-per-callback limit
+-- (measured with bin/perf/measure_app_instructions.lua).
+local function otherPortsExcl(portIndex, ports)
+  local excl = 0
   for i = 1, #ports do
-    if i ~= portIndex and maskHasAny(getPortExcl(ports[i].function_mask), def.id) then
-      return false
-    end
+    if i ~= portIndex then excl = excl | getPortExcl(ports[i].function_mask) end
   end
-  return true
+  return excl
 end
 
 local function buildFunctionChoiceTable(portIndex, ports)
   local port = ports[portIndex]
   if not port then return {} end
 
+  local excl = otherPortsExcl(portIndex, ports)
   local tableData = {}
   local seen = {}
   for i = 1, #PORT_FUNCTIONS do
     local def = PORT_FUNCTIONS[i]
-    if functionAllowedForPort(def, portIndex, ports) or def.id == port.function_mask then
+    if def.id == 0 or not maskHasAny(excl, def.id) or def.id == port.function_mask then
       tableData[#tableData + 1] = {def.name, def.id}
       seen[def.id] = true
     end
@@ -226,6 +229,8 @@ local function open(opts)
   local disposed = false
   local loaded = false
   local busy = false
+  local boardDesign = nil -- from MSP_BOARD_INFO; nil until read or when generic
+  local boardName = nil   -- from MSP_BOARD_INFO; keys boards that share a generic design
   local dirty = false
   local loadError = nil
   local saveError = nil
@@ -240,7 +245,6 @@ local function open(opts)
   local pendingSaveConfirm = false
   local portsOriginal = {}
   local portsWorking = {}
-  local rxSerialProvider = 0
 
   memstats.print("ports open")
 
@@ -327,7 +331,8 @@ local function open(opts)
     portsWorking = {}
     fields = {}
     package.loaded["rfsuite.lib.msp_serial_config"] = nil
-    package.loaded["rfsuite.lib.msp_rx_config"] = nil
+    package.loaded["rfsuite.lib.msp_board_info"] = nil
+    package.loaded["rfsuite.lib.port_labels"] = nil
     memstats.print("ports disposed")
   end
 
@@ -337,6 +342,40 @@ local function open(opts)
     if opts.onBack then opts.onBack() end
     collectgarbage("collect")
     memstats.print("ports after back")
+  end
+
+  -- The serial-port rows from an MSP_SERIAL_CONFIG reply: the USB VCP (identifier 20)
+  -- is not shown, and a port carrying the receiver function is locked.
+  local function serialPortsFrom(data)
+    local filtered = {}
+    local ports = data and data.ports or {}
+    for i = 1, #ports do
+      local port = shallowCopy(ports[i])
+      if port.identifier ~= 20 then
+        port.receiver_locked = maskHasAny(port.function_mask, FUNCTION_MASK_RX_SERIAL)
+        filtered[#filtered + 1] = port
+      end
+    end
+    return filtered
+  end
+
+  -- After a successful EEPROM write the page reads the board's serial ports back, so
+  -- the rows show what the board holds rather than what was sent (#2497). A read
+  -- that fails or returns nothing keeps the rows as they were sent.
+  local function readBackPorts(done)
+    bus.publish("msp.request", serialConfig.buildReadMessage(function(data)
+      if disposed then return end
+      local filtered = serialPortsFrom(data)
+      if #filtered > 0 then
+        portsOriginal = clonePorts(filtered)
+        portsWorking = clonePorts(filtered)
+        needsRender = true
+      end
+      done()
+    end, function()
+      if disposed then return end
+      done()
+    end))
   end
 
   local function startLoad(focusFn)
@@ -349,41 +388,37 @@ local function open(opts)
     setBusy(true)
     activeDialog = openProgress(MSG_LOADING_TITLE, MSG_LOADING_BODY)
 
-    bus.publish("msp.request", serialConfig.buildReadMessage(function(data)
-      if disposed then return end
-      local filtered = {}
-      local ports = data and data.ports or {}
-      for i = 1, #ports do
-        local port = shallowCopy(ports[i])
-        if port.identifier ~= 20 then
-          port.receiver_locked = maskHasAny(port.function_mask, FUNCTION_MASK_RX_SERIAL)
-          filtered[#filtered + 1] = port
-        end
-      end
-      portsOriginal = clonePorts(filtered)
-      portsWorking = clonePorts(filtered)
-
-      bus.publish("msp.request", rxConfig.buildReadMessage(function(rxData)
+    local function loadSerialPorts()
+      bus.publish("msp.request", serialConfig.buildReadMessage(function(data)
         if disposed then return end
-        rxSerialProvider = rxData and rxData.serialrx_provider or 0
+        local filtered = serialPortsFrom(data)
+        portsOriginal = clonePorts(filtered)
+        portsWorking = clonePorts(filtered)
         loaded = true
         closeDialog(focusFn)
         setBusy(false)
         needsRender = true
       end, function()
         if disposed then return end
-        rxSerialProvider = 0
-        loaded = true
+        loadError = "@i18n(app.modules.ports.error_read_serial_ports)@"
         closeDialog(focusFn)
         setBusy(false)
         needsRender = true
       end))
+    end
+
+    -- The board design selects the silkscreen labels, so it is read first. If it
+    -- is missing or the read fails, the page still loads with plain UART names.
+    bus.publish("msp.request", boardInfo.buildReadMessage(function(info)
+      if disposed then return end
+      boardDesign = info and info.boardDesign ~= "" and info.boardDesign or nil
+      boardName = info and info.boardName ~= "" and info.boardName or nil
+      loadSerialPorts()
     end, function()
       if disposed then return end
-      loadError = "@i18n(app.modules.ports.error_read_serial_ports)@"
-      closeDialog(focusFn)
-      setBusy(false)
-      needsRender = true
+      boardDesign = nil
+      boardName = nil
+      loadSerialPorts()
     end))
   end
 
@@ -433,13 +468,16 @@ local function open(opts)
               if index > #portsWorking then
                 bus.publish("msp.request", eeprom.buildWriteMessage(function()
                   if disposed then return end
-                  dirty = false
-                  portsOriginal = clonePorts(portsWorking)
-                  closeDialog(headerHandle and headerHandle.focusSave)
-                  setBusy(false)
-                  if isArmed ~= true then
-                    bus.publish("msp.request", reboot.buildWriteMessage())
-                  end
+                  readBackPorts(function()
+                    if disposed then return end
+                    dirty = false
+                    portsOriginal = clonePorts(portsWorking)
+                    closeDialog(headerHandle and headerHandle.focusSave)
+                    setBusy(false)
+                    if isArmed ~= true then
+                      bus.publish("msp.request", reboot.buildWriteMessage())
+                    end
+                  end)
                 end, failEeprom))
                 return
               end
@@ -518,13 +556,13 @@ local function open(opts)
     local rightPadding = 8
     local gap = 6
     local wBaud = math.floor(width * 0.28)
-    local wFunc = math.floor(width * 0.42)
+    local wFunc = math.floor(width * 0.28)
     local xBaud = width - rightPadding - wBaud
     local xFunc = xBaud - gap - wFunc
 
     for i = 1, #portsWorking do
       local port = portsWorking[i]
-      local title = portLabel(port.identifier)
+      local title = portLabel(boardDesign, boardName, port.identifier)
       if port.receiver_locked then
         title = title .. " @i18n(app.modules.ports.rx_tag)@"
       end

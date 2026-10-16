@@ -102,6 +102,18 @@
       "needs_translation": false,
       "max_length": 18
     },
+    "msg_restarting": {
+      "english": "Restarting...",
+      "translation": "Restarting...",
+      "needs_translation": false,
+      "max_length": 13
+    },
+    "msg_restarting_fc": {
+      "english": "Restarting flight controller...",
+      "translation": "Restarting flight controller...",
+      "needs_translation": false,
+      "max_length": 31
+    },
     "msg_save_failed_title": {
       "english": "Save failed",
       "translation": "Save failed",
@@ -689,10 +701,10 @@
           "max_length": 28
         },
         "cyclic_cross_coupling_cutoff": {
-          "english": "Cyclic Cross Coupling: Cutoff",
-          "translation": "Cyclic Cross Coupling: Cutoff",
+          "english": "Cyclic Cross Coupling Cutoff",
+          "translation": "Cyclic Cross Coupling Cutoff",
           "needs_translation": false,
-          "max_length": 29
+          "max_length": 28
         }
       },
       "pid_bandwidth": {
@@ -1029,10 +1041,10 @@
       },
       "rates_advanced": {
         "name": {
-          "english": "Rates",
-          "translation": "Rates",
+          "english": "Rate Options",
+          "translation": "Rate Options",
           "needs_translation": false,
-          "max_length": 5
+          "max_length": 12
         },
         "menu_advanced": {
           "english": "Advanced",
@@ -1041,10 +1053,10 @@
           "max_length": 8
         },
         "cyclic_behaviour": {
-          "english": "Cyclic Behaviour",
-          "translation": "Cyclic Behaviour",
+          "english": "Cyclic Behav.",
+          "translation": "Cyclic Behav.",
           "needs_translation": false,
-          "max_length": 16
+          "max_length": 13
         },
         "rate_table": {
           "english": "Rate Table",
@@ -1552,6 +1564,36 @@
           "needs_translation": false,
           "max_length": 8
         },
+        "status_alerts": {
+          "english": "FC status",
+          "max_length": 9,
+          "needs_translation": false,
+          "translation": "FC status"
+        },
+        "status_blackbox": {
+          "english": "Blackbox full",
+          "max_length": 13,
+          "needs_translation": false,
+          "translation": "Blackbox full"
+        },
+        "status_gps": {
+          "english": "GPS not responding",
+          "max_length": 18,
+          "needs_translation": false,
+          "translation": "GPS not responding"
+        },
+        "status_gyro": {
+          "english": "Gyro overflow",
+          "max_length": 13,
+          "needs_translation": false,
+          "translation": "Gyro overflow"
+        },
+        "status_saturation": {
+          "english": "Control limit",
+          "max_length": 13,
+          "needs_translation": false,
+          "translation": "Control limit"
+        },
         "txt_developer": {
           "english": "Developer",
           "translation": "Developer",
@@ -1781,10 +1823,10 @@
           "max_length": 16
         },
         "esc_temperature": {
-          "english": "ESC temperature",
-          "translation": "ESC temperature",
+          "english": "ESC temp",
+          "translation": "ESC temp",
           "needs_translation": false,
-          "max_length": 15
+          "max_length": 8
         },
         "esc_threshold": {
           "english": "ESC threshold",
@@ -1834,11 +1876,59 @@
           "needs_translation": false,
           "max_length": 17
         },
+        "main_power_lost": {
+          "english": "Main power lost",
+          "translation": "Main power lost",
+          "needs_translation": false,
+          "max_length": 15
+        },
+        "link": {
+          "english": "Link",
+          "translation": "Link",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "telemetry_lost": {
+          "english": "Telemetry lost",
+          "translation": "Telemetry lost",
+          "needs_translation": false,
+          "max_length": 14
+        },
         "alert_repeat_interval": {
           "english": "Repeat interval",
           "translation": "Repeat interval",
           "needs_translation": false,
           "max_length": 15
+        },
+        "voltage_hold": {
+          "english": "Hold time",
+          "translation": "Hold time",
+          "needs_translation": false,
+          "max_length": 9
+        },
+        "voltage_callout": {
+          "english": "Voltage callout",
+          "translation": "Voltage callout",
+          "needs_translation": false,
+          "max_length": 15
+        },
+        "voltage_callout_none": {
+          "english": "Alert only",
+          "translation": "Alert only",
+          "needs_translation": false,
+          "max_length": 10
+        },
+        "voltage_callout_pack": {
+          "english": "Pack voltage",
+          "translation": "Pack voltage",
+          "needs_translation": false,
+          "max_length": 12
+        },
+        "voltage_callout_cell": {
+          "english": "Cell voltage",
+          "translation": "Cell voltage",
+          "needs_translation": false,
+          "max_length": 12
         },
         "fuel": {
           "english": "Fuel",
@@ -1901,10 +1991,10 @@
           "max_length": 15
         },
         "model_announcement": {
-          "english": "Model announcement",
-          "translation": "Model announcement",
+          "english": "Model callout",
+          "translation": "Model callout",
           "needs_translation": false,
-          "max_length": 18
+          "max_length": 13
         },
         "timer_alerting": {
           "english": "Timer audio",
@@ -2056,9 +2146,27 @@
           "needs_translation": false,
           "max_length": 6
         },
+        "dashboard_theme_bastion": {
+          "english": "Bastion",
+          "translation": "Bastion",
+          "needs_translation": false,
+          "max_length": 7
+        },
         "dashboard_theme_kevd": {
           "english": "Kevd",
           "translation": "Kevd",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "dashboard_theme_kse4": {
+          "english": "KSE4",
+          "translation": "KSE4",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "dashboard_theme_kse5": {
+          "english": "KSE5",
+          "translation": "KSE5",
           "needs_translation": false,
           "max_length": 4
         },
@@ -2135,10 +2243,10 @@
           "translation": "Sync model name"
         },
         "txt_show_battery_profile_connect": {
-          "english": "Show battery profile on connect",
-          "max_length": 31,
+          "english": "Battery profile on connect",
+          "max_length": 26,
           "needs_translation": false,
-          "translation": "Show battery profile on connect"
+          "translation": "Battery profile on connect"
         },
         "temperature_unit": {
           "english": "Temperature Unit",
@@ -2173,6 +2281,12 @@
           "max_length": 28,
           "needs_translation": false,
           "translation": "Calibrate the accelerometer?"
+        },
+        "msg_calibration_timeout": {
+          "english": "The calibration did not finish. Try again.",
+          "max_length": 46,
+          "needs_translation": false,
+          "translation": "The calibration did not finish. Try again."
         },
         "name": {
           "english": "Accelerometer",
@@ -2405,6 +2519,12 @@
           "translation": "S.PORT Master",
           "needs_translation": false,
           "max_length": 13
+        },
+        "function_crsf_sensors": {
+          "english": "CRSF Sensors",
+          "translation": "CRSF Sensors",
+          "needs_translation": false,
+          "max_length": 12
         },
         "function_telem_frsky": {
           "english": "Telemetry FrSky",
@@ -3889,6 +4009,72 @@
           "max_length": 20,
           "needs_translation": false,
           "translation": "Motor Stop PWM Value"
+        },
+        "motor": {
+          "english": "Motor",
+          "max_length": 5,
+          "needs_translation": false,
+          "translation": "Motor"
+        },
+        "motor_override": {
+          "english": "Motor Override",
+          "max_length": 14,
+          "needs_translation": false,
+          "translation": "Motor Override"
+        },
+        "motor_override_armed": {
+          "english": "Disarm before driving a motor.",
+          "max_length": 30,
+          "needs_translation": false,
+          "translation": "Disarm before driving a motor."
+        },
+        "motor_override_disable": {
+          "english": "Disable motor override",
+          "max_length": 22,
+          "needs_translation": false,
+          "translation": "Disable motor override"
+        },
+        "motor_override_disable_msg": {
+          "english": "Return control of the motor to the flight controller.",
+          "max_length": 53,
+          "needs_translation": false,
+          "translation": "Return control of the motor to the flight controller."
+        },
+        "motor_override_disconnected": {
+          "english": "Link lost. Override released.",
+          "max_length": 29,
+          "needs_translation": false,
+          "translation": "Link lost. Override released."
+        },
+        "motor_override_enable": {
+          "english": "Enable motor override",
+          "max_length": 21,
+          "needs_translation": false,
+          "translation": "Enable motor override"
+        },
+        "motor_override_enable_msg": {
+          "english": "The flight controller drives the motor directly. Remove the blades, secure the craft and stand clear.",
+          "max_length": 101,
+          "needs_translation": false,
+          "translation": "The flight controller drives the motor directly. Remove the blades, secure the craft and stand clear."
+        },
+        "motor_override_note": {
+          "english": "Blades off and the craft secured.",
+          "max_length": 33,
+          "needs_translation": false,
+          "translation": "Blades off and the craft secured."
+        },
+        "motor_override_note_2": {
+          "english": "The motor turns with the throttle.",
+          "max_length": 34,
+          "needs_translation": false,
+          "translation": "The motor turns with the throttle."
+        },
+        "motor_override_throttle": {
+          "english": "Throttle",
+          "max_length": 8,
+          "needs_translation": false,
+          "translation": "Throttle"
         },
         "motor_pole_count": {
           "english": "Motor Pole Count",
@@ -6229,10 +6415,10 @@
       },
       "msp_exp": {
         "name": {
-          "english": "MSP Experimental",
-          "max_length": 16,
+          "english": "MSP Exp.",
+          "max_length": 8,
           "needs_translation": false,
-          "translation": "MSP Experimental"
+          "translation": "MSP Exp."
         }
       },
       "msp_speed": {
@@ -6350,7 +6536,387 @@
           "needs_translation": false,
           "translation": "Total queries"
         }
+      },
+      "tune_advisor": {
+        "name": {
+          "english": "Tune Advisor",
+          "translation": "Tune Advisor",
+          "needs_translation": false,
+          "max_length": 12
+        },
+        "axis": {
+          "english": "Axis",
+          "translation": "Axis",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "roll": {
+          "english": "Roll",
+          "translation": "Roll",
+          "needs_translation": false,
+          "max_length": 4
+        },
+        "pitch": {
+          "english": "Pitch",
+          "translation": "Pitch",
+          "needs_translation": false,
+          "max_length": 5
+        },
+        "yaw": {
+          "english": "Yaw",
+          "translation": "Yaw",
+          "needs_translation": false,
+          "max_length": 3
+        },
+        "data": {
+          "english": "Flight data",
+          "translation": "Flight data",
+          "needs_translation": false,
+          "max_length": 11
+        },
+        "unsupported": {
+          "english": "Needs newer firmware",
+          "translation": "Needs newer firmware",
+          "needs_translation": false,
+          "max_length": 20
+        },
+        "clear_prompt": {
+          "english": "Erase the saved flights?",
+          "translation": "Erase the saved flights?",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "response": {
+          "english": "Response",
+          "translation": "Response",
+          "needs_translation": false,
+          "max_length": 8
+        },
+        "stops": {
+          "english": "Stops",
+          "translation": "Stops",
+          "needs_translation": false,
+          "max_length": 5
+        },
+        "changes": {
+          "english": "Suggested changes",
+          "translation": "Suggested changes",
+          "needs_translation": false,
+          "max_length": 17
+        },
+        "changes_short": {
+          "english": "Changes",
+          "translation": "Changes",
+          "needs_translation": false,
+          "max_length": 7
+        },
+        "more_why": {
+          "english": "More under Why",
+          "translation": "More under Why",
+          "needs_translation": false,
+          "max_length": 14
+        },
+        "why": {
+          "english": "Why",
+          "translation": "Why",
+          "needs_translation": false,
+          "max_length": 3
+        },
+        "resp_more_fmt": {
+          "english": "Needs more flying (%d%%)",
+          "translation": "Needs more flying (%d%%)",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "resp_uneven": {
+          "english": "Too uneven to judge",
+          "translation": "Too uneven to judge",
+          "needs_translation": false,
+          "max_length": 19
+        },
+        "resp_fast_fmt": {
+          "english": "%d%% faster than asked",
+          "translation": "%d%% faster than asked",
+          "needs_translation": false,
+          "max_length": 22
+        },
+        "resp_slow_fmt": {
+          "english": "%d%% slower than asked",
+          "translation": "%d%% slower than asked",
+          "needs_translation": false,
+          "max_length": 22
+        },
+        "resp_ok": {
+          "english": "Matches the stick",
+          "translation": "Matches the stick",
+          "needs_translation": false,
+          "max_length": 17
+        },
+        "stops_more_fmt": {
+          "english": "Needs more stops (%d/%d)",
+          "translation": "Needs more stops (%d/%d)",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "stops_value_fmt": {
+          "english": "%d%% bounce-back",
+          "translation": "%d%% bounce-back",
+          "needs_translation": false,
+          "max_length": 16
+        },
+        "act_fly_roll": {
+          "english": "Fly rolls in rate mode, centre the stick after each",
+          "translation": "Fly rolls in rate mode, centre the stick after each",
+          "needs_translation": false,
+          "max_length": 51
+        },
+        "act_fly_pitch": {
+          "english": "Fly flips in rate mode, centre the stick after each",
+          "translation": "Fly flips in rate mode, centre the stick after each",
+          "needs_translation": false,
+          "max_length": 51
+        },
+        "act_fly_yaw": {
+          "english": "Fly pirouettes in rate mode, centre the stick after each",
+          "translation": "Fly pirouettes in rate mode, centre the stick after each",
+          "needs_translation": false,
+          "max_length": 56
+        },
+        "act_f_fmt": {
+          "english": "PIDs > %s > F:  %d -> %d",
+          "translation": "PIDs > %s > F:  %d -> %d",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "act_rate_fmt": {
+          "english": "Rates > %s > %s:  %s -> %s",
+          "translation": "Rates > %s > %s:  %s -> %s",
+          "needs_translation": false,
+          "max_length": 26
+        },
+        "act_rate_pct_up_fmt": {
+          "english": "Rates > %s: all rates about %d%% higher",
+          "translation": "Rates > %s: all rates about %d%% higher",
+          "needs_translation": false,
+          "max_length": 39
+        },
+        "act_rate_pct_down_fmt": {
+          "english": "Rates > %s: all rates about %d%% lower",
+          "translation": "Rates > %s: all rates about %d%% lower",
+          "needs_translation": false,
+          "max_length": 38
+        },
+        "act_relax_fmt": {
+          "english": "Advanced > PID Controller > Iterm Relax Cutoff > %s:  %d -> %d",
+          "translation": "Advanced > PID Controller > Iterm Relax Cutoff > %s:  %d -> %d",
+          "needs_translation": false,
+          "max_length": 62
+        },
+        "act_p_fmt": {
+          "english": "PIDs > %s > P:  %d -> %d",
+          "translation": "PIDs > %s > P:  %d -> %d",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "act_none": {
+          "english": "No change suggested",
+          "translation": "No change suggested",
+          "needs_translation": false,
+          "max_length": 19
+        },
+        "why_more": {
+          "english": "Each flight in rate mode is saved when you disarm.",
+          "translation": "Each flight in rate mode is saved when you disarm.",
+          "needs_translation": false,
+          "max_length": 50
+        },
+        "why_uneven": {
+          "english": "The response varies too much to judge. Common in 3D.",
+          "translation": "The response varies too much to judge. Common in 3D.",
+          "needs_translation": false,
+          "max_length": 52
+        },
+        "why_fast": {
+          "english": "The heli turns faster than the stick asks for.",
+          "translation": "The heli turns faster than the stick asks for.",
+          "needs_translation": false,
+          "max_length": 46
+        },
+        "why_slow": {
+          "english": "The heli turns slower than the stick asks for.",
+          "translation": "The heli turns slower than the stick asks for.",
+          "needs_translation": false,
+          "max_length": 46
+        },
+        "why_keep_feel": {
+          "english": "Changing F and the rates together keeps the stick feel.",
+          "translation": "Changing F and the rates together keeps the stick feel.",
+          "needs_translation": false,
+          "max_length": 55
+        },
+        "why_no_f": {
+          "english": "This axis has no F, so its PID gains set the response.",
+          "translation": "This axis has no F, so its PID gains set the response.",
+          "needs_translation": false,
+          "max_length": 54
+        },
+        "why_full_fmt": {
+          "english": "Full stick asks %d deg/s but the heli tops out at %d.",
+          "translation": "Full stick asks %d deg/s but the heli tops out at %d.",
+          "needs_translation": false,
+          "max_length": 53
+        },
+        "why_coll_high_fmt": {
+          "english": "It turns %d%% faster at high collective than at low.",
+          "translation": "It turns %d%% faster at high collective than at low.",
+          "needs_translation": false,
+          "max_length": 52
+        },
+        "why_coll_low_fmt": {
+          "english": "It turns %d%% faster at low collective than at high.",
+          "translation": "It turns %d%% faster at low collective than at high.",
+          "needs_translation": false,
+          "max_length": 52
+        },
+        "why_relax": {
+          "english": "After a stop, the I-term pushes the heli back.",
+          "translation": "After a stop, the I-term pushes the heli back.",
+          "needs_translation": false,
+          "max_length": 46
+        },
+        "why_fix_f_fmt": {
+          "english": "Stops bounce back %d%%. Fix F first, then check again.",
+          "translation": "Stops bounce back %d%%. Fix F first, then check again.",
+          "needs_translation": false,
+          "max_length": 54
+        },
+        "why_brake_fmt": {
+          "english": "Stops bounce back %d%%. More P brakes them (or add B).",
+          "translation": "Stops bounce back %d%%. More P brakes them (or add B).",
+          "needs_translation": false,
+          "max_length": 54
+        },
+        "why_ok": {
+          "english": "The heli answers the stick as asked.",
+          "translation": "The heli answers the stick as asked.",
+          "needs_translation": false,
+          "max_length": 36
+        },
+        "data_flights_fmt": {
+          "english": "%dm %02ds, %d/%d flights",
+          "translation": "%dm %02ds, %d/%d flights",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "no_aircraft": {
+          "english": "Connect to a model first",
+          "translation": "Connect to a model first",
+          "needs_translation": false,
+          "max_length": 24
+        },
+        "apply_hint": {
+          "english": "Press Save to write these to the flight controller.",
+          "translation": "Press Save to write these to the flight controller.",
+          "needs_translation": false,
+          "max_length": 51
+        },
+        "apply_prompt": {
+          "english": "Write these changes to the flight controller and save them?",
+          "translation": "Write these changes to the flight controller and save them?",
+          "needs_translation": false,
+          "max_length": 59
+        },
+        "applied": {
+          "english": "Changes saved to the flight controller. Fly again to check the new tune.",
+          "translation": "Changes saved to the flight controller. Fly again to check the new tune.",
+          "needs_translation": false,
+          "max_length": 72
+        },
+        "stage_read": {
+          "english": "Reading current settings...",
+          "translation": "Reading current settings...",
+          "needs_translation": false,
+          "max_length": 27
+        },
+        "stage_write": {
+          "english": "Writing changes...",
+          "translation": "Writing changes...",
+          "needs_translation": false,
+          "max_length": 18
+        },
+        "stage_save": {
+          "english": "Saving to flight controller...",
+          "translation": "Saving to flight controller...",
+          "needs_translation": false,
+          "max_length": 30
+        },
+        "stage_verify": {
+          "english": "Checking saved settings...",
+          "translation": "Checking saved settings...",
+          "needs_translation": false,
+          "max_length": 26
+        },
+        "err_read": {
+          "english": "Could not read the settings from the flight controller. Nothing was changed.",
+          "translation": "Could not read the settings from the flight controller. Nothing was changed.",
+          "needs_translation": false,
+          "max_length": 76
+        },
+        "err_changed": {
+          "english": "The settings on the flight controller are not the ones these flights were flown with. Nothing was changed. Fly again with the current settings.",
+          "translation": "The settings on the flight controller are not the ones these flights were flown with. Nothing was changed. Fly again with the current settings.",
+          "needs_translation": false,
+          "max_length": 143
+        },
+        "err_armed": {
+          "english": "Disarm first. Nothing was saved.",
+          "translation": "Disarm first. Nothing was saved.",
+          "needs_translation": false,
+          "max_length": 32
+        },
+        "err_write": {
+          "english": "Writing failed. Nothing was saved: restart the flight controller to undo any part already sent.",
+          "translation": "Writing failed. Nothing was saved: restart the flight controller to undo any part already sent.",
+          "needs_translation": false,
+          "max_length": 95
+        },
+        "err_save": {
+          "english": "Saving failed. The changes are active until the flight controller restarts, then undone.",
+          "translation": "Saving failed. The changes are active until the flight controller restarts, then undone.",
+          "needs_translation": false,
+          "max_length": 88
+        },
+        "err_verify": {
+          "english": "Saved, but reading back did not confirm it. Check the settings on PIDs, Rates and PID Controller.",
+          "translation": "Saved, but reading back did not confirm it. Check the settings on PIDs, Rates and PID Controller.",
+          "needs_translation": false,
+          "max_length": 97
+        }
       }
+    },
+    "menu_section_board_radio": {
+      "english": "Board & Radio",
+      "translation": "Board & Radio",
+      "needs_translation": false,
+      "max_length": 13
+    },
+    "menu_section_sensors": {
+      "english": "Sensors",
+      "translation": "Sensors",
+      "needs_translation": false,
+      "max_length": 7
+    },
+    "menu_section_mixer_servos": {
+      "english": "Mixer & Servos",
+      "translation": "Mixer & Servos",
+      "needs_translation": false,
+      "max_length": 14
+    },
+    "menu_section_power_motors": {
+      "english": "Power & Motors",
+      "translation": "Power & Motors",
+      "needs_translation": false,
+      "max_length": 14
     },
     "menu_section_controls": {
       "english": "Controls",
@@ -6800,7 +7366,7 @@
     },
     "sensor_gps_heading": {
       "english": "GPS Course",
-      "max_length": 11,
+      "max_length": 10,
       "needs_translation": false,
       "translation": "GPS Course"
     },
@@ -6941,6 +7507,18 @@
       "max_length": 8,
       "needs_translation": false,
       "translation": "SYS Load"
+    },
+    "sensor_system_config": {
+      "english": "System Config",
+      "max_length": 13,
+      "needs_translation": false,
+      "translation": "System Config"
+    },
+    "sensor_system_status": {
+      "english": "System Status",
+      "max_length": 13,
+      "needs_translation": false,
+      "translation": "System Status"
     },
     "sensor_tailspeed": {
       "english": "Tailspeed",
@@ -7249,6 +7827,60 @@
       }
     },
     "dashboard": {
+      "alert_acc_uncalibrated": {
+        "english": "ACC NOT CALIBRATED",
+        "max_length": 18,
+        "needs_translation": false,
+        "translation": "ACC NOT CALIBRATED"
+      },
+      "alert_battery_critical": {
+        "english": "BATTERY CRITICAL",
+        "max_length": 16,
+        "needs_translation": false,
+        "translation": "BATTERY CRITICAL"
+      },
+      "alert_blackbox_full": {
+        "english": "BLACKBOX FULL",
+        "max_length": 13,
+        "needs_translation": false,
+        "translation": "BLACKBOX FULL"
+      },
+      "alert_failsafe": {
+        "english": "FAILSAFE",
+        "max_length": 8,
+        "needs_translation": false,
+        "translation": "FAILSAFE"
+      },
+      "alert_governor_fallback": {
+        "english": "GOVERNOR FALLBACK",
+        "max_length": 17,
+        "needs_translation": false,
+        "translation": "GOVERNOR FALLBACK"
+      },
+      "alert_gps_lost": {
+        "english": "GPS NOT RESPONDING",
+        "max_length": 18,
+        "needs_translation": false,
+        "translation": "GPS NOT RESPONDING"
+      },
+      "alert_gyro_overflow": {
+        "english": "GYRO OVERFLOW",
+        "max_length": 13,
+        "needs_translation": false,
+        "translation": "GYRO OVERFLOW"
+      },
+      "alert_override": {
+        "english": "TEST OVERRIDE ACTIVE",
+        "max_length": 20,
+        "needs_translation": false,
+        "translation": "TEST OVERRIDE ACTIVE"
+      },
+      "alert_reboot_required": {
+        "english": "REBOOT REQUIRED",
+        "max_length": 15,
+        "needs_translation": false,
+        "translation": "REBOOT REQUIRED"
+      },
       "altitude_max": {
         "english": "Altitude Max",
         "max_length": 12,
@@ -7345,6 +7977,90 @@
         "needs_translation": false,
         "translation": "Headspeed"
       },
+      "info_armed": {
+        "english": "Armed",
+        "max_length": 5,
+        "needs_translation": false,
+        "translation": "Armed"
+      },
+      "info_arming": {
+        "english": "Arming",
+        "max_length": 6,
+        "needs_translation": false,
+        "translation": "Arming"
+      },
+      "info_blocked": {
+        "english": "Blocked",
+        "max_length": 7,
+        "needs_translation": false,
+        "translation": "Blocked"
+      },
+      "info_controller": {
+        "english": "Controller",
+        "max_length": 10,
+        "needs_translation": false,
+        "translation": "Controller"
+      },
+      "info_gps": {
+        "english": "GPS",
+        "max_length": 3,
+        "needs_translation": false,
+        "translation": "GPS"
+      },
+      "info_link": {
+        "english": "Link",
+        "max_length": 4,
+        "needs_translation": false,
+        "translation": "Link"
+      },
+      "info_mode": {
+        "english": "Flight mode",
+        "max_length": 11,
+        "needs_translation": false,
+        "translation": "Flight mode"
+      },
+      "info_not_connected": {
+        "english": "Not connected",
+        "max_length": 13,
+        "needs_translation": false,
+        "translation": "Not connected"
+      },
+      "info_pack": {
+        "english": "Pack",
+        "max_length": 4,
+        "needs_translation": false,
+        "translation": "Pack"
+      },
+      "info_profiles_fmt": {
+        "english": "PID %d  Rate %d  Batt %d",
+        "max_length": 24,
+        "needs_translation": false,
+        "translation": "PID %d  Rate %d  Batt %d"
+      },
+      "info_ready": {
+        "english": "Ready",
+        "max_length": 5,
+        "needs_translation": false,
+        "translation": "Ready"
+      },
+      "info_sats": {
+        "english": "Satellites",
+        "max_length": 10,
+        "needs_translation": false,
+        "translation": "Satellites"
+      },
+      "info_used": {
+        "english": "Used",
+        "max_length": 4,
+        "needs_translation": false,
+        "translation": "Used"
+      },
+      "info_used_fmt": {
+        "english": "%d%% used",
+        "max_length": 9,
+        "needs_translation": false,
+        "translation": "%d%% used"
+      },
       "link_max": {
         "english": "Link Max",
         "max_length": 8,
@@ -7356,6 +8072,42 @@
         "max_length": 8,
         "needs_translation": false,
         "translation": "Link Min"
+      },
+      "mode_angle": {
+        "english": "Angle",
+        "max_length": 5,
+        "needs_translation": false,
+        "translation": "Angle"
+      },
+      "mode_failsafe": {
+        "english": "Failsafe",
+        "max_length": 8,
+        "needs_translation": false,
+        "translation": "Failsafe"
+      },
+      "mode_gps_rescue": {
+        "english": "GPS Rescue",
+        "max_length": 10,
+        "needs_translation": false,
+        "translation": "GPS Rescue"
+      },
+      "mode_horizon": {
+        "english": "Horizon",
+        "max_length": 7,
+        "needs_translation": false,
+        "translation": "Horizon"
+      },
+      "mode_normal": {
+        "english": "Normal",
+        "max_length": 6,
+        "needs_translation": false,
+        "translation": "Normal"
+      },
+      "mode_rescue": {
+        "english": "Rescue",
+        "max_length": 6,
+        "needs_translation": false,
+        "translation": "Rescue"
       },
       "startup_no_link": {
         "english": "No telemetry link detected",
