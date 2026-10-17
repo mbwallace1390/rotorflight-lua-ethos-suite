@@ -25,7 +25,9 @@ retains the dynamic model name, transmitter battery/RSSI, and centered title.
   state; it is not a flight-clearance system.
 - **Inflight:** the headspeed arc with the numeric headspeed in its centre, MCU
   temperature, throttle, altitude and flight state. The status pill is amber
-  when armed and red for lost headspeed. Link, BEC, current, capacity used, pack
+  when armed and red for lost headspeed. It reads ARM UNKNOWN until the flight
+  controller reports its arm state, and an armed model without a governor reads
+  ARMED / PASSTHRU. Link, BEC, current, capacity used, pack
   voltage, fuel and ESC temperature surround it.
 - **Postflight:** recorded results: flight time, average current, peak
   headspeed, peak MCU and ESC temperature, peak current, capacity used and
@@ -70,8 +72,9 @@ instrument thresholds.
 
 ## Lettering
 
-ETHOS cannot load font files, so the theme draws each character from a glyph
-mask in its `gfx/` folder and tints it with the text colour. The masks are
+ETHOS documents no font file format for `lcd.loadFont`, so the theme draws each
+character from a glyph mask in its `gfx/` folder and tints it with the text
+colour. The masks are
 rendered from Barlow Condensed in five sizes; with the carbon tile, `gfx/` holds
 203 PNG files of about 76 KB, generated with `glyphs.lua` by an external MWRC
 Theme Studio script that is not part of this repository. A mask is loaded the
@@ -83,9 +86,11 @@ missing carbon tile to a flat background.
 
 Each paint lays out a limited amount of new text to keep within the radio's
 per-callback instruction limit. After startup, a phase change or a resize, the
-panels draw first and the lettering fills in over the next few paints. Readings
-that have waited longest go first, so a changing reading waits at most a few
-paints.
+panels draw first and the lettering completes over the next few frames. The
+dashboard repaints only when its data changes, so while text is still waiting
+the theme requests the next frame with `lcd.invalidate()`, and stops once the
+screen is complete. Readings that have waited longest go first, so a changing
+reading waits at most a few paints.
 
 ## Installation and verification
 

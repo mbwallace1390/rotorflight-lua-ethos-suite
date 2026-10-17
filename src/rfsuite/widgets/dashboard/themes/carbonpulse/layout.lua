@@ -29,21 +29,24 @@ local BRIGHT = {[C.green] = C.zoneGreen, [C.amber] = C.zoneAmber, [C.red] = C.zo
 local SEGMENTS, SWEEP, START = 40, 240, 240
 local PHASE = {preflight = "PREFLIGHT", inflight = "INFLIGHT", postflight = "RECORDED"}
 local CHECKS = {"PACK", "FUEL", "BEC", "ESC", "LINK"}
-local PILL = {["TELEMETRY OFFLINE"] = "OFFLINE", ["DISARMED"] = "DISARMED"}
+-- Calm states draw an outlined pill; every other state is an armed one.
+local PILL = {["TELEMETRY OFFLINE"] = "OFFLINE", ["DISARMED"] = "DISARMED", ["ARM UNKNOWN"] = "ARM UNKNOWN"}
 -- Text-cache slot names are constants so paint never builds strings.
 local RIGHT_L, RIGHT_V = {"right1L", "right2L", "right3L"}, {"right1V", "right2V", "right3V"}
 
--- Chamfered outline (top-left and bottom-right corners cut) appended to a flat
--- segment list, plus a one-pixel outer glow in a second list.
-local function outline(list, n, x, y, w, h, cut)
+-- Chamfered outline (top-left and bottom-right corners cut): six segments
+-- appended to four parallel arrays {x1, y1, x2, y2}, written inline because a
+-- helper call per segment would add to the geometry paint, the heaviest one.
+local function outline(l, n, x, y, w, h, cut)
     local r, b = x + w - 1, y + h - 1
-    list[n + 1], list[n + 2], list[n + 3], list[n + 4] = x + cut, y, r, y
-    list[n + 5], list[n + 6], list[n + 7], list[n + 8] = r, y, r, b - cut
-    list[n + 9], list[n + 10], list[n + 11], list[n + 12] = r, b - cut, r - cut, b
-    list[n + 13], list[n + 14], list[n + 15], list[n + 16] = r - cut, b, x, b
-    list[n + 17], list[n + 18], list[n + 19], list[n + 20] = x, b, x, y + cut
-    list[n + 21], list[n + 22], list[n + 23], list[n + 24] = x, y + cut, x + cut, y
-    return n + 24
+    local x1, y1, x2, y2 = l[1], l[2], l[3], l[4]
+    x1[n + 1], y1[n + 1], x2[n + 1], y2[n + 1] = x + cut, y, r, y
+    x1[n + 2], y1[n + 2], x2[n + 2], y2[n + 2] = r, y, r, b - cut
+    x1[n + 3], y1[n + 3], x2[n + 3], y2[n + 3] = r, b - cut, r - cut, b
+    x1[n + 4], y1[n + 4], x2[n + 4], y2[n + 4] = r - cut, b, x, b
+    x1[n + 5], y1[n + 5], x2[n + 5], y2[n + 5] = x, b, x, y + cut
+    x1[n + 6], y1[n + 6], x2[n + 6], y2[n + 6] = x, y + cut, x + cut, y
+    return n + 6
 end
 
 local function frame(g, key, x, y, w, h)
@@ -70,8 +73,9 @@ end
 
 -- Every position, cached for the last box size and shared by the three phases,
 -- so a phase change does not rebuild it. Returns the geometry and whether this
--- call rebuilt it.
-local G = {neon = {}, glow = {}, tiles = {}, arc = {}, zone = {}}
+-- call rebuilt it. neon and glow are outline segments with a one-pixel outer
+-- glow; a1/a2 are arc segment angles and runs the arc's zone runs.
+local G = {neon = {{}, {}, {}, {}}, glow = {{}, {}, {}, {}}, tiles = {}, a1 = {}, a2 = {}, runs = {}}
 local function geometry(x, y, w, h)
     local g = G
     if g.x == x and g.y == y and g.w == w and g.h == h then return g, false end
@@ -102,8 +106,11 @@ local function geometry(x, y, w, h)
     g.mark = frame(g, "markBox", leftX, bottomY, sideW, bottomH)
     g.battery = frame(g, "batteryBox", centerX, bottomY, centerW, bottomH)
     g.esc = frame(g, "escBox", rightX, bottomY, sideW, bottomH)
-    for i = g.neonCount + 1, #g.neon do g.neon[i] = nil end
-    for i = g.glowCount + 1, #g.glow do g.glow[i] = nil end
+    for k = 1, 4 do
+        local neon, glow = g.neon[k], g.glow[k]
+        for i = g.neonCount + 1, #neon do neon[i] = nil end
+        for i = g.glowCount + 1, #glow do glow[i] = nil end
+    end
     g.tileCount = tiles(g.tiles, x, y, w, h)
     g.clipX, g.clipY, g.clipW, g.clipH = x, y, w, h
     g.winW, g.winH = lcd.getWindowSize()
@@ -113,18 +120,26 @@ local function geometry(x, y, w, h)
     local radius = floor(min(centerW * 0.40, mainH * (k and 0.44 or 0.42)))
     g.arcR, g.arcInner = radius, radius - (k and 9 or 14)
     g.arcX, g.arcY = cp.x + floor(centerW / 2), cp.y + floor(mainH * (k and 0.56 or 0.54))
-    local arc, zone = g.arc, g.zone
+    local a1, a2, runs = g.a1, g.a2, g.runs
     local step = SWEEP / SEGMENTS
+    local n, previous = 0, nil
     for i = 1, SEGMENTS do
-        local a1 = START + (i - 1) * step + 0.6
-        local a2 = START + i * step - 0.6
-        if a1 >= 360 then a1, a2 = a1 - 360, a2 - 360 end
-        arc[2 * i - 1], arc[2 * i] = a1, a2
+        local from, to = START + (i - 1) * step + 0.6, START + i * step - 0.6
+        if from >= 360 then from, to = from - 360, to - 360 end
+        a1[i], a2[i] = from, to
         -- A segment's zone is that of its start, the rule state.lua uses for the
         -- needle, so the needle always matches the segment it points into.
         local f = (i - 1) / SEGMENTS
-        zone[i] = f >= 0.9 and C.red or (f >= 0.75 and C.amber or C.green)
+        local zone = f >= 0.9 and C.red or (f >= 0.75 and C.amber or C.green)
+        -- Contiguous runs {first, last, zone, ...} so paint sets each colour once.
+        if zone ~= previous then
+            runs[n + 1], runs[n + 2], runs[n + 3] = i, i, zone
+            n, previous = n + 3, zone
+        else
+            runs[n - 1] = i
+        end
     end
+    for i = n + 1, #runs do runs[i] = nil end
     g.needleFraction = nil
     return g, true
 end
@@ -148,7 +163,8 @@ local function begin(x, y, w, h)
     local g, rebuilt = geometry(x, y, w, h)
     D.frame()
     L.frame(rebuilt and 0 or QUOTA)
-    if carbon == nil then carbon = lcd.loadBitmap(CARBON_PATH) or false end
+    -- Not lazy, so a missing tile fails here and the flat fill takes over.
+    if carbon == nil then carbon = lcd.loadBitmap(CARBON_PATH, false) or false end
     if carbon then
         local list, drawBitmap = g.tiles, lcd.drawBitmap
         lcd.setClipping(g.clipX, g.clipY, g.clipW, g.clipH)
@@ -160,9 +176,13 @@ local function begin(x, y, w, h)
     return g
 end
 
+-- The Suite repaints only when its data changes; while lettering still waits
+-- for the per-paint quota, ask ETHOS for the next frame so the text completes
+-- within a few frames. Nothing is requested once every slot is laid out.
 local function finish(g)
-    D.lines(C.glow, g.glow, g.glowCount)
-    D.lines(C.neon, g.neon, g.neonCount)
+    D.segments(C.glow, g.glow, g.glowCount)
+    D.segments(C.neon, g.neon, g.neonCount)
+    if L.pending() then lcd.invalidate() end
 end
 
 -- Status pill: outlined when calm, filled for armed states: dark text on amber,
@@ -228,15 +248,22 @@ end
 
 -- Headspeed arc with zone colours, bright where lit, and a needle.
 local function gauge(c, g)
-    local arc, zone = g.arc, g.zone
+    local a1, a2, runs = g.a1, g.a2, g.runs
     local lit = floor((c.rpmFraction or 0) * SEGMENTS + 0.5)
     local cx, cy, inner, outer = g.arcX, g.arcY, g.arcInner, g.arcR
-    local sector, last = lcd.drawAnnulusSector, nil
-    for i = 1, SEGMENTS do
-        local z = zone[i]
-        local color = i <= lit and BRIGHT[z] or DIM[z]
-        if color ~= last then D.setColor(color); last = color end
-        sector(cx, cy, inner, outer, arc[2 * i - 1], arc[2 * i])
+    local sector, setColor = lcd.drawAnnulusSector, D.setColor
+    -- Per zone run, in segment order: the lit part bright, the rest dim.
+    for r = 1, #runs, 3 do
+        local first, last, z = runs[r], runs[r + 1], runs[r + 2]
+        local split = lit < last and lit or last
+        if split >= first then
+            setColor(BRIGHT[z])
+            for i = first, split do sector(cx, cy, inner, outer, a1[i], a2[i]) end
+        end
+        if split < last then
+            setColor(DIM[z])
+            for i = (split < first and first or split + 1), last do sector(cx, cy, inner, outer, a1[i], a2[i]) end
+        end
     end
     if c.rpm ~= nil then
         needle(g, c.rpmFraction or 0)
@@ -261,10 +288,10 @@ local function centerReadouts(c, g, aLabel, aValue, aColor, bLabel, bValue, bCol
     local bw, bh = k and 120 or 160, k and 20 or 28
     local bx, by = g.arcX - floor(bw / 2), vy + vh + (k and 16 or 22)
     if by + bh <= p.y + p.h - (k and 20 or 30) then
-        D.fill(C.glow, bx, by, bw, 1)
-        D.fill(C.glow, bx, by + bh - 1, bw, 1)
-        D.fill(C.glow, bx, by, 1, bh)
-        D.fill(C.glow, bx + bw - 1, by, 1, bh)
+        D.rect(C.glow, bx, by, bw, 1)
+        D.rect(C.glow, bx, by + bh - 1, bw, 1)
+        D.rect(C.glow, bx, by, 1, bh)
+        D.rect(C.glow, bx + bw - 1, by, 1, bh)
         T(c, "altL", bx + 6, by, floor(bw * 0.35), bh, altLabel, g.label, C.label)
         T(c, "altV", bx + floor(bw * 0.35), by, floor(bw * 0.65) - 6, bh, c.altText, k and "label" or "small", C.white, "right")
     end
@@ -290,11 +317,11 @@ local function bottom(c, g, phase, packLabel, fuelLabel, escLabel)
     local bp = g.battery
     local iw, ih = k and 18 or 24, bp.h - (k and 16 or 24)
     local ix, iy = bp.x + (k and 10 or 16), bp.y + floor((bp.h - ih) / 2) + 2
-    D.fill(C.label, ix + floor(iw / 2) - 3, iy - 3, 6, 3)
-    D.fill(C.label, ix, iy, iw, 2)
-    D.fill(C.label, ix, iy + ih - 2, iw, 2)
-    D.fill(C.label, ix, iy, 2, ih)
-    D.fill(C.label, ix + iw - 2, iy, 2, ih)
+    D.rect(C.label, ix + floor(iw / 2) - 3, iy - 3, 6, 3)
+    D.rect(C.label, ix, iy, iw, 2)
+    D.rect(C.label, ix, iy + ih - 2, iw, 2)
+    D.rect(C.label, ix, iy, 2, ih)
+    D.rect(C.label, ix + iw - 2, iy, 2, ih)
     if c.fuel ~= nil then
         local fh = floor((ih - 6) * max(0, min(100, c.fuel)) / 100)
         if fh > 0 then D.fill(c.fuelValueColor, ix + 3, iy + ih - 3 - fh, iw - 6, fh) end
@@ -323,8 +350,9 @@ local function checkLamps(c, g, y)
         else color = c.linkColor end
         if color == C.white then color = C.green end
         local xx = p.x + inset + (i - 1) * w
-        D.fill(color or C.muted, xx + 4, y, w - 8, k and 4 or 6)
-        T(c, CHECKS[i], xx, y + (k and 6 or 10), w, k and 14 or 18, CHECKS[i], "tiny", color or C.muted, "center")
+        D.rect(color or C.muted, xx + 4, y, w - 8, k and 4 or 6)
+        -- The label size reuses glyphs the screen already loads.
+        T(c, CHECKS[i], xx, y + (k and 6 or 10), w, k and 14 or 18, CHECKS[i], g.label, color or C.muted, "center")
     end
 end
 

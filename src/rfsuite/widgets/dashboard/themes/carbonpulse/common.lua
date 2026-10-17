@@ -1,4 +1,4 @@
--- Carbon Pulse palette, cached text fitting and flat line lists.
+-- Carbon Pulse palette, cached radio-font text fitting and drawing helpers.
 -- Text fitter and colour cache adapted from Studio Stratus 98 (from Studio
 -- Sector and MWRC Cinder). GPLv3.
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
@@ -24,7 +24,6 @@ local C = M.colors
 local NAMES = {"FONT_XXS", "FONT_XS", "FONT_S", "FONT_STD", "FONT_L", "FONT_XL", "FONT_XXL", "FONT_XXXXL"}
 local RANK = {}
 for i = 1, #NAMES do RANK[NAMES[i]] = i end
-M.NAMES = NAMES
 -- Resolved font handles by rank; the radio's font constants never change.
 local FONTS = {}
 
@@ -88,12 +87,6 @@ local function fitSlot(c, slot, w, h, text, requested)
     return fit
 end
 
--- Rank of the font a text would use in a box (no drawing). Used to step a
--- group of readouts to one shared size.
-function M.fit(c, slot, w, h, text, requested)
-    return fitSlot(c, slot, w, h, text or "--", requested).rank
-end
-
 -- Draw text in the largest font (from `requested` down) that fits w x h.
 -- The rounded draw position is cached with the fit until the text, box or
 -- requested font changes; each slot keeps one alignment.
@@ -123,22 +116,6 @@ function M.text(c, slot, x, y, w, h, text, requested, color, align)
     lcd.drawText(fit.drawX, fit.drawY, text)
 end
 
--- Measure a static string at geometry time only (never in steady paint).
-function M.measure(text, fontName)
-    local font = utils.resolveFont(fontName, nil)
-    lcd.font(font)
-    lastFont = font
-    local tw = lcd.getTextSize(text)
-    return tw or 0
-end
-
--- Width of the last fitted text in a slot (0 before the first draw).
-function M.textWidth(c, slot)
-    local fits = c._textFits
-    local fit = fits and fits[slot]
-    return fit and fit.tw or 0
-end
-
 -- Filled rectangle through the colour cache; floored and never negative.
 function M.fill(color, x, y, w, h)
     w, h = floor(w), floor(h)
@@ -148,10 +125,9 @@ function M.fill(color, x, y, w, h)
 end
 
 ------------------------------------------------------------------------
--- Exact-geometry fast path. Callers use these only after proving that every
--- rectangle of the frame is whole-pixel with a positive size, so the result
--- matches M.fill without per-rectangle flooring or size checks. Both need
--- frame() first.
+-- Exact-geometry fast path for fixed decorations whose coordinates are whole
+-- pixels with positive sizes: the result matches M.fill without the per-call
+-- flooring and size checks. Needs frame() first.
 ------------------------------------------------------------------------
 function M.rect(color, x, y, w, h)
     if color ~= lastColor then
@@ -161,17 +137,15 @@ function M.rect(color, x, y, w, h)
     drawRect(x, y, w, h)
 end
 
--- Draw a flat list of segments {x1, y1, x2, y2, ...} in one colour. Lists are
--- built once per geometry, so paint performs no arithmetic per segment.
-function M.lines(color, list, count)
+-- Draw n segments in one colour from four parallel arrays {x1, y1, x2, y2},
+-- built once per geometry, so paint does no address arithmetic per segment.
+function M.segments(color, l, n)
     if color ~= lastColor then
         lcd.color(color)
         lastColor = color
     end
-    local drawLine = lcd.drawLine
-    for i = 1, count or #list, 4 do
-        drawLine(list[i], list[i + 1], list[i + 2], list[i + 3])
-    end
+    local drawLine, x1, y1, x2, y2 = lcd.drawLine, l[1], l[2], l[3], l[4]
+    for i = 1, n do drawLine(x1[i], y1[i], x2[i], y2[i]) end
 end
 
 -- Filled triangle through the colour cache.
@@ -181,16 +155,6 @@ function M.triangle(color, x1, y1, x2, y2, x3, y3)
         lastColor = color
     end
     lcd.drawFilledTriangle(x1, y1, x2, y2, x3, y3)
-end
-
--- Annulus sector through the colour cache; angles are degrees clockwise from
--- the top and never cross 360 (callers split segments at the top).
-function M.sector(color, x, y, inner, outer, a1, a2)
-    if color ~= lastColor then
-        lcd.color(color)
-        lastColor = color
-    end
-    lcd.drawAnnulusSector(x, y, inner, outer, a1, a2)
 end
 
 return M

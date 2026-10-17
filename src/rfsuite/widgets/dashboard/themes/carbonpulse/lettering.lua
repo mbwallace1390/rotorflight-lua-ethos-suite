@@ -2,7 +2,8 @@
 -- (Barlow Condensed, SIL Open Font License 1.1; see gfx/FONT-LICENSE.txt) and
 -- tinted with the current colour. Studio original. GPLv3.
 --
--- ETHOS cannot load a font file, so each character is a mask from gfx/<set>/.
+-- ETHOS documents no font file format for lcd.loadFont, so each character is
+-- a mask from gfx/<set>/.
 -- A text is laid out once per slot when it, its box or its set changes; steady
 -- paints only draw the cached run. Masks load once per character, after a set
 -- is chosen, and are released with the Suite's other images (theme reload,
@@ -15,7 +16,8 @@
 -- set tried. A slot past the quota keeps its previous run, or stays blank, and
 -- waits. So that sustained changes ahead of it cannot starve it, the slots that
 -- have waited longest may also be laid out past the quota, at most OVERDRAFT
--- slots a paint.
+-- slots a paint. The Suite repaints only when its data changes, so while any
+-- slot waits M.pending() is true and layout.lua requests the next frame.
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local D = requireModule("widgets/dashboard/themes/carbonpulse/common.lua")
 local SETS = requireModule("widgets/dashboard/themes/carbonpulse/glyphs.lua")
@@ -49,15 +51,21 @@ end
 -- quota: characters left this paint. paint: paint counter. A waiting slot
 -- records the paint it started waiting; `oldest` is the earliest of those seen
 -- on the previous paint and `seen` collects this paint's.
-local quota, paint, overdraft, oldest, seen = 0, 0, 0, nil, nil
+-- pending: some slot waited on this paint.
+local quota, paint, overdraft, oldest, seen, pending = 0, 0, 0, nil, nil, false
 
 -- Start a paint with a layout allowance in characters. None means no layout
 -- at all on this paint, past-quota slots included.
 function M.frame(characters)
     quota = characters
     paint = paint + 1
-    oldest, seen = seen, nil
+    oldest, seen, pending = seen, nil, false
     overdraft = characters > 0 and OVERDRAFT or 0
+end
+
+-- True when a slot waited on this paint, so another frame is needed.
+function M.pending()
+    return pending
 end
 
 -- Convert a chosen run's codes to mask handles and add the x origin.
@@ -70,7 +78,9 @@ local function realize(run, n, name, ox)
         if m == nil then
             local failed = FAILED[name]
             if failed[code] then return false end
-            m = lcd.loadMask(format("%s%s/%04x.png", ROOT, name, code))
+            -- Not lazy: load now, in the paint that first draws it, so a missing
+            -- or unreadable file fails here and the radio font takes over.
+            m = lcd.loadMask(format("%s%s/%04x.png", ROOT, name, code), false)
             if not m then
                 failed[code] = true
                 return false
@@ -151,6 +161,7 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
             end
             r.fallback, r.x, r.y, r.w, r.h, r.size, r.text = fallback, x, y, w, h, size, text
         else
+            pending = true
             if since == nil then since = paint; r.waiting = paint end
             if seen == nil or since < seen then seen = since end
             if r.text == nil or r.x ~= x or r.y ~= y or r.w ~= w or r.h ~= h or r.size ~= size then

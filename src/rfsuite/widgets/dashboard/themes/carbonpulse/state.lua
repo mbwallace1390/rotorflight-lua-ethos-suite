@@ -13,6 +13,8 @@ local DEFAULTS = {bec_min=6.5, bec_warn=7.0, esc_warn=110, esc_max=150, fuel_war
 local STATES = {[0]="OFF", [1]="IDLE", [2]="SPOOLUP", [3]="RECOVERY", [4]="ACTIVE", [5]="THROTTLE OFF", [6]="LOST HEADSPEED", [7]="AUTOROTATION", [8]="BAILOUT"}
 local ARMED = {}
 for key, label in pairs(STATES) do ARMED[key] = "ARMED / " .. label end
+-- Governor state 0 with gov_mode NONE or LIMIT means no governor, not OFF (Suite #2353).
+local PASSTHRU = "ARMED / PASSTHRU"
 -- Profile numbers are small integers; their labels are built once.
 local PROFILE = {}
 for i = 0, 9 do PROFILE[i] = tostring(i) end
@@ -105,8 +107,6 @@ local function thermal(c, telemetry, historical)
     if fahrenheit then
         c.escWarn, c.escMax = c.escWarn * 1.8 + 32, c.escMax * 1.8 + 32
     end
-    c.escBar = c.esc
-    if c.escBar and fahrenheit then c.escBar = (c.escBar - 32) / 1.8 end
     if historical then
         c.mcu = sample(telemetry, "temp_mcu", "max")
         if c.mcu and fahrenheit then c.mcu = c.mcu * 1.8 + 32 end
@@ -182,12 +182,22 @@ local function flightState(c, telemetry)
         c.flightState, c.flightStateColor = "TELEMETRY OFFLINE", C.muted
         return
     end
+    -- armflags is 1, 0 or nil (not yet known, as after a reconnect); the
+    -- session's isArmed turns nil into false, so it cannot be used here.
+    local armflags = sensor(telemetry, "armflags")
     local governor = sensor(telemetry, "governor")
-    if not s.isArmed or governor == 101 then
+    if armflags == 0 or governor == 101 then
         c.flightState, c.flightStateColor = "DISARMED", C.green
-    else
-        c.flightState = ARMED[governor] or "ARMED"
+    elseif armflags == 1 or (governor and governor >= 1 and governor <= 8) then
+        -- Armed, or arm state unknown while the governor is running.
+        local label = ARMED[governor]
+        if governor == 0 and s.governorModeKnown == true and (s.governorMode == 0 or s.governorMode == 1) then
+            label = PASSTHRU
+        end
+        c.flightState = label or "ARMED"
         c.flightStateColor = governor == 6 and C.red or C.amber
+    else
+        c.flightState, c.flightStateColor = "ARM UNKNOWN", C.amber
     end
 end
 
@@ -241,7 +251,6 @@ local function live(c, telemetry)
     c.bec = sensor(telemetry, "bec_voltage")
     c.consumed = sensor(telemetry, "smartconsumption")
     c.link = percent(sensor(telemetry, "vfr"))
-    if c.link == nil then c.link = percent(sensor(telemetry, "rssi")) end
     thermal(c, telemetry, false)
     flightState(c, telemetry)
     local s = context.session
@@ -268,7 +277,6 @@ local function history(c, telemetry)
     c.consumed = sample(telemetry, "consumption", "max")
     c.cell = sample(telemetry, "cell_voltage", "min")
     c.link = percent(sample(telemetry, "vfr", "min"))
-    if c.link == nil then c.link = percent(sample(telemetry, "rssi", "min")) end
     c.rpm = sample(telemetry, "rpm", "max")
     if c.rpm and c.rpm < 0 then c.rpm = nil end
     c.altitude = sample(telemetry, "altitude", "max")
@@ -276,6 +284,7 @@ local function history(c, telemetry)
     thermal(c, telemetry, true)
     c.recorded = c.current ~= nil or c.fuel ~= nil or c.bec ~= nil or c.consumed ~= nil
         or c.cell ~= nil or c.link ~= nil or c.esc ~= nil or c.rpm ~= nil
+        or c.voltage ~= nil or c.mcu ~= nil or c.altitude ~= nil
     local s = context.session
     local modelName = model and model.name and model.name() or ""
     if c._model ~= modelName then
