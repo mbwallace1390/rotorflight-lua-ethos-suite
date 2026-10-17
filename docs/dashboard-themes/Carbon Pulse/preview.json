@@ -21,11 +21,11 @@
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/header.lua": "de02571c28fe394d8ad61310d99a3028c2e955e13df0a7c7868adb0bc82ab238",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/inflight.lua": "b3de3b19eef053b86c84187a049d85f64e537d3a822ebd3d4e306a22d4263086",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/init.lua": "10c381f9edfb2e127175cb772fd2c0c0b85c181d815bae8acc638f61a29a793b",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "5292ab8567fb2844f4744690ff7bb59f22ae653984a4c66e8531157da310f44e",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/lettering.lua": "19270e09cb25a545a30a1f6724e369168a02470e48e8f144115062a2eca2edeb",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "18a2c0e72f01ab740426c218e5fb1ff5b7df1d78825add8dc01f91d5732e941d",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/lettering.lua": "616e1763a53b4b1313c97c64a84639d1be81ac605a83d893fd10f484b40e9ea6",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/postflight.lua": "92d1f86f37611e40b47c45ce0471f3a6d7c5271dab7cfc27a364fa7d2ff108fb",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/preflight.lua": "53154ecad815022775a97d03236ca4d5bb101c29dcad3f510f6a7fec757316fe",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/state.lua": "c3d197afa00eb310cf383d02fd868acb155a617f89cfcad9062f0c84734206c9",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/state.lua": "3b95fa76bc23e5b38b93f4ca993d4f80ee1cccc3f22840026012730034be044b",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/gfx/carbon.png": "d7b2d0cde02352d9dd4acb6b63802c035b6585b76a817c3cd2f438492e16c413"
   },
   "previews": {
