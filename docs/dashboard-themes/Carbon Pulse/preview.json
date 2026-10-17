@@ -21,7 +21,7 @@
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/header.lua": "de02571c28fe394d8ad61310d99a3028c2e955e13df0a7c7868adb0bc82ab238",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/inflight.lua": "b3de3b19eef053b86c84187a049d85f64e537d3a822ebd3d4e306a22d4263086",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/init.lua": "10c381f9edfb2e127175cb772fd2c0c0b85c181d815bae8acc638f61a29a793b",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "18a2c0e72f01ab740426c218e5fb1ff5b7df1d78825add8dc01f91d5732e941d",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "5dcf518da6b3744f1b3bc4ffca120a2cca60690f405ebfbb388807d3950cedd3",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/lettering.lua": "616e1763a53b4b1313c97c64a84639d1be81ac605a83d893fd10f484b40e9ea6",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/postflight.lua": "92d1f86f37611e40b47c45ce0471f3a6d7c5271dab7cfc27a364fa7d2ff108fb",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/preflight.lua": "53154ecad815022775a97d03236ca4d5bb101c29dcad3f510f6a7fec757316fe",
@@ -29,9 +29,9 @@
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/gfx/carbon.png": "d7b2d0cde02352d9dd4acb6b63802c035b6585b76a817c3cd2f438492e16c413"
   },
   "previews": {
-    "preflight.png": "a2bf90061c3b239b3d978354e900e0ed4979c052b6c4ee847683371e6016cff9",
-    "inflight.png": "8458b08149ee0ed1a9b8a91abf1dc5e503b5d375e3212535e316be016079894e",
-    "postflight.png": "2e5b14a257c08a7d6de2e2bbaac3dc6589c05f3d1da878d965dd0d9732f7c3fa"
+    "preflight.png": "0b728674f812aa30d2d2b2e695c97c48e0d1a93c57de038f658ced54fb380888",
+    "inflight.png": "7bda0ee0f20440a08edeb2ff3fd168acc5e727df23b2e0e8a09ad1c523725980",
+    "postflight.png": "85fdc785cfd432161a40855d206e70e1e09285a0ea4a19e68f55960d6b67c3dc"
   },
   "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
 }

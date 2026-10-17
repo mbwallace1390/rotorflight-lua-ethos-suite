@@ -81,7 +81,11 @@ colour. The masks are
 rendered from Barlow Condensed in five sizes; with the carbon tile, `gfx/` holds
 203 PNG files of about 76 KB, generated with `glyphs.lua` by an external MWRC
 Theme Studio script that is not part of this repository. A mask is loaded the
-first time its character is laid out, and the masks and tile are released with
+first time its character is laid out, which takes about 13 ms on a radio, so a
+full screen draws its secondary text (the pill, last, total and flight count,
+the corner and altitude readings, the issue, the flight state and the theme
+name) at its 16 px caption size, the size the compact layout already uses for
+that text apart from the pill. The masks and tile are released with
 the Suite's other images on a theme reload, a model change and when the widget
 closes. A text with a character outside the glyph sets, or too wide for every
 size, uses the radio font. Missing masks fall back to the radio font and a

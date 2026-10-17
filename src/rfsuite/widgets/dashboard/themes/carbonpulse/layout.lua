@@ -240,7 +240,7 @@ local function pill(c, g, label, color, filled)
         local r, b = p.x + p.w - 1, p.y + p.h - 1
         D.triangle(C.bg, r, b, r - g.cut, b, r, b - g.cut)
     end
-    T(c, "pill", p.x + 8, p.y, p.w - 16, p.h, label, "small",
+    T(c, "pill", p.x + 8, p.y, p.w - 16, p.h, label, g.compact and "small" or "label",
         filled and (color == C.red and C.white or C.bg) or color, "center")
 end
 
@@ -264,7 +264,7 @@ end
 local function row(c, g, slotL, slotV, x, y, w, h, label, value, color)
     local lw = floor(w * 0.45)
     T(c, slotL, x, y, lw, h, label, g.label, C.label)
-    T(c, slotV, x + lw, y, w - lw, h, value, g.compact and "label" or "small", color or C.white, "right")
+    T(c, slotV, x + lw, y, w - lw, h, value, "label", color or C.white, "right")
 end
 
 local function timerPanel(c, g, title)
@@ -321,9 +321,9 @@ local function centerReadouts(c, g, aLabel, aValue, aColor, bLabel, bValue, bCol
     local inset = k and 8 or 14
     local cornerW = floor(p.w * 0.30)
     T(c, "cornerAL", p.x + inset, p.y + 4, cornerW, k and 14 or 18, aLabel, g.label, C.label)
-    T(c, "cornerAV", p.x + inset, p.y + (k and 18 or 22), cornerW, k and 18 or 26, aValue, k and "label" or "small", aColor)
+    T(c, "cornerAV", p.x + inset, p.y + (k and 18 or 22), cornerW, k and 18 or 26, aValue, "label", aColor)
     T(c, "cornerBL", p.x + p.w - inset - cornerW, p.y + 4, cornerW, k and 14 or 18, bLabel, g.label, C.label, "right")
-    T(c, "cornerBV", p.x + p.w - inset - cornerW, p.y + (k and 18 or 22), cornerW, k and 18 or 26, bValue, k and "label" or "small", bColor, "right")
+    T(c, "cornerBV", p.x + p.w - inset - cornerW, p.y + (k and 18 or 22), cornerW, k and 18 or 26, bValue, "label", bColor, "right")
     local vw = floor(g.arcInner * 1.5)
     local vh = k and 44 or 70
     local vy = g.arcY - floor(vh * 0.75)
@@ -338,7 +338,7 @@ local function centerReadouts(c, g, aLabel, aValue, aColor, bLabel, bValue, bCol
         D.rect(C.glow, bx, by, 1, bh)
         D.rect(C.glow, bx + bw - 1, by, 1, bh)
         T(c, "altL", bx + 6, by, floor(bw * 0.35), bh, altLabel, g.label, C.label)
-        T(c, "altV", bx + floor(bw * 0.35), by, floor(bw * 0.65) - 6, bh, c.altText, k and "label" or "small", C.white, "right")
+        T(c, "altV", bx + floor(bw * 0.35), by, floor(bw * 0.65) - 6, bh, c.altText, "label", C.white, "right")
     end
     T(c, "state", p.x + inset, p.y + p.h - (k and 18 or 26), p.w - 2 * inset, k and 14 or 20,
         state, g.label, stateColor, "center")
@@ -356,7 +356,7 @@ end
 local function bottom(c, g, phase, packLabel, fuelLabel, escLabel)
     local k = g.compact
     local mp = g.mark
-    T(c, "brand", mp.x + 6, mp.y + 4, mp.w - 12, floor(mp.h / 2) - 2, "CARBON PULSE", k and "label" or "small", C.label, "center")
+    T(c, "brand", mp.x + 6, mp.y + 4, mp.w - 12, floor(mp.h / 2) - 2, "CARBON PULSE", "label", C.label, "center")
     T(c, "phase", mp.x + 6, mp.y + floor(mp.h / 2), mp.w - 12, floor(mp.h / 2) - 4, PHASE[phase], g.label, C.muted, "center")
     -- Battery: icon fill shows fuel only when it is known.
     local bp = g.battery
@@ -410,9 +410,9 @@ function M.preflight(x, y, w, h, c)
     local inset = k and 10 or 18
     T(c, "checkLabel", p.x + inset, p.y + 6, p.w - 2 * inset, k and 14 or 18, "PREFLIGHT CHECK", g.label, C.label, "center")
     T(c, "status", p.x + inset, p.y + (k and 24 or 40), p.w - 2 * inset, k and 40 or 64, c.status, k and "small" or "mid", c.statusColor, "center")
-    T(c, "issue", p.x + inset, p.y + (k and 68 or 112), p.w - 2 * inset, k and 18 or 26, c.issue, k and "label" or "small", c.issues > 0 and C.amber or C.muted, "center")
+    T(c, "issue", p.x + inset, p.y + (k and 68 or 112), p.w - 2 * inset, k and 18 or 26, c.issue, "label", c.issues > 0 and C.amber or C.muted, "center")
     T(c, "coverage", p.x + inset, p.y + (k and 88 or 142), p.w - 2 * inset, k and 18 or 24, c.coverage, g.label, C.white, "center")
-    T(c, "flightState", p.x + inset, p.y + (k and 108 or 176), p.w - 2 * inset, k and 18 or 26, c.flightState, k and "label" or "small", c.flightStateColor, "center")
+    T(c, "flightState", p.x + inset, p.y + (k and 108 or 176), p.w - 2 * inset, k and 18 or 26, c.flightState, "label", c.flightStateColor, "center")
     checkLamps(c, g, p.y + p.h - (k and 28 or 44))
     stat(c, g, "linkL", "linkV", g.link.x + 6, g.link.y + 2, g.link.w - 12, g.link.h - 4, "LINK", c.linkText, c.linkValueColor)
     rightStack(c, g, "BEC", c.becText, c.becValueColor, "MCU", c.mcuText, c.mcu and C.value or C.muted,
