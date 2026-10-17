@@ -25,14 +25,16 @@ retains the dynamic model name, transmitter battery/RSSI, and centered title.
   state; it is not a flight-clearance system.
 - **Inflight:** the headspeed arc with the numeric headspeed in its centre, MCU
   temperature, throttle, altitude and flight state. The status pill is amber
-  when armed and red for lost headspeed. It reads ARM UNKNOWN until the flight
-  controller reports its arm state, and an armed model without a governor reads
-  ARMED / PASSTHRU. Link, BEC, current, capacity used, pack
-  voltage, fuel and ESC temperature surround it.
+  when armed and red for lost headspeed. Link, BEC, current, capacity used,
+  pack voltage, fuel and ESC temperature surround it.
 - **Postflight:** recorded results: flight time, average current, peak
   headspeed, peak MCU and ESC temperature, peak current, capacity used and
   maximum altitude, with minimum link, cell, BEC, pack voltage and fuel.
   Unavailable readings remain marked.
+
+On the preflight and inflight screens the pill and flight state read ARM UNKNOWN
+until the flight controller reports its arm state, and an armed model without a
+governor reads ARMED / PASSTHRU.
 
 See the [three phase previews](../dashboard-themes/Carbon%20Pulse/README.md).
 They use simulated telemetry and desktop fonts: **Desktop preview, not radio capture**.
@@ -89,7 +91,8 @@ per-callback instruction limit. After startup, a phase change or a resize, the
 panels draw first and the lettering completes over the next few frames. The
 dashboard repaints only when its data changes, so while text is still waiting
 the theme requests the next frame with `lcd.invalidate()`, and stops once the
-screen is complete. Readings that have waited longest go first, so a changing
+screen is complete. After 20 requests in a row, or while two dashboards of
+different sizes paint in turn, it requests at most one frame a second. Readings that have waited longest go first, so a changing
 reading waits at most a few paints.
 
 ## Installation and verification

@@ -307,8 +307,9 @@ local function history(c, telemetry)
             seconds = c._lastSeconds
         else
             seconds = saved
-            -- The facade synthesizes zero without history; known live zero is retained above.
-            if seconds == 0 and not c.recorded then seconds = nil end
+            -- Disconnected, the facade substitutes zero for missing statistics;
+            -- a zero seen live is retained in c._lastSeconds above instead.
+            if seconds == 0 then seconds = nil end
         end
     end
     c._lastSeconds = seconds

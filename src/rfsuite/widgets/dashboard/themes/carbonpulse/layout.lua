@@ -6,7 +6,7 @@ local D = requireModule("widgets/dashboard/themes/carbonpulse/common.lua")
 local L = requireModule("widgets/dashboard/themes/carbonpulse/lettering.lua")
 local T = L.text
 local C = D.colors
-local lcd, floor, min, max = lcd, math.floor, math.min, math.max
+local lcd, floor, min, max, clock = lcd, math.floor, math.min, math.max, os.clock
 local sin, cos, rad = math.sin, math.cos, math.rad
 local M = {}
 
@@ -22,6 +22,13 @@ end
 -- Characters laid out per paint (see lettering.lua). None on a paint that also
 -- builds the geometry: that paint is already the most expensive one.
 local QUOTA = 48
+-- Frames the theme requests back to back; a cold screen needs about 5. Past
+-- MAX_CHAINED, or while the geometry is rebuilt on consecutive paints (two
+-- dashboards of different sizes painting in turn, which cannot finish), it
+-- asks at most once per RETRY seconds instead. rebuilt/rebuiltBefore: this
+-- paint and the previous one built the geometry.
+local MAX_CHAINED, RETRY = 20, 1
+local chained, retried, rebuilt, rebuiltBefore = 0, 0, false, false
 
 local DIM = {[C.green] = lcd.RGB(16, 64, 34), [C.amber] = lcd.RGB(70, 54, 8), [C.red] = lcd.RGB(72, 20, 16)}
 local BRIGHT = {[C.green] = C.zoneGreen, [C.amber] = C.zoneAmber, [C.red] = C.zoneRed}
@@ -160,7 +167,9 @@ end
 
 -- Carbon fibre clipped to the box; a flat fill if the tile cannot load.
 local function begin(x, y, w, h)
-    local g, rebuilt = geometry(x, y, w, h)
+    local g
+    rebuiltBefore = rebuilt
+    g, rebuilt = geometry(x, y, w, h)
     D.frame()
     L.frame(rebuilt and 0 or QUOTA)
     -- Not lazy, so a missing tile fails here and the flat fill takes over.
@@ -182,7 +191,19 @@ end
 local function finish(g)
     D.segments(C.glow, g.glow, g.glowCount)
     D.segments(C.neon, g.neon, g.neonCount)
-    if L.pending() then lcd.invalidate() end
+    if not L.pending() then
+        chained = 0
+    elseif chained < MAX_CHAINED and not (rebuilt and rebuiltBefore) then
+        chained = chained + 1
+        lcd.invalidate()
+    else
+        -- Throttled, not stopped, so a screen that settles again still finishes.
+        local now = clock()
+        if now - retried >= RETRY then
+            retried = now
+            lcd.invalidate()
+        end
+    end
 end
 
 -- Status pill: outlined when calm, filled for armed states: dark text on amber,
