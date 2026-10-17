@@ -3,6 +3,7 @@ name: Create rfsuite-lua-ethos-lite ZIP on Push
 on:
   push:
     branches:
+      - 'radio-all-themes'
       - 'main'
       - 'RF-*'
 

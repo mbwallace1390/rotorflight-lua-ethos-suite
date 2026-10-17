@@ -81,6 +81,8 @@ _G.system = {
 }
 
 _G.lcd = {
+  -- Theme Bridge uses this native API to build its palette during create().
+  RGB = function(r, g, b) return r * 65536 + g * 256 + b end,
   loadMask = function(p) return { path = p } end,
   loadImage = function(p) return { path = p } end,
   getWindowSize = function() return 480, 320 end,
