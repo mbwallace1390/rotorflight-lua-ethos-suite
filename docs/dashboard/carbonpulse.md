@@ -88,8 +88,8 @@ size, uses the radio font. Missing masks fall back to the radio font and a
 missing carbon tile to a flat background.
 
 Each paint lays out a limited amount of new text to keep within the radio's
-per-callback instruction limit, more when the radio reports spare instructions
-in that paint. After startup, a phase change or a resize, the panels draw on the
+per-callback instruction limit, more on a frame that only continues waiting text
+and when the radio reports spare instructions in that paint. After startup, a phase change or a resize, the panels draw on the
 first frame and the lettering is laid out over the next few; it is then drawn all
 at once, about 0.1 to 0.2 s after power-up or a theme selection, with or without
 a link. The dashboard

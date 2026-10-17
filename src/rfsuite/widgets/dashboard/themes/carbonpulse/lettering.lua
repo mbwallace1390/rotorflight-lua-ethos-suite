@@ -168,7 +168,7 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
     if not r then r = {run = {}, n = 0, top = 0}; runs[slot] = r end
     if r.text ~= text or r.x ~= x or r.y ~= y or r.w ~= w or r.h ~= h or r.size ~= size then
         local since = r.waiting
-        local allowed = quota > 0 or (usage ~= nil and usage() < SPARE)
+        local allowed = quota > 0 or (usage and usage() < SPARE)
         if not allowed and overdraft > 0 and since ~= nil and since == oldest then
             overdraft, allowed = overdraft - 1, true
         end

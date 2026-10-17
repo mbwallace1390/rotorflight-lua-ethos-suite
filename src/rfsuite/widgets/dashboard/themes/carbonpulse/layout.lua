@@ -20,8 +20,11 @@ if utils.registerImageCacheClearer then
     utils.registerImageCacheClearer(function() carbon = nil end)
 end
 -- Characters laid out per paint (see lettering.lua). None on a paint that also
--- builds the geometry: that paint is already the most expensive one.
-local QUOTA = 48
+-- builds the geometry: that paint is already the most expensive one. CONTINUED
+-- on a paint that only continues waiting text, on a pass the pacer held open
+-- (state.lua): no data event, reload or connect shares that paint, so it has
+-- room for more, and radios without system.getInstructionsUsage finish sooner.
+local QUOTA, CONTINUED = 48, 144
 -- Wake passes kept open in a row (see M.waiting); a cold screen needs about 5.
 -- Past MAX_PACED nothing is kept open until a paint completes the screen, so
 -- text that cannot finish (two dashboards of different sizes painting in turn)
@@ -177,7 +180,7 @@ local function begin(x, y, w, h, c)
     D.frame()
     local hold = c._paced == true and c._complete ~= g.version and (c._held or 0) < MAX_HELD
     c._holding = hold
-    L.frame(rebuilt and 0 or QUOTA, hold)
+    L.frame(rebuilt and 0 or (c._paced == true and c._continuing == true and CONTINUED or QUOTA), hold)
     -- Not lazy, so a missing tile fails here and the flat fill takes over.
     if carbon == nil then carbon = lcd.loadBitmap(CARBON_PATH, false) or false end
     if carbon then

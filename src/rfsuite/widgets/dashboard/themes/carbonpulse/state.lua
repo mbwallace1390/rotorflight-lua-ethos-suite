@@ -369,6 +369,8 @@ function M.create(phase)
     -- One callback pair and one cache per loaded phase; none are created in paint.
     local function wakeup(box, telemetry)
         local c = update(box, telemetry, phase)
+        -- The last paint left text waiting, so this pass only continues it.
+        c._continuing = c._settled == false
         -- Gaining or losing the link changes many readings at once, more than
         -- one paint may lay out.
         local online = context.session.isConnected == true
