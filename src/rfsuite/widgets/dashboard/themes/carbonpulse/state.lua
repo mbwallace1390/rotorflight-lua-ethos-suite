@@ -386,7 +386,9 @@ function M.create(phase)
             panels[phase](x, y, w, h, c)
         end
     end
-    local main = {col=1, row=1, colspan=12, rowspan=12, type="func", subtype="func",
+    -- One cell: the engine rounds a box down to whole grid cells, and a finer grid
+    -- left an unpainted strip along the screen edges.
+    local main = {col=1, row=1, colspan=1, rowspan=1, type="func", subtype="func",
         wakeup=wakeup, paint=paint, bgcolor="transparent"}
     -- The engine adds header boxes, after these, only on a full screen.
     local full, compact, withPacer, headerList = {main}, {main, pacer}, {}, nil
@@ -404,7 +406,7 @@ function M.create(phase)
         return withPacer
     end
     return {
-        layout = {cols=12, rows=12, padding=0},
+        layout = {cols=1, rows=1, padding=0},
         boxes = getBoxes,
         header_layout=headerLayout, header_boxes=getHeaderBoxes,
         screenBorderStyle={enabled=false},

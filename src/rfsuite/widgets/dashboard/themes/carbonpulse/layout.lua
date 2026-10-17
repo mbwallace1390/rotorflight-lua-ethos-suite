@@ -1,4 +1,4 @@
--- Carbon Pulse: neon chamfered panels over carbon fibre, with a segmented
+-- Carbon Pulse: neon chamfered panels on the header's dark face, with a segmented
 -- headspeed arc and condensed italic lettering. Studio original visual frame;
 -- telemetry roles are adapted from Studio Stratus 98. GPLv3.
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
@@ -10,15 +10,6 @@ local lcd, floor, min, max = lcd, math.floor, math.min, math.max
 local sin, cos, rad = math.sin, math.cos, math.rad
 local M = {}
 
-local CARBON_PATH = "widgets/dashboard/themes/carbonpulse/gfx/carbon.png"
-local TILE = 128
--- The tile bitmap: nil until loaded, false if it cannot load. Released with
--- the Suite's other images and loaded again on the next paint.
-local carbon = nil
-local utils = requireModule("widgets/dashboard/context.lua").widgets.dashboard.utils
-if utils.registerImageCacheClearer then
-    utils.registerImageCacheClearer(function() carbon = nil end)
-end
 -- Characters laid out per paint (see lettering.lua). None on a paint that also
 -- builds the geometry: that paint is already the most expensive one. CONTINUED
 -- on a paint that only continues waiting text, on a pass the pacer held open
@@ -70,24 +61,11 @@ local function frame(g, key, x, y, w, h)
     return p
 end
 
--- Carbon tile origins covering the box, as a flat {x, y, ...} list.
-local function tiles(list, x, y, w, h)
-    local n = 0
-    for ty = y, y + h - 1, TILE do
-        for tx = x, x + w - 1, TILE do
-            list[n + 1], list[n + 2] = tx, ty
-            n = n + 2
-        end
-    end
-    for i = n + 1, #list do list[i] = nil end
-    return n
-end
-
 -- Every position, cached for the last box size and shared by the three phases,
 -- so a phase change does not rebuild it. Returns the geometry and whether this
 -- call rebuilt it. neon and glow are outline segments with a one-pixel outer
 -- glow; a1/a2 are arc segment angles and runs the arc's zone runs.
-local G = {neon = {{}, {}, {}, {}}, glow = {{}, {}, {}, {}}, tiles = {}, a1 = {}, a2 = {}, runs = {}}
+local G = {neon = {{}, {}, {}, {}}, glow = {{}, {}, {}, {}}, a1 = {}, a2 = {}, runs = {}}
 local function geometry(x, y, w, h)
     local g = G
     if g.x == x and g.y == y and g.w == w and g.h == h then return g, false end
@@ -123,9 +101,6 @@ local function geometry(x, y, w, h)
         for i = g.neonCount + 1, #neon do neon[i] = nil end
         for i = g.glowCount + 1, #glow do glow[i] = nil end
     end
-    g.tileCount = tiles(g.tiles, x, y, w, h)
-    g.clipX, g.clipY, g.clipW, g.clipH = x, y, w, h
-    g.winW, g.winH = lcd.getWindowSize()
     -- Headspeed arc: 240 degrees clockwise from the lower left, split at the top
     -- so no sector crosses 360. Segment zones match the readout colours.
     local cp = g.center
@@ -170,7 +145,7 @@ local function needle(g, fraction)
     g.n3x, g.n3y = floor(cx + dx * base + dy * half + 0.5), floor(cy + dy * base - dx * half + 0.5)
 end
 
--- Carbon fibre clipped to the box; a flat fill if the tile cannot load. Until
+-- One flat fill in the header's face colour, so the body matches the header. Until
 -- the screen of cache c has had all its text laid out at this geometry, the
 -- lettering is held and drawn at once by the paint that completes it (finish);
 -- the panels draw at once. Held only where the Suite delivers the frames that
@@ -181,16 +156,7 @@ local function begin(x, y, w, h, c)
     local hold = c._paced == true and c._complete ~= g.version and (c._held or 0) < MAX_HELD
     c._holding = hold
     L.frame(rebuilt and 0 or (c._paced == true and c._continuing == true and CONTINUED or QUOTA), hold)
-    -- Not lazy, so a missing tile fails here and the flat fill takes over.
-    if carbon == nil then carbon = lcd.loadBitmap(CARBON_PATH, false) or false end
-    if carbon then
-        local list, drawBitmap = g.tiles, lcd.drawBitmap
-        lcd.setClipping(g.clipX, g.clipY, g.clipW, g.clipH)
-        for i = 1, g.tileCount, 2 do drawBitmap(list[i], list[i + 1], carbon) end
-        lcd.setClipping(0, 0, g.winW, g.winH)
-    else
-        D.fill(C.bg, x, y, w, h)
-    end
+    D.fill(C.bg, x, y, w, h)
     return g
 end
 

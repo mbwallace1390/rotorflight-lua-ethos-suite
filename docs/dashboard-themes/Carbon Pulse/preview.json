@@ -15,23 +15,22 @@
     "src/rfsuite/lib/require.lua": "79aa3a23ca3c5af9f02917969c5b604da3a810e0b8b16668d834b86d71f8bd5e",
     "src/rfsuite/widgets/dashboard/context.lua": "303b52c962ee773b14d80cfb32f978cca3942e0e862328ae560dcbb7101189f5",
     "src/rfsuite/widgets/dashboard/engine.lua": "f537afd2c0fdb3eae6d3cf233662df9f269f3e5b561e9ef5351ec69015c98965",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/common.lua": "bc879a67655637d7a3d151abee8df35e05a8d2efd9b6b8086067bdee3c8f47ff",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/common.lua": "e74ecb6ed0c072abe4fade2c3cb41ff74a9a35acff3657a25739a35d91cfacfd",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/configure.lua": "4010d1d7aa173b06ecfc2a8bce9fc657090803ea871e08ffc758b4b3f73ae9b7",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/glyphs.lua": "4a92ce5e1e0fd530089e1d0f4489a2143072bcfd0a0526a37a5e4edfeef8cc47",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/header.lua": "de02571c28fe394d8ad61310d99a3028c2e955e13df0a7c7868adb0bc82ab238",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/header.lua": "8afb599618862eacf20922040bdbed037c8a72f9b2f8bf41d1019aafa26c9576",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/inflight.lua": "b3de3b19eef053b86c84187a049d85f64e537d3a822ebd3d4e306a22d4263086",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/init.lua": "10c381f9edfb2e127175cb772fd2c0c0b85c181d815bae8acc638f61a29a793b",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "5dcf518da6b3744f1b3bc4ffca120a2cca60690f405ebfbb388807d3950cedd3",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/init.lua": "ef2c9dc0cb801251f2480703ea9b8f3e15ba5540c753cb4426e46de62e7acfb5",
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/layout.lua": "9977f100b4d4e083ef8050f02b92a6340c81c5df0690b582a34eb505557deaef",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/lettering.lua": "616e1763a53b4b1313c97c64a84639d1be81ac605a83d893fd10f484b40e9ea6",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/postflight.lua": "92d1f86f37611e40b47c45ce0471f3a6d7c5271dab7cfc27a364fa7d2ff108fb",
     "src/rfsuite/widgets/dashboard/themes/carbonpulse/preflight.lua": "53154ecad815022775a97d03236ca4d5bb101c29dcad3f510f6a7fec757316fe",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/state.lua": "3b95fa76bc23e5b38b93f4ca993d4f80ee1cccc3f22840026012730034be044b",
-    "src/rfsuite/widgets/dashboard/themes/carbonpulse/gfx/carbon.png": "d7b2d0cde02352d9dd4acb6b63802c035b6585b76a817c3cd2f438492e16c413"
+    "src/rfsuite/widgets/dashboard/themes/carbonpulse/state.lua": "de0d5989013fa9d4954913f23391a121981fdef7fe982200271fa026f8c52394"
   },
   "previews": {
-    "preflight.png": "0b728674f812aa30d2d2b2e695c97c48e0d1a93c57de038f658ced54fb380888",
-    "inflight.png": "7bda0ee0f20440a08edeb2ff3fd168acc5e727df23b2e0e8a09ad1c523725980",
-    "postflight.png": "85fdc785cfd432161a40855d206e70e1e09285a0ea4a19e68f55960d6b67c3dc"
+    "preflight.png": "412762dbc48fe2d6682b3a57b1d24a0a0cf7c5e48c6f5e23d7e5b820234f3b74",
+    "inflight.png": "b5df204076d498613d7ab7acb39ac5f424574231f9cc5ad8029d5494902eb7a3",
+    "postflight.png": "b7f9a61ba52c7c96d4b78adb40e47724113c13918b0fea2ed80854145207a80b"
   },
   "inputHashNormalization": "UTF-8 Lua source with CRLF/CR normalized to LF"
 }

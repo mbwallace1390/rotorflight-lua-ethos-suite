@@ -1,4 +1,4 @@
--- Carbon Pulse native header on a dark carbon face.
+-- Carbon Pulse native header on the body's dark face.
 -- Adapted from Studio Stratus 98 (from Studio Sector, MWRC Cinder and the bounded
 -- dashboard header). GPLv3.
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
@@ -8,7 +8,7 @@ local C = requireModule("widgets/dashboard/themes/carbonpulse/common.lua").color
 local lcd, type = lcd, type
 local floor = math.floor
 
--- Keep the dark carbon face inside the native header rectangles.
+-- Keep the dark face inside the native header rectangles.
 local function headerFace(x, y, w, h)
     x, y, w, h = floor(x), floor(y), floor(w), floor(h)
     if w <= 0 or h <= 0 then return end
@@ -140,7 +140,7 @@ local function header_boxes()
     return header_boxes_cache
 end
 
--- The header keeps the carbon face; battery and RSSI fills use the neon pair.
+-- The header keeps the dark face; battery and RSSI fills use the neon pair.
 colorMode.bgcolor = C.head
 colorMode.tbbgcolor = C.head
 colorMode.tbtextcolor, colorMode.cntextcolor, colorMode.rssitextcolor = C.white, C.white, C.white

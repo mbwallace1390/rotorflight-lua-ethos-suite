@@ -1,6 +1,6 @@
 # Carbon Pulse
 
-Neon-blue chamfered panels over carbon fibre, a segmented headspeed arc with a
+Neon-blue chamfered panels on a flat dark face, a segmented headspeed arc with a
 needle, bright green readings and condensed italic lettering drawn from glyph masks.
 
 - **Preflight:** live telemetry checks with lamps for pack, fuel, BEC, ESC and link.

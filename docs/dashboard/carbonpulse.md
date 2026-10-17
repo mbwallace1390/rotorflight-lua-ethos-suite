@@ -1,7 +1,7 @@
 # Carbon Pulse
 
-Neon-blue chamfered panels over carbon fibre, a segmented headspeed arc with a
-needle, bright green readings and condensed italic lettering.
+Neon-blue chamfered panels on a flat dark face that matches the native header,
+a segmented headspeed arc with a needle, bright green readings and condensed italic lettering.
 
 ## Select and configure
 
@@ -78,18 +78,17 @@ instrument thresholds.
 ETHOS documents no font file format for `lcd.loadFont`, so the theme draws each
 character from a glyph mask in its `gfx/` folder and tints it with the text
 colour. The masks are
-rendered from Barlow Condensed in five sizes; with the carbon tile, `gfx/` holds
-203 PNG files of about 76 KB, generated with `glyphs.lua` by an external MWRC
+rendered from Barlow Condensed in five sizes; `gfx/` holds 202 PNG files of
+about 75 KB, generated with `glyphs.lua` by an external MWRC
 Theme Studio script that is not part of this repository. A mask is loaded the
 first time its character is laid out, which takes about 13 ms on a radio, so a
 full screen draws its secondary text (the pill, last, total and flight count,
 the corner and altitude readings, the issue, the flight state and the theme
 name) at its 16 px caption size, the size the compact layout already uses for
-that text apart from the pill. The masks and tile are released with
+that text apart from the pill. The masks are released with
 the Suite's other images on a theme reload, a model change and when the widget
 closes. A text with a character outside the glyph sets, or too wide for every
-size, uses the radio font. Missing masks fall back to the radio font and a
-missing carbon tile to a flat background.
+size, uses the radio font, as do missing masks.
 
 Each paint lays out a limited amount of new text to keep within the radio's
 per-callback instruction limit, more on a frame that only continues waiting text
@@ -118,7 +117,7 @@ insufficient.
 The portable checks in `tests/themes/test_carbonpulse_registration.py` exercise
 selection, save/reopen, model overrides, and minimum-size visibility against
 production Suite modules. See `tests/themes/README.md` for commands and evidence
-limits. Mask and bitmap rendering on the radio, file-loading time, real telemetry
+limits. Mask rendering on the radio, file-loading time, real telemetry
 transitions, and radio instruction/memory behaviour still need simulator and
 physical-radio verification.
 

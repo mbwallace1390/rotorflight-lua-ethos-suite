@@ -1,4 +1,4 @@
--- Carbon Pulse: neon-framed instruments over carbon fibre.
+-- Carbon Pulse: neon-framed instruments on a dark face.
 -- Registration shape adapted from Studio Stratus 98. GPLv3.
 return {
     key = "carbonpulse", name = "Carbon Pulse",

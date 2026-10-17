@@ -7,9 +7,10 @@ local lcd = lcd
 local floor = math.floor
 local M = {}
 
--- Near-black carbon, neon-blue frames and bright readouts; alarm hues stay distinct.
+-- One near-black face for the header and body, neon-blue frames and bright
+-- readouts; alarm hues stay distinct.
 M.colors = {
-    bg = lcd.RGB(7, 10, 15),
+    bg = lcd.RGB(9, 13, 19),
     panel = lcd.RGB(9, 13, 19), head = lcd.RGB(9, 13, 19),
     neon = lcd.RGB(30, 144, 255), glow = lcd.RGB(16, 78, 150),
     label = lcd.RGB(143, 200, 255), white = lcd.RGB(234, 242, 255), muted = lcd.RGB(93, 107, 122),
