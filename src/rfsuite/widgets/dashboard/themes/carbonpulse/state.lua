@@ -150,8 +150,9 @@ end
 -- Saved model statistics. The facade substitutes zero when history is absent,
 -- so a disconnected zero is shown as unavailable rather than invented.
 -- The facade substitutes zero for model statistics it no longer has, as after a
--- disconnect. With `retain` (postflight) the figures last shown stay until the
--- model changes, as the flight time does; otherwise a disconnected zero is unknown.
+-- disconnect. With `retain` (postflight) the figures last shown stay until
+-- another aircraft or flight, as the flight time does; otherwise a disconnected
+-- zero is unknown.
 local function statistics(c, connected, retain)
     local s = context.session
     local general = s.modelPreferences and s.modelPreferences.general
@@ -286,17 +287,28 @@ local function history(c, telemetry)
         or c.cell ~= nil or c.link ~= nil or c.esc ~= nil or c.rpm ~= nil
         or c.voltage ~= nil or c.mcu ~= nil or c.altitude ~= nil
     local s = context.session
-    local modelName = model and model.name and model.name() or ""
-    if c._model ~= modelName then
-        -- The last visible summary belongs to one selected radio model only.
-        c._model, c._lastSeconds, c._savedSeen = modelName, nil, nil
+    -- Retained results belong to one aircraft and one flight. The Suite keeps
+    -- mcu_id while a flight is held and clears it on a plain disconnect, when
+    -- it may also restore the radio model's name, so only a different reported
+    -- id is another aircraft. It replaces its per-sensor sample entries when a
+    -- connection or a flight starts, even while the dashboard is hidden, so
+    -- other entries mean a later flight. An ETHOS model switch closes the
+    -- widget, which discards this cache.
+    local id = s.mcu_id
+    local stats = telemetry and telemetry.sensorStats
+    local samples = stats and (stats.voltage or stats.current or stats.rpm or stats.consumption
+        or stats.throttle_percent)
+    if (id and id ~= "" and c._model ~= id) or (samples and c._samples ~= samples) then
+        if id and id ~= "" then c._model = id end
+        if samples then c._samples = samples end
+        c._lastSeconds, c._savedSeen = nil, nil
         c._lastCount, c._lastTotal, c._lastSaved = nil, nil, nil
     end
     local general = s.modelPreferences and s.modelPreferences.general
     local saved = number(general and general.lastflighttime)
     if c._savedSeen ~= saved then
-        -- A flight saved since the last wakeup, possibly while the dashboard
-        -- was hidden, supersedes the duration this phase retained.
+        -- A flight saved since the last wakeup supersedes the duration this
+        -- phase retained.
         if c._savedSeen ~= nil and saved and saved > 0 then c._lastSeconds = nil end
         c._savedSeen = saved
     end
@@ -339,21 +351,63 @@ local function update(box, telemetry, phase)
     return c
 end
 
+-- The pacer box keeps the engine's wake pass open while the screen still
+-- needs frames (layout.lua M.waiting). A box whose object type cannot load is
+-- left unwoken, and the engine then reports its pass not done, so the
+-- dashboard schedules another wakeup and repaint (engine.lua wakeOne and
+-- wakeObjects, dashboard.lua wakeup). No object file has this name; a failed
+-- load is retried at most once a second. The box has no size and draws
+-- nothing. It wakes last in each pass, after the theme box has decided: after
+-- the header boxes on a full screen, after the theme box otherwise. Placed
+-- there, the boxes before it wake in the same groups as without it.
+local WAITING = "carbonpulse-waiting"
+local isFullScreen = context.widgets.dashboard.utils.isFullScreen
+
 function M.create(phase)
     local headerLayout, headerBoxes = header.create()
+    local pacer = {x=0, y=0, w=0, h=0, type="func", subtype="func", bgcolor="transparent"}
     -- One callback pair and one cache per loaded phase; none are created in paint.
-    local function wakeup(box, telemetry) return update(box, telemetry, phase) end
-    local function paint(x, y, w, h, box, c)
-        if c then panels[phase](x, y, w, h, c) end
+    local function wakeup(box, telemetry)
+        local c = update(box, telemetry, phase)
+        -- Gaining or losing the link changes many readings at once, more than
+        -- one paint may lay out.
+        local online = context.session.isConnected == true
+        if c._online ~= online then c._online, c._settled = online, false end
+        pacer.type = panels.waiting(c, box) and WAITING or "func"
+        return c
     end
-    local boxes = {{col=1, row=1, colspan=12, rowspan=12, type="func", subtype="func",
-        wakeup=wakeup, paint=paint, bgcolor="transparent"}}
-    local function getBoxes() return boxes end
+    local function paint(x, y, w, h, box, c)
+        if c then
+            -- Engines that hold a pass open for an unwoken box (#2447) mark each
+            -- woken box; only there do the frames that complete held text come.
+            c._paced = box._dashboardWoken == true
+            panels[phase](x, y, w, h, c)
+        end
+    end
+    local main = {col=1, row=1, colspan=12, rowspan=12, type="func", subtype="func",
+        wakeup=wakeup, paint=paint, bgcolor="transparent"}
+    -- The engine adds header boxes, after these, only on a full screen.
+    local full, compact, withPacer, headerList = {main}, {main, pacer}, {}, nil
+    local function getBoxes()
+        return isFullScreen(lcd.getWindowSize()) and full or compact
+    end
+    local function getHeaderBoxes()
+        local list = headerBoxes()
+        if list ~= headerList then
+            headerList = list
+            for i = #withPacer, 1, -1 do withPacer[i] = nil end
+            for i = 1, #list do withPacer[i] = list[i] end
+            withPacer[#list + 1] = pacer
+        end
+        return withPacer
+    end
     return {
         layout = {cols=12, rows=12, padding=0},
         boxes = getBoxes,
-        header_layout=headerLayout, header_boxes=headerBoxes,
+        header_layout=headerLayout, header_boxes=getHeaderBoxes,
         screenBorderStyle={enabled=false},
+        -- A pass wakes boxes in order, so the theme box always decides before the
+        -- pacer wakes; at this ratio either size wakes every box in one call.
         scheduler={spread_scheduling=true, spread_scheduling_paint=false, spread_ratio=0.85},
     }
 end

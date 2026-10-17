@@ -32,9 +32,10 @@ retains the dynamic model name, transmitter battery/RSSI, and centered title.
   maximum altitude, with minimum link, cell, BEC, pack voltage and fuel.
   Unavailable readings remain marked.
 
-On the preflight and inflight screens the pill and flight state read ARM UNKNOWN
-until the flight controller reports its arm state, and an armed model without a
-governor reads ARMED / PASSTHRU.
+On the preflight screen the pill and flight state read ARM UNKNOWN until the
+flight controller reports its arm state, unless the governor is running. With the
+governor mode set to OFF or LIMIT, an armed model's flight state reads ARMED /
+PASSTHRU.
 
 See the [three phase previews](../dashboard-themes/Carbon%20Pulse/README.md).
 They use simulated telemetry and desktop fonts: **Desktop preview, not radio capture**.
@@ -87,12 +88,19 @@ size, uses the radio font. Missing masks fall back to the radio font and a
 missing carbon tile to a flat background.
 
 Each paint lays out a limited amount of new text to keep within the radio's
-per-callback instruction limit. After startup, a phase change or a resize, the
-panels draw first and the lettering completes over the next few frames. The
-dashboard repaints only when its data changes, so while text is still waiting
-the theme requests the next frame with `lcd.invalidate()`, and stops once the
-screen is complete. After 20 requests in a row, or while two dashboards of
-different sizes paint in turn, it requests at most one frame a second. Readings that have waited longest go first, so a changing
+per-callback instruction limit, more when the radio reports spare instructions
+in that paint. After startup, a phase change or a resize, the panels draw on the
+first frame and the lettering is laid out over the next few; it is then drawn all
+at once, about 0.1 to 0.2 s after power-up or a theme selection, with or without
+a link. The dashboard
+repaints only when its data changes, and the radio ignores a repaint request
+made during a paint. So while text is still waiting, an invisible pacer box in
+the theme keeps the dashboard's wake pass from finishing, and the dashboard
+schedules another wakeup and repaint, as for any box that has not woken. Once the
+screen is complete the extra frames stop. After 20 held passes in a row, as while
+two dashboards of different sizes paint in turn, it stops holding passes until a
+paint completes the screen. After a resize the dashboard repaints once without
+text; the text completes on the next telemetry update or screen change. Readings that have waited longest go first, so a changing
 reading waits at most a few paints.
 
 ## Installation and verification

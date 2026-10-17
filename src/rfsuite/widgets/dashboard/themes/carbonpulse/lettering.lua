@@ -16,8 +16,15 @@
 -- set tried. A slot past the quota keeps its previous run, or stays blank, and
 -- waits. So that sustained changes ahead of it cannot starve it, the slots that
 -- have waited longest may also be laid out past the quota, at most OVERDRAFT
--- slots a paint. The Suite repaints only when its data changes, so while any
--- slot waits M.pending() is true and layout.lua requests the next frame.
+-- slots a paint. Where ETHOS reports the share of the callback's instruction
+-- limit already used (system.getInstructionsUsage), slots are also laid out
+-- past the quota while that share is below SPARE percent, so a cold screen
+-- needs fewer paints. The Suite repaints only when its data changes, so while
+-- any slot waits M.pending() is true and state.lua's pacer box keeps the
+-- Suite's wake passes, and so its repaints, going (layout.lua M.waiting).
+-- While a screen's text is first laid out, its slots are held rather than
+-- drawn (M.frame), and the paint that completes them draws them all
+-- (M.reveal), so the text appears at once.
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local D = requireModule("widgets/dashboard/themes/carbonpulse/common.lua")
 local SETS = requireModule("widgets/dashboard/themes/carbonpulse/glyphs.lua")
@@ -32,6 +39,9 @@ local LADDER = {"big", "mid", "small", "label", "tiny"}
 local RANK = {big = 1, mid = 2, small = 3, label = 4, tiny = 5}
 local FALLBACK = {big = "FONT_XXL", mid = "FONT_XL", small = "FONT_L", label = "FONT_XS", tiny = "FONT_XXS"}
 local OVERDRAFT = 2
+-- The share leaves room for the rest of the paint after the last slot laid
+-- out: its other drawing and the Suite's header boxes and overlays.
+local usage, SPARE = system and system.getInstructionsUsage, 50
 
 -- Mask handles by set and byte, and the bytes whose mask failed to load, so a
 -- missing file is not read again on every layout.
@@ -51,21 +61,31 @@ end
 -- quota: characters left this paint. paint: paint counter. A waiting slot
 -- records the paint it started waiting; `oldest` is the earliest of those seen
 -- on the previous paint and `seen` collects this paint's.
--- pending: some slot waited on this paint.
+-- pending: some slot waited on this paint. blank: some slot had nothing to
+-- draw. holding: slots go to `held` (heldCount of them) instead of the screen.
 local quota, paint, overdraft, oldest, seen, pending = 0, 0, 0, nil, nil, false
+local blank, holding, held, heldCount = false, false, {}, 0
 
 -- Start a paint with a layout allowance in characters. None means no layout
--- at all on this paint, past-quota slots included.
-function M.frame(characters)
+-- within the allowance, and no overdraft, on this paint. With `hold`, slots are
+-- kept for M.reveal instead of drawn.
+function M.frame(characters, hold)
     quota = characters
     paint = paint + 1
-    oldest, seen, pending = seen, nil, false
+    oldest, seen, pending, blank, holding = seen, nil, false, false, hold == true
     overdraft = characters > 0 and OVERDRAFT or 0
+    for i = 1, heldCount do held[i] = nil end
+    heldCount = 0
 end
 
 -- True when a slot waited on this paint, so another frame is needed.
 function M.pending()
     return pending
+end
+
+-- True when a slot had no run for its box on this paint.
+function M.blank()
+    return blank
 end
 
 -- Convert a chosen run's codes to mask handles and add the x origin.
@@ -148,8 +168,11 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
     if not r then r = {run = {}, n = 0, top = 0}; runs[slot] = r end
     if r.text ~= text or r.x ~= x or r.y ~= y or r.w ~= w or r.h ~= h or r.size ~= size then
         local since = r.waiting
-        if quota > 0 or (overdraft > 0 and since ~= nil and since == oldest) then
-            if quota <= 0 then overdraft = overdraft - 1 end
+        local allowed = quota > 0 or (usage ~= nil and usage() < SPARE)
+        if not allowed and overdraft > 0 and since ~= nil and since == oldest then
+            overdraft, allowed = overdraft - 1, true
+        end
+        if allowed then
             -- The key is written only once the run is complete, so a callback
             -- aborted mid-layout leaves the slot marked as not laid out.
             r.text, r.waiting = nil, nil
@@ -167,9 +190,16 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
             if r.text == nil or r.x ~= x or r.y ~= y or r.w ~= w or r.h ~= h or r.size ~= size then
                 -- Not laid out for this box yet: blank until it is. A changed
                 -- text in an unchanged box keeps its previous run meanwhile.
+                blank = true
                 return
             end
         end
+    end
+    if holding then
+        r.color, r.align, r.cache, r.slot = color, align, c, slot
+        heldCount = heldCount + 1
+        held[heldCount] = r
+        return
     end
     if r.fallback then
         D.text(c, slot, r.x, r.y, r.w, r.h, r.text, r.fallback, color, align)
@@ -178,6 +208,23 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
     setColor(color or WHITE)
     local run, dy, drawMask = r.run, r.drawY, lcd.drawMask
     for i = 1, r.n, 2 do drawMask(run[i], dy, run[i + 1]) end
+end
+
+-- Draw the slots held on this paint, in their order, and stop holding.
+function M.reveal()
+    local drawMask = lcd.drawMask
+    for i = 1, heldCount do
+        local r = held[i]
+        held[i] = nil
+        if r.fallback then
+            D.text(r.cache, r.slot, r.x, r.y, r.w, r.h, r.text, r.fallback, r.color, r.align)
+        else
+            setColor(r.color or WHITE)
+            local run, dy = r.run, r.drawY
+            for j = 1, r.n, 2 do drawMask(run[j], dy, run[j + 1]) end
+        end
+    end
+    heldCount, holding = 0, false
 end
 
 return M

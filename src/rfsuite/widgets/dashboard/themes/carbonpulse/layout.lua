@@ -6,7 +6,7 @@ local D = requireModule("widgets/dashboard/themes/carbonpulse/common.lua")
 local L = requireModule("widgets/dashboard/themes/carbonpulse/lettering.lua")
 local T = L.text
 local C = D.colors
-local lcd, floor, min, max, clock = lcd, math.floor, math.min, math.max, os.clock
+local lcd, floor, min, max = lcd, math.floor, math.min, math.max
 local sin, cos, rad = math.sin, math.cos, math.rad
 local M = {}
 
@@ -22,13 +22,15 @@ end
 -- Characters laid out per paint (see lettering.lua). None on a paint that also
 -- builds the geometry: that paint is already the most expensive one.
 local QUOTA = 48
--- Frames the theme requests back to back; a cold screen needs about 5. Past
--- MAX_CHAINED, or while the geometry is rebuilt on consecutive paints (two
--- dashboards of different sizes painting in turn, which cannot finish), it
--- asks at most once per RETRY seconds instead. rebuilt/rebuiltBefore: this
--- paint and the previous one built the geometry.
-local MAX_CHAINED, RETRY = 20, 1
-local chained, retried, rebuilt, rebuiltBefore = 0, 0, false, false
+-- Wake passes kept open in a row (see M.waiting); a cold screen needs about 5.
+-- Past MAX_PACED nothing is kept open until a paint completes the screen, so
+-- text that cannot finish (two dashboards of different sizes painting in turn)
+-- cannot keep the radio repainting.
+local MAX_PACED = 20
+local paced = 0
+-- Paints a screen's text may be held before it is drawn as it is laid out
+-- (see begin), so text that cannot finish is still shown.
+local MAX_HELD = 10
 
 local DIM = {[C.green] = lcd.RGB(16, 64, 34), [C.amber] = lcd.RGB(70, 54, 8), [C.red] = lcd.RGB(72, 20, 16)}
 local BRIGHT = {[C.green] = C.zoneGreen, [C.amber] = C.zoneAmber, [C.red] = C.zoneRed}
@@ -86,7 +88,7 @@ local G = {neon = {{}, {}, {}, {}}, glow = {{}, {}, {}, {}}, tiles = {}, a1 = {}
 local function geometry(x, y, w, h)
     local g = G
     if g.x == x and g.y == y and g.w == w and g.h == h then return g, false end
-    g.x, g.y, g.w, g.h = x, y, w, h
+    g.x, g.y, g.w, g.h, g.version = x, y, w, h, (g.version or 0) + 1
     x, y, w, h = floor(x), floor(y), floor(w), floor(h)
     local k = h < 340
     g.compact = k
@@ -165,13 +167,17 @@ local function needle(g, fraction)
     g.n3x, g.n3y = floor(cx + dx * base + dy * half + 0.5), floor(cy + dy * base - dx * half + 0.5)
 end
 
--- Carbon fibre clipped to the box; a flat fill if the tile cannot load.
-local function begin(x, y, w, h)
-    local g
-    rebuiltBefore = rebuilt
-    g, rebuilt = geometry(x, y, w, h)
+-- Carbon fibre clipped to the box; a flat fill if the tile cannot load. Until
+-- the screen of cache c has had all its text laid out at this geometry, the
+-- lettering is held and drawn at once by the paint that completes it (finish);
+-- the panels draw at once. Held only where the Suite delivers the frames that
+-- complete it (c._paced, state.lua); elsewhere text draws as it is laid out.
+local function begin(x, y, w, h, c)
+    local g, rebuilt = geometry(x, y, w, h)
     D.frame()
-    L.frame(rebuilt and 0 or QUOTA)
+    local hold = c._paced == true and c._complete ~= g.version and (c._held or 0) < MAX_HELD
+    c._holding = hold
+    L.frame(rebuilt and 0 or QUOTA, hold)
     -- Not lazy, so a missing tile fails here and the flat fill takes over.
     if carbon == nil then carbon = lcd.loadBitmap(CARBON_PATH, false) or false end
     if carbon then
@@ -185,25 +191,40 @@ local function begin(x, y, w, h)
     return g
 end
 
--- The Suite repaints only when its data changes; while lettering still waits
--- for the per-paint quota, ask ETHOS for the next frame so the text completes
--- within a few frames. Nothing is requested once every slot is laid out.
-local function finish(g)
-    D.segments(C.glow, g.glow, g.glowCount)
-    D.segments(C.neon, g.neon, g.neonCount)
-    if not L.pending() then
-        chained = 0
-    elseif chained < MAX_CHAINED and not (rebuilt and rebuiltBefore) then
-        chained = chained + 1
-        lcd.invalidate()
-    else
-        -- Throttled, not stopped, so a screen that settles again still finishes.
-        local now = clock()
-        if now - retried >= RETRY then
-            retried = now
-            lcd.invalidate()
+-- A paint records whether it left lettering waiting; M.waiting reads it.
+local function finish(g, c)
+    local complete = not L.blank()
+    if c._holding then
+        if complete then
+            L.reveal()
+            c._held = 0
+        else
+            c._held = (c._held or 0) + 1
         end
     end
+    if complete then c._complete = g.version end
+    D.segments(C.glow, g.glow, g.glowCount)
+    D.segments(C.neon, g.neon, g.neonCount)
+    c._settled = not L.pending()
+end
+
+-- Whether the screen of cache c still needs frames, for state.lua's pacer box.
+-- The Suite repaints only when its data changes, and ETHOS ignores an
+-- lcd.invalidate() made during paint, so the frames that finish deferred
+-- lettering come from the Suite's own wake passes, kept open while this is
+-- true. True when the last paint left lettering waiting, when c has not been
+-- painted, or when the box has another size, as its next paint rebuilds the
+-- geometry and lays out no text. Called from the theme box's wakeup, where the
+-- engine has set the box's rectangle.
+function M.waiting(c, box)
+    local g = G
+    if c._settled == true and g.x == box._dashboardRectX and g.y == box._dashboardRectY
+            and g.w == box._dashboardRectW and g.h == box._dashboardRectH then
+        paced = 0
+        return false
+    end
+    paced = paced + 1
+    return paced <= MAX_PACED
 end
 
 -- Status pill: outlined when calm, filled for armed states: dark text on amber,
@@ -378,7 +399,7 @@ local function checkLamps(c, g, y)
 end
 
 function M.preflight(x, y, w, h, c)
-    local g = begin(x, y, w, h)
+    local g = begin(x, y, w, h, c)
     local k = g.compact
     flightPill(c, g)
     profiles(c, g, timerPanel(c, g, "FLIGHT TIMER") + (k and 2 or 6))
@@ -394,11 +415,11 @@ function M.preflight(x, y, w, h, c)
     rightStack(c, g, "BEC", c.becText, c.becValueColor, "MCU", c.mcuText, c.mcu and C.value or C.muted,
         "THROTTLE", c.throttleText, c.throttle and C.value or C.muted)
     bottom(c, g, "preflight", "PACK", "FUEL", "ESC")
-    finish(g)
+    finish(g, c)
 end
 
 function M.inflight(x, y, w, h, c)
-    local g = begin(x, y, w, h)
+    local g = begin(x, y, w, h, c)
     flightPill(c, g)
     profiles(c, g, timerPanel(c, g, "FLIGHT TIMER") + (g.compact and 2 or 6))
     gauge(c, g)
@@ -408,11 +429,11 @@ function M.inflight(x, y, w, h, c)
     rightStack(c, g, "BEC", c.becText, c.becValueColor, "CURRENT", c.currentText, c.current and C.value or C.muted,
         "USED", c.consumedText, c.consumed and C.value or C.muted)
     bottom(c, g, "inflight", "PACK", "FUEL", "ESC")
-    finish(g)
+    finish(g, c)
 end
 
 function M.postflight(x, y, w, h, c)
-    local g = begin(x, y, w, h)
+    local g = begin(x, y, w, h, c)
     pill(c, g, "RECORDED", C.neon, false)
     local y2 = timerPanel(c, g, "FLIGHT TIME")
     local p, k = g.left, g.compact
@@ -428,7 +449,7 @@ function M.postflight(x, y, w, h, c)
     rightStack(c, g, "MIN BEC", c.becText, c.becValueColor, "PEAK CURRENT", c.currentText, c.current and C.value or C.muted,
         "USED", c.consumedText, c.consumed and C.value or C.muted)
     bottom(c, g, "postflight", "MIN PACK", "MIN FUEL", "PEAK ESC")
-    finish(g)
+    finish(g, c)
 end
 
 return M
