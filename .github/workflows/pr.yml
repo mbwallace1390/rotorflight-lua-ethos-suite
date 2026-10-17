@@ -680,6 +680,34 @@ jobs:
       - name: Check the in-flight adjustment announcement
         run: lua5.4 bin/adj_voice/verify_adj_voice.lua
 
+  # Rob Thomson's report: Ethos shows the Smart Fuel telemetry sensor as lost as soon as the
+  # model is disarmed. Two things in the suite make that happen. The same-value refresh of a DIY
+  # sensor waited 4.0 s, while Ethos wants a value at least every 4 s and the caller ticks every
+  # 0.5 s, so the gap grew past 4 s. And after a disarm, when the pack voltage rises as the load goes
+  # away, the estimator restarts and answers nil, which the session wrote to the sensor as a reset.
+  #
+  # The harness drives the real sensor on the session's cadence and the real estimator through a
+  # disarm with rising voltage. It checks that an unchanged value is pushed again within 2.5 s, that
+  # the estimator says it is settling on every nil while it restarts, and that a missing voltage is
+  # still a plain nil. Against unpatched master six of the checks fail.
+  smartfuel-sensor:
+    name: The Smart Fuel sensor is sent often enough and keeps its value while the estimate restarts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the Smart Fuel sensor refresh and the settling answer
+        run: lua5.4 bin/smartfuel_sensor/verify_smartfuel_sensor.lua
+
   # A page tags its data with the profile it was read for, and the tag used to
   # be taken when the read finished rather than when it started. A pilot who
   # switched profile while that read was in flight therefore got the previous
@@ -2847,6 +2875,311 @@ jobs:
 
       - name: Check the mixer and servo overrides wait for the read
         run: lua5.4 bin/override_read_gate/verify_override_read_gate.lua
+
+  # Issue #2553: the header Tool button was enabled whenever a page passed an onTool,
+  # before the page had read its values. Save is gated by the page runtime; Tool was not.
+  # The runtime now drives the Tool button from the same loaded flag as Save, through a
+  # new setToolEnabled() on the header handle.
+  #
+  # No build and no package step reaches this -- it is the enable state of a button on a
+  # running page. The harness drives the real page runtime through a held, answered and
+  # failed read and checks the button the real header builds. Against unpatched master the
+  # header has no setToolEnabled and the Tool button stays enabled while the page is unloaded.
+  tool-button-loaded:
+    name: Header Tool button stays disabled until the page has loaded its values
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the header Tool button follows the page load state
+        run: lua5.4 bin/tool_button_loaded/verify_tool_button_loaded.lua
+
+  # Issue #2548: isArmed goes nil on every disconnect, and a gate written as
+  # `isArmed == true` reads that nil as "disarmed". On a reconnect into an armed model the
+  # save button and the stats write then opened before the arm flags were read again.
+  # Neither the firmware nor the page could tell that from a real disarm.
+  #
+  # tasks/session.lua keeps a latch, armedUnconfirmed: set on an armed read, cleared only by
+  # a fresh disarmed read, untouched by a disconnect. app/page_runtime.lua's save gate and
+  # the reboot-after-save gate read it through armedOrUnconfirmed(). The harness drives the
+  # real session.lua through session.wakeup() and the real page_runtime canSave(). Against
+  # unpatched master the latch and the disconnected-page checks fail. --self-test splices
+  # the latch and the gate back out and requires them to go red.
+  armed-unconfirmed:
+    name: A disconnected armed model is not writable until a fresh answer clears it
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the armed-unconfirmed latch and the save gate
+        run: lua5.4 bin/armed_unconfirmed/verify_armed_unconfirmed.lua
+
+  # Issue #2561: the locale build regenerates src/rfsuite/i18n from bin/i18n/json/
+  # and drops any key that is missing from a source. Three keys the code shows
+  # (edit_battery, msg_main_power_lost_banner, msg_save_failed_local_body) were missing from
+  # all twelve sources, so the next regeneration would have removed them from every locale.
+  #
+  # The harness reads each source with a small JSON reader and checks every @i18n(key)@
+  # reference in src/rfsuite against it. Against unpatched master it fails on all twelve
+  # locales with exactly those three keys. --self-test removes them from a copy of the
+  # English source and requires them to be reported.
+  i18n-sources:
+    name: Every referenced i18n key resolves in every locale source
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the i18n sources against the code references
+        run: lua5.4 bin/i18n_sources/verify_i18n_sources.lua
+
+  # Issue #2495: the erase wait could end on a read asked for before the erase, a read
+  # asked for while another was in flight was dropped so no read followed the erase, and the
+  # Tool button was always offered, so a second erase could start while one ran.
+  #
+  # Each read carries a sequence number; the erase is finished only by a read requested after
+  # the erase command completed, a read asked for while another is in flight is queued, and the
+  # Tool button is enabled only on a ready board and not while erasing. The harness drives the
+  # real blackbox_status page with the messages answered by hand, in the order that exposes each
+  # defect. Against unpatched master the erase-wait and Tool-gate checks fail. --self-test
+  # splices the sequence test out and requires the erase-wait check to go red.
+  blackbox-erase:
+    name: The dataflash erase waits for a read taken after it, and the Tool button follows the board
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the blackbox status erase wait and its Tool gate
+        run: lua5.4 bin/blackbox_erase/verify_blackbox_erase.lua
+
+  # Issue #2506: the Logs page read every column by its position and never parsed the
+  # header row, so a log written by another tool was plotted from the wrong columns, and an
+  # empty file was drawn as a flat zero line.
+  #
+  # The reader is lib/log_columns.lua, pure functions over the file text. The harness checks
+  # name-based lookup against a file in another column order, a missing column, a header-only
+  # and an empty file, CRLF line endings and non-numeric values. --self-test swaps in a
+  # position-based header lookup and requires the foreign-order checks to go red.
+  logs-named-columns:
+    name: The Logs page reads CSV columns by their header name
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the CSV column reader behind the Logs page
+        run: lua5.4 bin/log_columns/verify_log_columns.lua
+
+  # Issue #2507: a board without dataflash answers total = 0, and the BLACKBOX text
+  # object treated that as a real capacity and drew 0.0/0.0 MB. The widget now shows the
+  # existing "Not supported" text for total = 0, and keeps the loading dots for "no answer yet".
+  #
+  # The harness drives the real widget through render.wakeup() with the session values the
+  # summary sets. Against unpatched master the no-dataflash checks fail. --self-test removes
+  # the new branch and requires those checks to go red.
+  blackbox-no-dataflash:
+    name: A board without dataflash shows Not supported, not a zero capacity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the blackbox text object on a board without dataflash
+        run: lua5.4 bin/blackbox_text/verify_blackbox_text.lua
+
+  # MSP_PID_PROFILE grows by reply length, not by API version: API 12.10 master
+  # answers 44 bytes (error_decay_gain_cyclic appended), and rotorflight-firmware#538
+  # adds the cyclic and yaw master gains for 46 without bumping the API. Six pages
+  # share lib/msp_pid_profile.lua, and the fields a page never shows must round-trip
+  # unchanged, so a 44-byte reply decoded as 43 drops a byte from every save with no
+  # error anywhere. No build or package step reaches that.
+  #
+  # The harness decodes and re-encodes 43-, 44- and 46-byte replies through the real
+  # codec and requires the write to match the read byte for byte, opens the real PID
+  # Controller page on each and requires the master-gain fields greyed out unless the
+  # reply carries them, and pins the voice callouts for adjustments 83 and 84 to
+  # recorded wavs. The 44-byte checks go red on the first revision of #2550.
+  pid-profile-tail:
+    name: PID profile trailing bytes and master gains
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the PID profile reply lengths and the master-gain grey-out
+        run: lua5.4 bin/pid_profile_tail/verify_pid_profile_tail.lua
+
+  # Found in the review of #2568: the Rotorflight Dashboard ends its erase on the first summary
+  # read after the erase acknowledgement, whatever that read reports. The firmware acknowledges the
+  # erase before it runs and reports the flash ready only when it is idle, so the dialog could close
+  # while the erase was still running.
+  #
+  # The harness drives the real dashboard widget through its wakeup and the bus. It checks that a
+  # read reporting not ready keeps the wait open and is repeated, that a read reporting ready or no
+  # dataflash ends it, that a failed read does not end it, and that a wait without an answer fails
+  # after the timeout. Against unpatched master four of the checks fail.
+  dashboard-erase:
+    name: The dashboard erase finishes on a read that reports the flash ready
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the dashboard erase wait against the flash ready bit
+        run: lua5.4 bin/dashboard_erase/verify_dashboard_erase.lua
+
+  # Issue #2501: the Adjustments page offers functions 76 to 82 that have no name in the
+  # audio table, so they are silent when they change, and six names use words that have no
+  # audio file in the pack, so the value is spoken without its name.
+  #
+  # The harness reads the real name table and the real page list, and checks that every
+  # offered function has a name and that every word of every name has a file in the English
+  # default, us and gb folders. Against unpatched master it fails for functions 76 to 82 and
+  # for the six names. --self-test removes the name for function 76 and requires the name
+  # check to go red.
+  adjfunctions-audio:
+    name: Every adjustment function has a spoken name, and every word of a name has audio
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the adjustment names and their audio files in the English pack
+        run: lua5.4 bin/adjfunctions_audio/verify_adjfunctions_audio.lua
+
+  # Issue #2352 (armed part only): a model on the ground was shown on the dashboard
+  # with no visual warning that the rotor can spool up. The dashboard now draws a red
+  # bar across the top edge with an "Armed" label hanging from its centre over whatever
+  # theme is shown while the FC reports the armed state, and draws nothing red while
+  # disarmed. A widget property "Armed warning" (default on) switches it off.
+  #
+  # No build and no package step reaches this -- it is a paint path through a running
+  # widget. The harness drives the real widgets/dashboard.lua paint with a recording
+  # lcd and feeds the arm state through session.update the way the session does. It
+  # requires the red bar and the label while armed, no other red rectangle, and nothing
+  # red while disarmed or while the property is off. Against unpatched master the armed
+  # checks fail.
+  armed-warning:
+    name: Dashboard shows a red bar with an Armed label while armed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the dashboard armed warning
+        run: lua5.4 bin/armed_warning/verify_armed_warning.lua
+
+  # Issue #2503: the wakeup of tasks/audio_events.lua ran the arming, profile, battery and
+  # governor announcements back to back with no gate between them, so the radio cut each file
+  # with the next one. Only the adjustment path checked canSpeak(). The four state changes now
+  # go through the same gate, and a change that has to wait is held out of `previous`, so it is
+  # compared again on the next wakeup and spoken once.
+  #
+  # The harness drives the real task on a controllable clock and logs every file and number it
+  # asks for with the time it was asked. It checks that two changes in one wakeup are spoken in
+  # separate wakeups, that a single change is still spoken at once, that a governor change waits
+  # behind a profile announcement, and that a change still waiting when the link drops is not
+  # spoken after a reconnect. Against unpatched master four of the checks fail.
+  audio-serial:
+    name: State changes in one wakeup are spoken one after another
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Check the arming, profile, battery and governor announcements against one gate
+        run: lua5.4 bin/audio_serial/verify_audio_serial.lua
 
   # Per-language PR builds (mirrors push.yml behavior)
   create-zip:
