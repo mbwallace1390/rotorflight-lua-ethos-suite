@@ -355,8 +355,11 @@ end
 -- needs frames (layout.lua M.waiting). A box whose object type cannot load is
 -- left unwoken, and the engine then reports its pass not done, so the
 -- dashboard schedules another wakeup and repaint (engine.lua wakeOne and
--- wakeObjects, dashboard.lua wakeup). No object file has this name; a failed
--- load is retried at most once a second. The box has no size and draws
+-- wakeObjects, dashboard.lua wakeup; Suite #2447). No object file has this
+-- name, and those engines retry a failed load at most once a second. Older
+-- engines cannot hold a pass open and would retry it on every wakeup and paint,
+-- so once a paint shows that the engine does not mark woken boxes (c._paced is
+-- false) the pacer stays an ordinary box. The box has no size and draws
 -- nothing. It wakes last in each pass, after the theme box has decided: after
 -- the header boxes on a full screen, after the theme box otherwise. Placed
 -- there, the boxes before it wake in the same groups as without it.
@@ -369,13 +372,13 @@ function M.create(phase)
     -- One callback pair and one cache per loaded phase; none are created in paint.
     local function wakeup(box, telemetry)
         local c = update(box, telemetry, phase)
-        -- The last paint left text waiting, so this pass only continues it.
+        -- The last paint left text waiting, so this paint may lay out more.
         c._continuing = c._settled == false
         -- Gaining or losing the link changes many readings at once, more than
         -- one paint may lay out.
         local online = context.session.isConnected == true
         if c._online ~= online then c._online, c._settled = online, false end
-        pacer.type = panels.waiting(c, box) and WAITING or "func"
+        pacer.type = c._paced ~= false and panels.waiting(c, box) and WAITING or "func"
         return c
     end
     local function paint(x, y, w, h, box, c)

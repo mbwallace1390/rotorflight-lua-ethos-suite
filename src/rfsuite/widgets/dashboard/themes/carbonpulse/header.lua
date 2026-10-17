@@ -140,12 +140,15 @@ local function header_boxes()
     return header_boxes_cache
 end
 
--- The header keeps the dark face; battery and RSSI fills use the neon pair.
+-- The header keeps the dark face in every palette, so its colours stay fixed
+-- too: the battery outline would otherwise follow the radio's light palette and
+-- vanish on the face. Battery and RSSI fills use the neon pair.
 colorMode.bgcolor = C.head
 colorMode.tbbgcolor = C.head
 colorMode.tbtextcolor, colorMode.cntextcolor, colorMode.rssitextcolor = C.white, C.white, C.white
 colorMode.rssifillcolor, colorMode.rssifillbgcolor = C.neon, C.track
 colorMode.txfillcolor, colorMode.txbgfillcolor = C.green, C.track
+colorMode.txaccentcolor = C.white
 return header_layout, header_boxes
 end
 return {create=create}

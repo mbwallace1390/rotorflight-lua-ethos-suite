@@ -91,11 +91,13 @@ closes. A text with a character outside the glyph sets, or too wide for every
 size, uses the radio font, as do missing masks.
 
 Each paint lays out a limited amount of new text to keep within the radio's
-per-callback instruction limit, more on a frame that only continues waiting text
+per-callback instruction limit, more on a frame that follows one that left text waiting
 and when the radio reports spare instructions in that paint. After startup, a phase change or a resize, the panels draw on the
 first frame and the lettering is laid out over the next few; it is then drawn all
-at once, about 0.1 to 0.2 s after power-up or a theme selection, with or without
-a link. The dashboard
+at once by the paint that completes it, about the fourth frame after startup or a
+theme selection, with or without a link. On a radio test that took about 1.6 s,
+about 0.7 s of it reading some 50 glyph files; the smaller secondary text and the
+flat background have since cut the file reads. The dashboard
 repaints only when its data changes, and the radio ignores a repaint request
 made during a paint. So while text is still waiting, an invisible pacer box in
 the theme keeps the dashboard's wake pass from finishing, and the dashboard

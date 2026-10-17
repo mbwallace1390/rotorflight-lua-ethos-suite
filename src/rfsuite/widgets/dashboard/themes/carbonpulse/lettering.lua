@@ -48,16 +48,6 @@ local usage, SPARE = system and system.getInstructionsUsage, 50
 local MASKS, FAILED = {}, {}
 for i = 1, #LADDER do MASKS[LADDER[i]], FAILED[LADDER[i]] = {}, {} end
 
-if utils.registerImageCacheClearer then
-    utils.registerImageCacheClearer(function()
-        for i = 1, #LADDER do
-            local masks, failed = MASKS[LADDER[i]], FAILED[LADDER[i]]
-            for code in pairs(masks) do masks[code] = nil end
-            for code in pairs(failed) do failed[code] = nil end
-        end
-    end)
-end
-
 -- quota: characters left this paint. paint: paint counter. A waiting slot
 -- records the paint it started waiting; `oldest` is the earliest of those seen
 -- on the previous paint and `seen` collects this paint's.
@@ -65,6 +55,25 @@ end
 -- draw. holding: slots go to `held` (heldCount of them) instead of the screen.
 local quota, paint, overdraft, oldest, seen, pending = 0, 0, 0, nil, nil, false
 local blank, holding, held, heldCount = false, false, {}, 0
+
+-- Forget the held slots. Each one refers to its box cache and its masks, so a
+-- list left over from a paint that did not complete its screen would keep them
+-- after the theme is gone.
+function M.drop()
+    for i = 1, heldCount do held[i] = nil end
+    heldCount, holding = 0, false
+end
+
+if utils.registerImageCacheClearer then
+    utils.registerImageCacheClearer(function()
+        for i = 1, #LADDER do
+            local masks, failed = MASKS[LADDER[i]], FAILED[LADDER[i]]
+            for code in pairs(masks) do masks[code] = nil end
+            for code in pairs(failed) do failed[code] = nil end
+        end
+        M.drop()
+    end)
+end
 
 -- Start a paint with a layout allowance in characters. None means no layout
 -- within the allowance, and no overdraft, on this paint. With `hold`, slots are

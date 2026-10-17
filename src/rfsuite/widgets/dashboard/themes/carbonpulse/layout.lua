@@ -12,11 +12,12 @@ local M = {}
 
 -- Characters laid out per paint (see lettering.lua). None on a paint that also
 -- builds the geometry: that paint is already the most expensive one. CONTINUED
--- on a paint that only continues waiting text, on a pass the pacer held open
--- (state.lua): no data event, reload or connect shares that paint, so it has
--- room for more, and radios without system.getInstructionsUsage finish sooner.
+-- on the paint after one that left text waiting, on an engine that delivers the
+-- frames to finish it (state.lua), whatever started its pass: a pacer pass, a
+-- data event or a connect. The allowance bounds its cost, and radios without
+-- system.getInstructionsUsage finish sooner.
 local QUOTA, CONTINUED = 48, 144
--- Wake passes kept open in a row (see M.waiting); a cold screen needs about 5.
+-- Wake passes kept open in a row (see M.waiting); a cold screen needs about 3.
 -- Past MAX_PACED nothing is kept open until a paint completes the screen, so
 -- text that cannot finish (two dashboards of different sizes painting in turn)
 -- cannot keep the radio repainting.
@@ -145,9 +146,12 @@ local function needle(g, fraction)
     g.n3x, g.n3y = floor(cx + dx * base + dy * half + 0.5), floor(cy + dy * base - dx * half + 0.5)
 end
 
--- One flat fill in the header's face colour, so the body matches the header. Until
--- the screen of cache c has had all its text laid out at this geometry, the
--- lettering is held and drawn at once by the paint that completes it (finish);
+-- One flat fill in the header's face colour, so the body matches the header. It
+-- starts at the top of the window: the header boxes paint over it afterwards
+-- (the engine adds them after the theme box), and the engine rounds the header
+-- down to whole cells, which leaves a strip at its right end. Until the screen
+-- of cache c has had all its text laid out at this geometry, the lettering is
+-- held and drawn at once by the paint that completes it (finish);
 -- the panels draw at once. Held only where the Suite delivers the frames that
 -- complete it (c._paced, state.lua); elsewhere text draws as it is laid out.
 local function begin(x, y, w, h, c)
@@ -156,7 +160,7 @@ local function begin(x, y, w, h, c)
     local hold = c._paced == true and c._complete ~= g.version and (c._held or 0) < MAX_HELD
     c._holding = hold
     L.frame(rebuilt and 0 or (c._paced == true and c._continuing == true and CONTINUED or QUOTA), hold)
-    D.fill(C.bg, x, y, w, h)
+    D.fill(C.bg, x, 0, w, y + h)
     return g
 end
 
@@ -168,6 +172,7 @@ local function finish(g, c)
             L.reveal()
             c._held = 0
         else
+            L.drop()
             c._held = (c._held or 0) + 1
         end
     end
