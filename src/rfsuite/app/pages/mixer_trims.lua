@@ -49,6 +49,8 @@ local function openEditor(opts, initialMode)
 
   local runtime
   runtime = pageRuntime.new({
+    -- Writes every change to the flight controller as it is made: nothing to save on Back (#2504).
+    liveWrite = true,
     pageTitle = PAGE_TITLE,
     logTag = "mixer_trims",
     mspModule = mixerConfig,
@@ -81,6 +83,7 @@ local function openEditor(opts, initialMode)
         data.tail_center_trim = formData.tail_center_trim or 0
       end
     end,
+    toolIcon = "app/gfx/nav/override.png",
     onTool = function(focusFn)
       form.openDialog({
         title = inOverride and "@i18n(app.modules.trim.disable_mixer_override)@"
