@@ -432,7 +432,9 @@ local function updateFlightPhase(snapshot)
   phaseInput.governorState = snapshot.governorState
   phaseInput.throttlePercent = snapshot.throttlePercent
   phaseInput.rxMap = snapshot.rxMap
-  activePhase = tracker:update(phaseInput)
+  -- The tracker also reports "armed" and "offline"; like the dashboard, follow the
+  -- layout each one draws with (preflight and postflight) when choosing the palette.
+  activePhase = flightmode.layoutPhase(tracker:update(phaseInput))
 end
 
 local function applyPending(now)
