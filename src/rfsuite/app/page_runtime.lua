@@ -61,6 +61,7 @@ local memstats = requireModule("lib/memstats.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
 local debugLog = requireModule("lib/debug_log.lua")
 local progressDialog = requireModule("app/progress_dialog.lua")
+local leaveConfirm = requireModule("app/leave_confirm.lua")
 
 -- Generic dialog/progress text, matching rotorflight-lua-ethos-suite's own
 -- actual strings (app/tasks.lua's triggerSaveDialogs()/triggerReloadDialogs(),
@@ -174,12 +175,14 @@ end
 --                               -- not the instant data arrived, since Ethos doesn't necessarily re-invoke
 --                               -- every field's getter just because loadData() re-enabled them.
 --   beforeSave,                 -- optional; called at the start of performSave(), after the pilot
---                               -- confirms but before any MSP_SET_* write is built.
+--                               -- confirms but before any MSP_SET_* write is built. Returning false
+--                               -- aborts the save (the page reports the failure itself).
 --   extraSaveMessage,           -- optional text appended to the generic save confirmation body.
 --   eepromWrite,                 -- optional; defaults true. Set false for direct targets whose original
 --                               -- page writes its own non-FC storage and does not request MSP_EEPROM_WRITE.
 --   onTool,                     -- optional; enables the header Tool button and runs page-specific
 --                               -- actions from the app tool's own callback context.
+--   toolIcon,                   -- optional mask path for the Tool button (default app/gfx/nav/tool.png).
 --   onWakeup,                   -- optional; called from the page_runtime wakeup handler after its own
 --                               -- deferred dialog/reload work.
 --   onPaint,                    -- optional; called from app/tool.lua's paint callback while page is open.
@@ -249,12 +252,16 @@ function PageRuntime.new(config)
   self.extraSaveMessage = config.extraSaveMessage
   self.eepromWrite = config.eepromWrite ~= false
   self.onTool = config.onTool
+  self.toolIcon = config.toolIcon
   self.onWakeup = config.onWakeup
   self.onPaint = config.onPaint
   self.onDispose = config.onDispose
   self.onSaved = config.onSaved
   self.rebootAfterSave = config.rebootAfterSave
   self.isMspPage = config.isMspPage
+  -- A page that writes every change to the flight controller as it is made has nothing to save
+  -- when Back is pressed, so it does not ask (issue #2504).
+  self.liveWrite = config.liveWrite == true
   -- #2303: true for a page whose save only writes the radio's own storage
   -- (lib/settings_store.lua) and never requests MSP_EEPROM_WRITE, so the FC
   -- armed gate in canSave() does not apply to it. Off by default -- every page
@@ -267,6 +274,10 @@ function PageRuntime.new(config)
   -- resolved), treated the same as "not armed" by that gate, matching
   -- the original's own resolveArmedState() fallback.
   self.isArmed = nil
+  -- Latch from tasks/session.lua (#2548): true once the model was seen armed
+  -- and no fresh answer has said disarmed since. Read with isArmed through
+  -- armedOrUnconfirmed() below.
+  self.armedUnconfirmed = false
   -- Connection state and the handshake's apiVersion flag, kept from every
   -- "session.update" for the reboot wait (updateRebootWait()): a save that
   -- restarts the FC holds its page until the link drops and comes back. Both
@@ -524,7 +535,26 @@ function PageRuntime:setBusy(busy)
   self.busy = busy and true or false
   if not self.headerHandle then return end
   self:updateSaveEnabled()
+  self:updateToolEnabled()
   self.headerHandle.setReloadEnabled(not busy)
+end
+
+-- #2548: a nil isArmed means "not known yet", not "disarmed". After a disconnect
+-- it is nil until the arm flags are read again, and a gate on `isArmed == true`
+-- alone would open in that window. Same latch as tasks/session.lua's
+-- armedOrUnconfirmed(), carried on the session snapshot as armedUnconfirmed.
+local function armedOrUnconfirmed(runtime)
+  if runtime.isArmed == true then return true end
+  return runtime.isArmed == nil and runtime.armedUnconfirmed == true
+end
+
+-- Tool is only ever enabled once the page has a completed load, the same
+-- gate Save uses, and is not mid-operation (busy). A page's onTool edits
+-- the values it has not read yet otherwise (see issue #2553). Only pages
+-- that pass an onTool have a Tool button to drive.
+function PageRuntime:updateToolEnabled()
+  if self.disposed or not self.headerHandle or not self.onTool then return end
+  self.headerHandle.setToolEnabled(self.loaded == true and not self.busy)
 end
 
 -- Bounded page save predicate: saving is only permitted when data has been
@@ -532,7 +562,7 @@ end
 -- no background read/save/dialog is active, and the page is not armed-gated.
 function PageRuntime:canSave()
   if self.disposed then return false end
-  if self.isMspPage and not self.localSettings and self.isArmed == true then
+  if self.isMspPage and not self.localSettings and armedOrUnconfirmed(self) then
     return false
   end
   return self.loaded == true
@@ -611,6 +641,7 @@ function PageRuntime:loadData(focusFn)
 
   self:setBusy(true)
   self.loaded = false
+  self:updateToolEnabled()
   for _, field in pairs(self.fields) do
     field:enable(false)
   end
@@ -735,8 +766,10 @@ end
 function PageRuntime:performSave(focusFn)
   if self.disposed or not self:canSave() then return end
 
-  if self.beforeSave then
-    self.beforeSave(self)
+  -- Returning false from beforeSave refuses the whole save: nothing is written,
+  -- the page stays dirty, and beforeSave has already told the pilot why (#2545).
+  if self.beforeSave and self.beforeSave(self) == false then
+    return
   end
 
   self:setBusy(true)
@@ -755,17 +788,17 @@ function PageRuntime:performSave(focusFn)
   -- Only consulted from the committed save path (never on failure -- matches
   -- the original's own saveDone(), which is what calls rebootFc(), never
   -- saveFailed()). Skips the reboot (but still lets the rest of the save
-  -- stand -- the EEPROM commit already happened) if `self.isArmed == true`;
-  -- see rebootAfterSave's own config comment and lib/msp_reboot.lua's for why
-  -- this is the one safety gate on that command.
+  -- stand -- the EEPROM commit already happened) while the model is armed or
+  -- unconfirmed (#2548); see rebootAfterSave's own config comment and
+  -- lib/msp_reboot.lua for the firmware's own gate on the same command.
   local function rebootRequested()
     local shouldReboot = self_.rebootAfterSave
     if type(shouldReboot) == "function" then
       shouldReboot = shouldReboot(self_)
     end
     if not shouldReboot then return false end
-    if self_.isArmed == true then
-      self_:log("performSave: rebootAfterSave skipped (isArmed == true)")
+    if armedOrUnconfirmed(self_) then
+      self_:log("performSave: rebootAfterSave skipped (armed or unconfirmed)")
       return false
     end
     return true
@@ -1113,6 +1146,7 @@ function PageRuntime:onSessionUpdate(update)
   if self.disposed then return end
 
   self.isArmed = update.isArmed
+  self.armedUnconfirmed = update.armedUnconfirmed == true
   -- See the declaration above: tasks/session.lua's snapshot carries it, and the
   -- subscription this handler already exists for is the only sanctioned way in.
   self.apiVersionMinor = update.apiVersionMinor
@@ -1150,7 +1184,32 @@ end
 -- calling this same method (see buildChrome() and header.lua's onBack
 -- below) -- so it's the one place to see a "this module is exiting" RAM
 -- snapshot for any of them, without touching each page individually.
+-- Back with unsaved changes asks first (issue #2504). Stay keeps the page; Discard leaves it;
+-- Save saves and keeps it open, so a second Back leaves once the save has gone through.
+function PageRuntime:hasUnsavedChanges()
+  return not self.disposed and not self.liveWrite and self.loaded == true and self.dirty == true
+end
+
 function PageRuntime:goBack()
+  if self.busy or self.activeDialog then return end
+  if not self:hasUnsavedChanges() then
+    self:leave()
+    return
+  end
+  self:openMessageDialog(leaveConfirm.args({
+    canSave = self:canSave(),
+    armed = armedOrUnconfirmed(self),
+    save = function() self:performSave(nil) end,
+    discard = function() self:leave() end,
+    focus = function()
+      if self.headerHandle and self.headerHandle.focusSave then
+        self.headerHandle.focusSave()
+      end
+    end,
+  }))
+end
+
+function PageRuntime:leave()
   local logTag = self.logTag or "page"
   memstats.print(logTag .. " exit")
   local onBack = self.opts and self.opts.onBack
@@ -1230,6 +1289,7 @@ function PageRuntime:dispose()
   self.onLoaded = nil
   self.beforeSave = nil
   self.onTool = nil
+  self.toolIcon = nil
   self.onWakeup = nil
   self.onPaint = nil
   self.onDispose = nil
@@ -1345,6 +1405,7 @@ function PageRuntime:buildChrome()
         runtime.onTool(runtime.headerHandle.focusTool)
       end
     end or nil,
+    toolIcon = self.toolIcon,
   })
   self:setBusy(true)
 
