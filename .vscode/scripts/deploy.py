@@ -424,20 +424,21 @@ def scan_usb_drives_for_radio(quiet=False):
     if not quiet:
         print("[ETHOS] Performing fallback USB drive scan for radio...")
 
-    def _is_radio_root(path):
-        return (
-            os.path.isfile(os.path.join(path, "radio.bin")) or
-            os.path.isfile(os.path.join(path, "radio.cpuid")) or
-            os.path.isfile(os.path.join(path, "sdcard.cpuid")) or
-            os.path.isfile(os.path.join(path, "flash.cpuid"))
-        )
+    def _radio_root_priority(path):
+        # Match connect.py's SD/RADIO/FLASH preference even when FLASH has
+        # the earlier drive letter. Retain radio.bin-only legacy discovery.
+        for priority, marker in enumerate(("sdcard.cpuid", "radio.cpuid", "flash.cpuid", "radio.bin")):
+            if os.path.isfile(os.path.join(path, marker)):
+                return priority
+        return None
 
     if os.name == "nt":
         for letter in string.ascii_uppercase:
             root = f"{letter}:\\"
             try:
-                if _is_radio_root(root) and os.path.isdir(os.path.join(root, "scripts")):
-                    candidates.append(os.path.normpath(os.path.join(root, "scripts")))
+                priority = _radio_root_priority(root)
+                if priority is not None and os.path.isdir(os.path.join(root, "scripts")):
+                    candidates.append((priority, os.path.normpath(os.path.join(root, "scripts"))))
             except Exception:
                 pass
     else:
@@ -448,15 +449,17 @@ def scan_usb_drives_for_radio(quiet=False):
             for entry in os.listdir(base):
                 root = os.path.join(base, entry)
                 try:
-                    if _is_radio_root(root) and os.path.isdir(os.path.join(root, "scripts")):
-                        candidates.append(os.path.normpath(os.path.join(root, "scripts")))
+                    priority = _radio_root_priority(root)
+                    if priority is not None and os.path.isdir(os.path.join(root, "scripts")):
+                        candidates.append((priority, os.path.normpath(os.path.join(root, "scripts"))))
                 except Exception:
                     pass
 
     if candidates:
+        selected = min(candidates, key=lambda candidate: candidate[0])[1]
         if not quiet:
-            print(f"[ETHOS] Fallback USB scan found radio at: {candidates[0]}")
-        return candidates[0]
+            print(f"[ETHOS] Fallback USB scan found radio at: {selected}")
+        return selected
     return None
 
 

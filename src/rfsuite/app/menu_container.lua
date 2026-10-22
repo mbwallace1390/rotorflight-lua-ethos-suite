@@ -62,6 +62,7 @@
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local closeKey = requireModule("app/close_key.lua")
 local header = requireModule("app/header.lua")
+local themeBridge = requireModule("app/theme_bridge.lua")
 local tileGrid = requireModule("app/tile_grid.lua")
 
 local menu_container = {}
@@ -382,7 +383,9 @@ local function openScreen(nav, menus, rootEntries, screen, setEventHandler, setW
       if isArmed and entry.lockedWhileArmed == true then
         tileIcon = forbiddenIcon()
       end
-      tileButtons[i] = form.addButton(nil, {x = x, y = y, w = tileW, h = tileH}, {
+      -- Reuse each tile's bounds for Bridge chrome.
+      local tileRect = {x = x, y = y, w = tileW, h = tileH}
+      tileButtons[i] = form.addButton(nil, tileRect, {
         text = label,
         icon = tileIcon,
         options = tileFont,
@@ -418,6 +421,7 @@ local function openScreen(nav, menus, rootEntries, screen, setEventHandler, setW
           end
         end,
       })
+      themeBridge.registerChromeRect(tileRect, "tile")
 
       if tileButtons[i] and tileButtons[i].enable and entryIsLockedNow(entry) then
         tileButtons[i]:enable(false)

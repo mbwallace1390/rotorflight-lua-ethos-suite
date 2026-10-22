@@ -1,58 +1,49 @@
 # Bastion
 
-A graphite and cyan dashboard with a technical shield motif.
+A graphite and cyan Rotorflight dashboard with a restrained technical layout.
 
-## Select and configure
+## Selection and installation
 
-Select **System → Settings → Dashboard → Themes → Bastion**. Open
-**System → Settings → Dashboard → Settings → Bastion** to adjust its display
-limits. Global choices and theme settings work offline while the Suite
-background task runs. A model-specific selection requires a connected flight
-controller with a known MCU ID.
+Select **System → Settings → Dashboard → Themes → Bastion**. Configure its
+instrument warnings under **System → Settings → Dashboard → Settings → Bastion**.
+The selector and settings tile require at least 784 × 294 available pixels;
+480 × 320 and 472 × 191 windows cannot select this theme. The full layout is
+800 × 480. Global selections and warning settings work offline while the Suite
+background task runs; a per-model theme override requires a connected controller
+with a known MCU ID.
 
-This theme supports full 800 × 480 and compact 784 × 294 layouts. Both the theme
-choice and configuration tile are hidden below 784 × 294, including 480 × 320
-and 472 × 191 windows. The compact layout omits the native header; full screen
-retains the dynamic model name, transmitter battery/RSSI, and centered title.
+Install a complete matching All Themes package first. To update just this theme
+on a compatible All Themes installation, copy the complete `bastion` folder to
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, preserving helpers and assets, then
+fully restart the Suite Lua session or radio. Stock Suite releases need their
+own registration entries; copying a folder into one does not add those entries.
 
-## Screens
+## Screens and settings
 
-- **Preflight:** current telemetry and setup/status information before flight.
-- **Inflight:** live flight instruments, timing, and warning presentation.
-- **Postflight:** recorded flight results; unavailable readings remain marked.
+Preflight presents live readiness telemetry, inflight presents operating
+measurements, and postflight presents recorded flight results. Missing readings
+remain unavailable; recorded results are historical. The native full-screen
+header retains the current model and transmitter indicators, with the centered
+Rotorflight // Ethos title and smaller MWRC signature.
 
-See the [three phase previews](../dashboard-themes/Bastion/README.md).
-They use simulated telemetry and desktop fonts: **Desktop preview, not radio capture**.
+The All Themes saved selection is `system/aegis` and the warning section
+is `dashboard.aegis` in `SCRIPTS:/rfsuite.user/settings.ini`. Warning
+settings apply to models using this theme. Model-specific theme choices are
+stored separately in the model's local INI. Save does not write flight-controller
+EEPROM or change controller protection limits. Existing warning controls and
+defaults are retained; temperature thresholds are stored in Celsius and displayed
+in the selected units.
 
-## Saved settings
+## Previews and validation
 
-The selection ID is `system/bastion`. Theme instrument settings are stored in
-`dashboard.bastion` within `SCRIPTS:/rfsuite.user/settings.ini`. They are shared
-by models using this theme. Global phase choices are saved in the same file;
-model overrides are saved in `SCRIPTS:/rfsuite.user/models/<MCU ID>.ini`.
-
-Save changes local radio files, not flight-controller EEPROM or controller
-protection settings. Temperature fields use the selected display unit while
-stored thresholds remain Celsius. Reload restores the form's loaded or last
-saved values. Selecting a per-model appearance does not create per-model
-instrument thresholds.
-
-## Installation and verification
-
-Install the complete matching Suite build containing this theme and its loader,
-theme-picker, settings-tile, and settings-store registrations. Preserve the
-radio's `rfsuite.user` directory and restart scripts or the radio after updating.
-Copying the theme folder alone onto a stock build that does not register it is
-insufficient. These instructions describe this explicitly registered theme
-package; automatic discovery in `radio-all-themes` is a separate installation
-path and is not assumed here.
-
-The portable checks in `tests/themes/test_bastion_registration.py` exercise
-selection, save/reopen, model overrides, and minimum-size visibility against
-production Suite modules. See `tests/themes/README.md` for commands and evidence
-limits. Native font appearance, real telemetry transitions, and radio
-instruction/memory behavior still need physical-radio verification.
+See the three phase views in the [dashboard gallery](../dashboard-themes/README.md).
+They are desktop previews rendered from the actual Lua modules, not radio
+captures. Desktop integration checks cover selection, saved settings and layout;
+physical-radio font fitting, real telemetry and memory/instruction budgets still
+need device validation. Preflight status describes telemetry checks, not aircraft
+safety. Palette metadata supports the existing All Themes integration without
+requiring a separate Bridge installation to use the dashboard.
 
 Source: `src/rfsuite/widgets/dashboard/themes/bastion/`.
-
-GPLv3, consistent with the Suite. Preserve source notices and included artwork attribution.
+Related controller documentation: [Rotorflight](https://www.rotorflight.org/docs/).
+Documented against RFSuite Ethos 2.3.1, All Themes source, 2026-10-02.

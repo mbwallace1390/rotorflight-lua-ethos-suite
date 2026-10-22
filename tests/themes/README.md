@@ -1,29 +1,57 @@
-# Theme integration checks
+# Desktop theme checks
 
-Install Python 3.11 or newer and Lupa (`python -m pip install lupa==2.8`). Run
-from the repository root:
+These fixtures run the actual suite engine/context and Lua theme modules with
+simulated radio sources. They check behavior and render deterministic previews;
+they do not replace real-radio testing.
 
-```text
-python -m unittest discover -s tests/themes -p 'test_*.py' -v
+Requirements: Python, Pillow, and Lupa (`python -m pip install Pillow lupa`). The
+optional `build/test-deps` directory can hold isolated local dependencies. The
+preview renderer currently uses Windows Arial at `C:/Windows/Fonts/arial.ttf`;
+its font metrics approximate the radio's native fonts.
+
+Run from the repository root:
+
+```powershell
+python -m unittest discover -s tests/themes -p "test_*.py" -v
+python -m unittest discover -s tests/theme_bridge -v
+python tests/themes/render_themes.py --modes dark16 dark26 light26
+python tests/themes/render_themes.py --themes vantage --modes dark16 dark26 light26 --output artifacts/vantage/renders
+python tests/themes/render_themes.py --themes inkhalo --modes dark16 dark26 light26 --output artifacts/inkhalo/renders
+python tests/themes/build_vantage_preview.py
+python tests/themes/build_meridian_cinder_preview.py
 ```
 
-Each new theme supplies `test_<folder>_registration.py` and a matching
-`<folder>_registration.json`. Its `<folder>_registration.md` documents the exact
-command for that theme. The wrappers use the identical `theme_registration.py`
-helper, so independently submitted theme PRs do not replace a shared selection
-manifest or test module. Multiple wrappers can coexist without changing globals.
+The default renderer covers eight themes × three phases × two sizes × four data
+scenarios × three appearance modes (576 cases), including Vantage and Ink & Halo.
+Behavioral tests cover settings, temperature units, invalid/missing
+telemetry, historical cell voltage, consistent link sources, model-name changes,
+small MWRC signatures, and cache reuse. Bridge tests exercise shared snapshot
+ownership, flight-phase continuity, resize behavior, and cleanup.
 
-The fixture executes the target Suite's loader, settings normalization, pages,
-metadata and configure module. It uses the actual package locale resolver and
-generated English catalog. Checks cover names, minimum-size filtering, phase
-paths, global/model choices, settings save/reopen, unrelated-data preservation,
-cleanup, and three documented previews. No other custom theme is required.
+Meridian and Cinder have dedicated behavior/registration checks and a separate
+144-case render matrix, bringing the ten-theme matrix to 720 cases. Discovery
+checks cover all ten personal themes and system/user folder separation. The
+localization fixtures use the actual package resolver and locale files, including
+Lua string escaping. Missing labels cannot be hidden by fixture-only replacement.
 
-`RFSUITE_TEST_ROOT` optionally selects another Suite repository containing
-`src/rfsuite`. Optional local dependencies can be placed in this checkout's
-`build/test-deps`.
+The normal Suite package builder includes the installed themes and resolves their
+locale tags. For individual upstream submissions, follow
+[the theme submission standard](../../docs/theme-submissions.md), include only
+the theme being submitted, and run its own registration tests and three phase
+previews. The private Theme Studio repository enforces the future authoring
+checklist and keeps portable ten-theme behavior/render tools. Main/master and
+Bridge implementation are outside theme submission work.
 
-Storage, the radio UI, and phase painting are mocked here. The documented
-previews separately execute actual phase code and the Suite engine with desktop
-fonts. Neither substitutes for physical-radio acceptance. Existing regression
-tests remain present for their original coverage.
+## All Themes automation
+
+**All Themes behavior and locales** runs the existing complete theme test suite
+and checks translation tags in all twelve locales on relevant pull requests and
+pushes targeting `radio-all-themes`; it can also be run manually. It uses Windows
+2022 and Python 3.12 because these fixtures use Windows Arial for text fitting.
+Install its pinned desktop dependencies with
+`python -m pip install -r tests/themes/requirements.txt`.
+
+Push packaging now covers `radio-all-themes` in addition to its existing branches.
+It produces checked locale ZIP artifacts; no release is published by that push.
+The tests do not establish physical-radio operation, hardware font fitting,
+or transmitter performance. Suite core and theme sources are unchanged.
