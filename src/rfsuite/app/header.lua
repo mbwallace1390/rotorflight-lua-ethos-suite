@@ -15,9 +15,8 @@
 -- disabled, same as the original's own pids.lua (which never defines
 -- onToolMenu, and navButtons defaults tool=false unless a page opts in).
 -- A screen that provides none of onSave/onReload/onTool (menu/tile
--- screens, see app/menu_container.lua) gets a Menu-only header instead --
--- matching the original forcing MENU_ONLY_NAV_BUTTONS on submenu/tile
--- screens.
+-- screens, see app/menu_container.lua) gets the same row with Save/Reload/
+-- Tool all disabled, so the Menu button never sits alone mid-row.
 --
 -- Built entirely from the same proven idiom already used elsewhere in
 -- this app (see app/pages/pids.lua's grid: form.addLine(label) +
@@ -99,6 +98,24 @@ local MENU_ICON = lcd.loadMask("app/gfx/nav/back.png")
 local SAVE_ICON = lcd.loadMask("app/gfx/nav/save.png")
 local RELOAD_ICON = lcd.loadMask("app/gfx/nav/reload.png")
 local TOOL_ICON = lcd.loadMask("app/gfx/nav/tool.png")
+local INFO_ICON = lcd.loadMask("app/gfx/nav/info.png")
+
+-- Pages may swap the Tool button's icon for one that says what their tool
+-- does (opts.toolIcon, a mask path). Ethos has no setter for a button's
+-- icon, so it is chosen when the header is built. Masks are cached by path
+-- for the module's lifetime, like the ones above, so reopening a page loads
+-- nothing; the cache only ever holds the few icons pages actually name.
+local toolIconCache = {}
+
+local function resolveToolIcon(path)
+  if not path then return TOOL_ICON end
+  local mask = toolIconCache[path]
+  if mask == nil then
+    mask = lcd.loadMask(path) or false
+    toolIconCache[path] = mask
+  end
+  return mask or TOOL_ICON
+end
 
 -- Width hint for every icon button slot (see the header comment above).
 local SLOT_HINT = "  WWW  "
@@ -108,6 +125,7 @@ local function noop() end
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local tileGrid = requireModule("app/tile_grid.lua")
 local themeBridge = requireModule("app/theme_bridge.lua")
+local connectionDetails = requireModule("app/connection_details.lua")
 
 -- The static text's own font (form.addStaticText takes no font option).
 local TITLE_FONT = FONT_STD
@@ -208,14 +226,30 @@ local function buildTitleRect(slots)
   return {x = 0, y = slots[1].y, w = slots[2].x, h = slots[1].h}
 end
 
+-- Lays out the row: title, then Menu/Save/Reload/Tool at full width and the
+-- info button at half width, right-aligned. The four nav buttons move right
+-- by the width the info button gives up, so the title gains that space.
+local function layoutSlots(line)
+  local slots = form.getFieldSlots(line, {0, SLOT_HINT, SLOT_HINT, SLOT_HINT, SLOT_HINT, SLOT_HINT})
+  local info = slots[6]
+  local infoW = math.floor(info.w / 2)
+  local shift = info.w - infoW
+  info.x = info.x + shift
+  info.w = infoW
+  for i = 2, 5 do slots[i].x = slots[i].x + shift end
+  return slots
+end
+
 -- opts: {
 --   onBack = function() ... end,   -- required; the permanent "Menu" button
 --   onSave = function() ... end,   -- optional; enables the "Save" button
 --   onReload = function() ... end, -- optional; enables the "Reload" button
 --   onTool = function() ... end,   -- optional; enables the "Tool" button
+--   toolIcon = "app/gfx/nav/x.png", -- optional; Tool button icon (default tool.png)
 -- }
 -- Returns {setTitle = fn(text), setSaveEnabled = fn(enabled),
--- setReloadEnabled = fn(enabled), focusMenu = fn(), focusSave = fn(),
+-- setReloadEnabled = fn(enabled), setToolEnabled = fn(enabled),
+-- focusMenu = fn(), focusSave = fn(),
 -- focusReload = fn(), focusTool = fn(), showBanner = fn(text),
 -- updateBanner = fn() -> bool, paintBanner = fn()}.
 -- Each focus* re-focuses that specific button -- Ethos has a bug where a
@@ -236,17 +270,29 @@ function header.build(title, opts)
   local isLeafPage = (opts.onSave ~= nil) or (opts.onReload ~= nil) or (opts.onTool ~= nil)
 
   if not isLeafPage then
-    local slots = form.getFieldSlots(line, {0, SLOT_HINT})
+    -- Same row as the leaf pages, with Save/Reload/Tool shown disabled, so
+    -- the Menu button sits in the same place on every screen instead of
+    -- floating alone mid-row.
+    local slots = layoutSlots(line)
     local titleRect = buildTitleRect(slots)
     local titleField = form.addStaticText(line, titleRect, fitTitle(title, titleRect.w), LEFT)
     themeBridge.registerHeaderRect(titleRect)
     themeBridge.styleStaticText(titleField, "accent")
     local menuButton = addNavButton(line, slots[2], MENU_ICON, opts.onBack)
     themeBridge.registerNavigationRect(slots[2], "menu")
+    addNavButton(line, slots[3], SAVE_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[3], "save")
+    addNavButton(line, slots[4], RELOAD_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[4], "reload")
+    addNavButton(line, slots[5], TOOL_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[5], "tool")
+    addNavButton(line, slots[6], INFO_ICON, function() connectionDetails.open() end)
+    themeBridge.registerNavigationRect(slots[6], "info")
     return {
       setTitle = function(newTitle) titleField:value(fitTitle(newTitle, titleRect.w)) end,
       setSaveEnabled = noop,
       setReloadEnabled = noop,
+      setToolEnabled = noop,
       focusMenu = function() menuButton:focus() end,
       focusSave = noop,
       focusReload = noop,
@@ -257,7 +303,7 @@ function header.build(title, opts)
     }
   end
 
-  local slots = form.getFieldSlots(line, {0, SLOT_HINT, SLOT_HINT, SLOT_HINT, SLOT_HINT})
+  local slots = layoutSlots(line)
 
   local titleRect = buildTitleRect(slots)
   local titleField = form.addStaticText(line, titleRect, fitTitle(title, titleRect.w), LEFT)
@@ -274,8 +320,11 @@ function header.build(title, opts)
   themeBridge.registerNavigationRect(slots[4], "reload")
   reloadButton:enable(opts.onReload ~= nil)
 
-  local toolButton = addNavButton(line, slots[5], TOOL_ICON, opts.onTool or noop)
+  local toolButton = addNavButton(line, slots[5], resolveToolIcon(opts.toolIcon), opts.onTool or noop)
   themeBridge.registerNavigationRect(slots[5], "tool")
+  -- The connection details, on every page (#2318): an icon only, opens the link's status.
+  local infoButton = addNavButton(line, slots[6], INFO_ICON, function() connectionDetails.open() end)
+  themeBridge.registerNavigationRect(slots[6], "info")
   toolButton:enable(opts.onTool ~= nil)
 
   return {
@@ -285,6 +334,9 @@ function header.build(title, opts)
     end,
     setReloadEnabled = function(enabled)
       reloadButton:enable(opts.onReload ~= nil and enabled)
+    end,
+    setToolEnabled = function(enabled)
+      toolButton:enable(opts.onTool ~= nil and enabled)
     end,
     focusMenu = function() menuButton:focus() end,
     focusSave = function() saveButton:focus() end,
