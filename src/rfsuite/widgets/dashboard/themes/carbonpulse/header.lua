@@ -23,6 +23,9 @@ local function paintModelName(x, y, w, h, box)
     end
     if type(value) ~= "string" or value == "" then value = "--" end
     if box._modelValue ~= value or box._modelWidth ~= w then
+        -- The key is cleared first and written last, so a paint stopped while
+        -- measuring leaves the name to be measured again.
+        box._modelValue = nil
         local text = value
         local font = utils.resolveFont("FONT_S", nil)
         lcd.font(font)
@@ -43,15 +46,27 @@ local function paintModelName(x, y, w, h, box)
             until tw <= w - 10 or cut == 0
             text = text .. "..."
         end
-        box._modelValue, box._modelWidth = value, w
         box._modelText, box._modelFont, box._modelHeight = text, font, th
+        box._modelWidth = w
+        box._modelValue = value
     end
     headerFace(x, y, w, h)
     lcd.font(box._modelFont)
     lcd.color(box.textcolor)
     lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
 end
+-- The three phases show the same header, so they share one: the first phase
+-- loaded builds it, and the others reuse it while the window keeps its width
+-- (the Suite sizes its header by width). It is released with the Suite's
+-- images (theme reload, model change, widget close); without that hook each
+-- phase builds its own, as no release would come. The release is registered
+-- from create(), which only the loaded copy of this module runs, so a module
+-- body stopped at the instruction limit and run again cannot register twice.
+local shared, share, registered = nil, utils.registerImageCacheClearer, false
+local function release() shared = nil end
 local function create()
+local width = lcd.getWindowSize()
+if shared and shared[3] == width then return shared[1], shared[2] end
 local headeropts = utils.getHeaderOptions()
 -- This theme owns its header geometry; leave the Suite defaults unchanged.
 headeropts.height = math.max(headeropts.height or 0, 44)
@@ -87,6 +102,9 @@ local function header_boxes()
                     local cache = headerBox
                     -- Measure only when the header geometry changes; keep the builder mark smaller.
                     if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+                        -- The key is cleared first and written last, so a paint
+                        -- stopped while measuring leaves the title to be measured again.
+                        cache._titleWidth = nil
                         local titleFont = utils.resolveFont("FONT_L", nil)
                         local markFont = utils.resolveFont("FONT_XS", nil)
                         if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
@@ -113,14 +131,14 @@ local function header_boxes()
                             lcd.font(titleFont)
                             tw, th = lcd.getTextSize("Rotorflight // Ethos")
                         end
-                        cache._titleWidth = w
-                        cache._titleLayoutHeight = h
                         cache._titleFont = titleFont
                         cache._titleHeight = th
                         cache._titleTextWidth = tw
                         cache._markFont = markFont
                         cache._markHeight = mh
                         cache._titleGroupWidth = tw + 8 + mw
+                        cache._titleLayoutHeight = h
+                        cache._titleWidth = w
                     end
                     local screenW = lcd.getWindowSize()
                     local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
@@ -149,6 +167,10 @@ colorMode.tbtextcolor, colorMode.cntextcolor, colorMode.rssitextcolor = C.white,
 colorMode.rssifillcolor, colorMode.rssifillbgcolor = C.neon, C.track
 colorMode.txfillcolor, colorMode.txbgfillcolor = C.green, C.track
 colorMode.txaccentcolor = C.white
+if share then
+    if not registered then share(release); registered = true end
+    shared = {header_layout, header_boxes, width}
+end
 return header_layout, header_boxes
 end
 return {create=create}

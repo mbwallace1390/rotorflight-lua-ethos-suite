@@ -98,11 +98,16 @@ function M.text(c, slot, x, y, w, h, text, requested, color, align)
     if not fit or fit.text ~= text or fit.x ~= x or fit.y ~= y or fit.width ~= w
         or fit.height ~= h or fit.requested ~= requested then
         fit = fitSlot(c, slot, w, h, text, requested)
+        -- The box key is cleared first and its x written last, so a callback
+        -- aborted between these writes leaves a key that matches no box, and
+        -- the next paint places the text again for whichever box it asks.
+        fit.x = nil
         local tx = x
         if align == "center" then tx = x + (w - fit.tw) / 2
         elseif align == "right" then tx = x + w - fit.tw end
-        fit.x, fit.y = x, y
         fit.drawX, fit.drawY = floor(tx + 0.5), floor(y + (h - fit.th) / 2 + 0.5)
+        fit.y = y
+        fit.x = x
     end
     local font = fit.font
     if font ~= lastFont then

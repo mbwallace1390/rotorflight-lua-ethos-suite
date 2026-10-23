@@ -52,13 +52,14 @@ for i = 1, #LADDER do MASKS[LADDER[i]], FAILED[LADDER[i]] = {}, {} end
 -- records the paint it started waiting; `oldest` is the earliest of those seen
 -- on the previous paint and `seen` collects this paint's.
 -- pending: some slot waited on this paint. blank: some slot had nothing to
--- draw. holding: slots go to `held` (heldCount of them) instead of the screen.
+-- draw. holding: slots go to `held` (heldCount of them), with their colours in
+-- `heldColor`, instead of the screen.
 local quota, paint, overdraft, oldest, seen, pending = 0, 0, 0, nil, nil, false
-local blank, holding, held, heldCount = false, false, {}, 0
+local blank, holding, held, heldColor, heldCount = false, false, {}, {}, 0
 
--- Forget the held slots. Each one refers to its box cache and its masks, so a
--- list left over from a paint that did not complete its screen would keep them
--- after the theme is gone.
+-- Forget the held slots. Each one refers to its masks, or a radio-font one to
+-- its box cache, so a list left over from a paint that did not complete its
+-- screen would keep them after the theme is gone.
 function M.drop()
     for i = 1, heldCount do held[i] = nil end
     heldCount, holding = 0, false
@@ -122,11 +123,12 @@ local function realize(run, n, name, ox)
 end
 
 -- Lay `text` out in the largest set from `size` down that has every byte, fits
--- w x h and whose masks load. Fills r.run with absolute x, mask pairs; false if
--- none fits. r.top is the highest index ever written, so no attempt leaves
--- stale entries.
+-- w x h and whose masks load. Fills the slot record's array part, r[1] to
+-- r[#r], with absolute x, mask pairs; false if none fits. Entries are written
+-- in order and cleared from the end, so the array never has a hole and #r is
+-- the end of the run, even after an aborted layout.
 local function layout(r, x, y, w, h, text, size, align)
-    local run, len = r.run, #text
+    local len = #text
     for rank = RANK[size] or 4, #LADDER do
         local name = LADDER[rank]
         local set = SETS[name]
@@ -140,24 +142,24 @@ local function layout(r, x, y, w, h, text, size, align)
                 if not a then n = -1; break end
                 local o = off[code]
                 if o then
-                    run[n + 1], run[n + 2] = pen + o, code
+                    r[n + 1] = pen + o
+                    r[n + 2] = code
                     n = n + 2
                 end
                 pen = pen + a
             end
-            if n > r.top then r.top = n end
             if n >= 0 then
                 -- Align the ink, not the advances: italic glyphs overhang the
                 -- last advance, and a few start left of the pen.
-                local lead = n > 0 and run[1] < 0 and run[1] or 0
+                local lead = n > 0 and r[1] < 0 and r[1] or 0
                 local ink = pen + set.over - lead
                 if ink <= w then
                     local ox = x
                     if align == "center" then ox = x + (w - ink) / 2
                     elseif align == "right" then ox = x + w - ink end
-                    if realize(run, n, name, floor(ox + 0.5) - lead) then
-                        for j = n + 1, r.top do run[j] = nil end
-                        r.n, r.top, r.drawY = n, n, floor(y + (h - set.h) / 2 + 0.5)
+                    if realize(r, n, name, floor(ox + 0.5) - lead) then
+                        for j = #r, n + 1, -1 do r[j] = nil end
+                        r.drawY = floor(y + (h - set.h) / 2 + 0.5)
                         return true
                     end
                 end
@@ -174,7 +176,7 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
     local runs = c._lettering
     if not runs then runs = {}; c._lettering = runs end
     local r = runs[slot]
-    if not r then r = {run = {}, n = 0, top = 0}; runs[slot] = r end
+    if not r then r = {}; runs[slot] = r end
     if r.text ~= text or r.x ~= x or r.y ~= y or r.w ~= w or r.h ~= h or r.size ~= size then
         local since = r.waiting
         local allowed = quota > 0 or (usage and usage() < SPARE)
@@ -182,16 +184,17 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
             overdraft, allowed = overdraft - 1, true
         end
         if allowed then
-            -- The key is written only once the run is complete, so a callback
-            -- aborted mid-layout leaves the slot marked as not laid out.
+            -- The key is cleared first and its text written last, on its own,
+            -- so a callback aborted mid-layout, or between these writes, leaves
+            -- the slot marked as not laid out.
             r.text, r.waiting = nil, nil
             local fallback = nil
             if not layout(r, x, y, w, h, text, size, align) then
-                local run = r.run
-                for j = 1, r.top do run[j] = nil end
-                r.n, r.top, fallback = 0, 0, FALLBACK[size] or "FONT_XS"
+                for j = #r, 1, -1 do r[j] = nil end
+                fallback = FALLBACK[size] or "FONT_XS"
             end
-            r.fallback, r.x, r.y, r.w, r.h, r.size, r.text = fallback, x, y, w, h, size, text
+            r.fallback, r.x, r.y, r.w, r.h, r.size = fallback, x, y, w, h, size
+            r.text = text
         else
             pending = true
             if since == nil then since = paint; r.waiting = paint end
@@ -205,9 +208,10 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
         end
     end
     if holding then
-        r.color, r.align, r.cache, r.slot = color, align, c, slot
+        -- Only the radio font needs the box cache, slot and alignment back.
+        if r.fallback then r.align, r.cache, r.slot = align, c, slot end
         heldCount = heldCount + 1
-        held[heldCount] = r
+        held[heldCount], heldColor[heldCount] = r, color
         return
     end
     if r.fallback then
@@ -215,8 +219,8 @@ function M.text(c, slot, x, y, w, h, text, size, color, align)
         return
     end
     setColor(color or WHITE)
-    local run, dy, drawMask = r.run, r.drawY, lcd.drawMask
-    for i = 1, r.n, 2 do drawMask(run[i], dy, run[i + 1]) end
+    local dy, drawMask = r.drawY, lcd.drawMask
+    for i = 1, #r, 2 do drawMask(r[i], dy, r[i + 1]) end
 end
 
 -- Draw the slots held on this paint, in their order, and stop holding.
@@ -226,11 +230,11 @@ function M.reveal()
         local r = held[i]
         held[i] = nil
         if r.fallback then
-            D.text(r.cache, r.slot, r.x, r.y, r.w, r.h, r.text, r.fallback, r.color, r.align)
+            D.text(r.cache, r.slot, r.x, r.y, r.w, r.h, r.text, r.fallback, heldColor[i], r.align)
         else
-            setColor(r.color or WHITE)
-            local run, dy = r.run, r.drawY
-            for j = 1, r.n, 2 do drawMask(run[j], dy, run[j + 1]) end
+            setColor(heldColor[i] or WHITE)
+            local dy = r.drawY
+            for j = 1, #r, 2 do drawMask(r[j], dy, r[j + 1]) end
         end
     end
     heldCount, holding = 0, false
