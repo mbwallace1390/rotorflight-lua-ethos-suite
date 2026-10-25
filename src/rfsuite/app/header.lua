@@ -262,6 +262,8 @@ end
 -- own comment above); a caller with a paint/wakeup tick calls paintBanner()
 -- from paint and updateBanner() from wakeup, the latter returning true once as
 -- the banner expires so the caller can lcd.invalidate() for the clearing frame.
+-- rightEdge is the x where the button row ends, so content below can line up
+-- with it (app/menu_container.lua spreads its tile columns out to it).
 function header.build(title, opts)
   themeBridge.clearPage()
   local line = form.addLine("")
@@ -297,6 +299,7 @@ function header.build(title, opts)
       focusSave = noop,
       focusReload = noop,
       focusTool = noop,
+      rightEdge = slots[6].x + slots[6].w,
       showBanner = showBanner,
       updateBanner = updateBanner,
       paintBanner = paintBanner,
@@ -342,6 +345,7 @@ function header.build(title, opts)
     focusSave = function() saveButton:focus() end,
     focusReload = function() reloadButton:focus() end,
     focusTool = function() toolButton:focus() end,
+    rightEdge = slots[6].x + slots[6].w,
     showBanner = showBanner,
     updateBanner = updateBanner,
     paintBanner = paintBanner,
