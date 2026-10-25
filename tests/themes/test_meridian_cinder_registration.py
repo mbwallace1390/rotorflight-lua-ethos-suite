@@ -403,14 +403,15 @@ class RegistrationTests(unittest.TestCase):
                     bridge.open(settings); flushBridge()
                     assert(bridge.getPalette().path=="system/default")
                     bus.publish("session.update",{connected=true,isArmed=true,governorState=4,
-                        timerSession=30,timerFlightCounted=true,mcuId="craft"})
+                        timerSession=30,timerFlightCounted=true,mcuId="craft",flightState="inflight"})
                     flushBridge()
                     assert(bridge.getPalette().path=="system/"..theme and bridge.getPalette().phase=="inflight")
-                    bus.publish("session.update",{connected=false,timerSession=0})
+                    bus.publish("session.update",{connected=false,timerSession=0,flightState="offline"})
                     flushBridge()
                     assert(bridge.getPalette().path=="system/"..theme and bridge.getPalette().phase=="postflight")
                     modelFiles.other={dashboard={use_same_theme=true,theme_preflight="system/"..theme}}
-                    bus.publish("session.update",{connected=true,isArmed=false,mcuId="other"})
+                    bus.publish("session.update",{connected=true,isArmed=false,mcuId="other",
+                        flightState="preflight"})
                     flushBridge()
                     assert(bridge.getPalette().path=="system/"..theme and bridge.getPalette().phase=="preflight")
                     bridge.clearCache(); assert(activeSubscriptions==0)
