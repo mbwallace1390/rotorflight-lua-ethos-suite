@@ -1,0 +1,396 @@
+-- Ink & Halo / flight: graphite cockpit, live telemetry and a calibrated rotor dial.
+local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
+local rfsuite = requireModule("widgets/dashboard/context.lua")
+local lcd = lcd
+local math = math
+local floor = math.floor
+local min = math.min
+local max = math.max
+local sin = math.sin
+local cos = math.cos
+local rad = math.rad
+local rawNumber = tonumber
+local function tonumber(value)
+    local number = rawNumber(value)
+    if number and number == number and number >= -1000000000 and number <= 1000000000 then return number end
+    return nil
+end
+local tostring = tostring
+local type = type
+local format = string.format
+
+local utils = rfsuite.widgets.dashboard.utils
+local drawing = requireModule("widgets/dashboard/themes/inkhalo/common.lua")
+local panels = requireModule("widgets/dashboard/themes/inkhalo/layout.lua")
+
+-- Keep the live craft/model name readable inside its native header slot.
+local function paintModelName(x, y, w, h, box)
+    local value = rfsuite.session and rfsuite.session.craftName
+    if type(value) ~= "string" or value:match("^%s*$") then
+        value = model and model.name and model.name() or "--"
+    end
+    if type(value) ~= "string" or value == "" then value = "--" end
+    if box._modelValue ~= value or box._modelWidth ~= w then
+        local text = value
+        local font = utils.resolveFont("FONT_S", nil)
+        lcd.font(font)
+        local tw, th = lcd.getTextSize(text)
+        if tw > w - 10 then
+            font = utils.resolveFont("FONT_XS", nil)
+            lcd.font(font)
+            tw, th = lcd.getTextSize(text)
+        end
+        if tw > w - 10 then
+            -- Shorten whole UTF-8 characters, only when name or geometry changes.
+            local cut = #text
+            repeat
+                while cut > 1 and text:byte(cut) >= 128 and text:byte(cut) < 192 do cut = cut - 1 end
+                cut = cut - 1
+                text = value:sub(1, cut)
+                tw, th = lcd.getTextSize(text .. "...")
+            until tw <= w - 10 or cut == 0
+            text = text .. "..."
+        end
+        box._modelValue, box._modelWidth = value, w
+        box._modelText, box._modelFont, box._modelHeight = text, font, th
+    end
+    utils.drawBoxBackground(x, y, w, h, box.bgcolor)
+    lcd.font(box._modelFont)
+    lcd.color(box.textcolor)
+    lcd.drawText(math.floor(x + 5), math.floor(y + (h - box._modelHeight) / 2), box._modelText)
+end
+local headeropts = utils.getHeaderOptions()
+-- This theme owns its header geometry; leave the Suite defaults unchanged.
+headeropts.height = math.max(headeropts.height or 0, 44)
+-- The Suite caches its native palette; each theme owns its presentation copy.
+local colorMode = {}
+for key, value in pairs(utils.themeColors()) do colorMode[key] = value end
+local header_layout = utils.standardHeaderLayout(headeropts)
+local header_boxes_cache = nil
+local last_txbatt_type = nil
+local C
+
+local function header_boxes()
+    local txbatt_type = 0
+    if rfsuite and rfsuite.preferences and rfsuite.preferences.general then
+        txbatt_type = rfsuite.preferences.general.txbatt_type or 0
+    end
+
+    if header_boxes_cache == nil or last_txbatt_type ~= txbatt_type then
+        local boxes = utils.standardHeaderBoxes(i18n, colorMode, headeropts, txbatt_type)
+
+        -- Replace the stock Rotorflight logo with the MWRC-style title while
+        -- keeping the radio's native header surface and battery/RSSI widgets.
+        for _, headerBox in ipairs(boxes) do
+            if headerBox.subtype == "craftname" then
+                headerBox.type, headerBox.subtype = "func", "func"
+                headerBox.paint = paintModelName
+            end
+            if headerBox.type == "image" then
+                headerBox.type = "func"
+                headerBox.subtype = "func"
+                headerBox.bgcolor = "transparent"
+                headerBox.paint = function(x, y, w, h)
+                    lcd.color(C.panel)
+                    lcd.drawFilledRectangle(math.floor(x), math.floor(y), math.floor(w), math.floor(h))
+                    local cache = headerBox
+                    -- Measure only when the header geometry changes; keep the builder mark smaller.
+                    if cache._titleWidth ~= w or cache._titleLayoutHeight ~= h then
+                        local titleFont = utils.resolveFont("FONT_L", nil)
+                        local markFont = utils.resolveFont("FONT_XS", nil)
+                        if type(titleFont) ~= "number" or type(markFont) ~= "number" then return end
+                        lcd.font(markFont)
+                        local mw, mh = lcd.getTextSize("| MWRC")
+                        lcd.font(titleFont)
+                        local tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_STD", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_S", nil) or titleFont
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        -- Narrow header slots retain the same hierarchy with the smallest pair.
+                        if tw + mw + 24 > w or th > h - 4 then
+                            titleFont = utils.resolveFont("FONT_XS", nil) or titleFont
+                            markFont = utils.resolveFont("FONT_XXS", nil) or markFont
+                            lcd.font(markFont)
+                            mw, mh = lcd.getTextSize("| MWRC")
+                            lcd.font(titleFont)
+                            tw, th = lcd.getTextSize("Rotorflight // Ethos")
+                        end
+                        cache._titleWidth = w
+                        cache._titleLayoutHeight = h
+                        cache._titleFont = titleFont
+                        cache._titleHeight = th
+                        cache._titleTextWidth = tw
+                        cache._markFont = markFont
+                        cache._markHeight = mh
+                        cache._titleGroupWidth = tw + 8 + mw
+                    end
+                    local screenW = lcd.getWindowSize()
+                    local groupX = math.floor((screenW - cache._titleGroupWidth) / 2 + 0.5)
+                    lcd.font(cache._titleFont)
+                    lcd.color(C.cyan)
+                    lcd.drawText(groupX, math.floor(y + (h - cache._titleHeight) / 2), "Rotorflight // Ethos")
+                    lcd.font(cache._markFont)
+                    lcd.color(C.muted)
+                    lcd.drawText(groupX + cache._titleTextWidth + 8, math.floor(y + (h - cache._markHeight) / 2), "| MWRC")
+                end
+            end
+        end
+
+        header_boxes_cache = boxes
+        last_txbatt_type = txbatt_type
+    end
+    return header_boxes_cache
+end
+
+local DEFAULTS = {
+    rpm_max = 3000,
+    bec_min = 6.5,
+    bec_warn = 7.0,
+    esc_warn = 110,
+    esc_max = 150,
+    fuel_warn = 25,
+    link_warn = 50
+}
+
+C = drawing.colors
+
+-- Keep telemetry contrast stable when the transmitter uses a light system theme.
+colorMode.bgcolor = C.bg
+colorMode.tbbgcolor = C.panel
+colorMode.tbtextcolor = C.white
+colorMode.cntextcolor = C.white
+colorMode.rssitextcolor = C.white
+colorMode.rssifillcolor = C.cyan or C.turquoise
+colorMode.rssifillbgcolor = C.line
+colorMode.txbgfillcolor = C.line
+colorMode.txfillcolor = C.green or C.emerald
+
+local function getThemeValue(key)
+    -- The rewritten Suite binds preferences to the active dashboard theme.
+    local value = tonumber(rfsuite.widgets.dashboard.getPreference(key))
+
+    return value or DEFAULTS[key]
+end
+
+local function sensor(telemetry, name, alias1, alias2)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    if not (telemetry and telemetry.getSensor) then return nil end
+    local value = tonumber((telemetry.getSensor(name)))
+    if value ~= nil then return value end
+    if alias1 then
+        value = tonumber((telemetry.getSensor(alias1)))
+        if value ~= nil then return value end
+    end
+    if alias2 then
+        value = tonumber((telemetry.getSensor(alias2)))
+        if value ~= nil then return value end
+    end
+    return nil
+end
+
+local function temperatureSensor(telemetry, warning, maximum)
+    telemetry = telemetry or (rfsuite.tasks and rfsuite.tasks.telemetry)
+    if not (telemetry and telemetry.getSensor) then
+        return nil, "°C", warning, maximum
+    end
+
+    local value, _, unit, displayWarning, displayMaximum = telemetry.getSensor("temp_esc", warning, maximum)
+    return tonumber(value), unit or "°C", tonumber(displayWarning) or warning, tonumber(displayMaximum) or maximum
+end
+
+
+local GOVERNOR_LABELS = {
+    [0] = "OFF",
+    [1] = "IDLE",
+    [2] = "SPOOLUP",
+    [3] = "RECOVERY",
+    [4] = "ACTIVE",
+    [5] = "THR OFF",
+    [6] = "LOST HS",
+    [7] = "AUTOROT",
+    [8] = "BAILOUT",
+    [100] = "GOV DISABLED",
+    [101] = "DISARMED"
+}
+
+local GOVERNOR_COLORS = {
+    [0] = C.amber,
+    [1] = C.amber,
+    [2] = C.red,
+    [3] = C.amber,
+    [4] = C.red,
+    [5] = C.green,
+    [6] = C.red,
+    [7] = C.amber,
+    [8] = C.red,
+    [100] = C.muted,
+    [101] = C.green
+}
+
+-- Armed labels are immutable; wakeup never concatenates governor text.
+local ARMED_GOVERNOR_LABELS = {}
+for code, label in pairs(GOVERNOR_LABELS) do
+    ARMED_GOVERNOR_LABELS[code] = "ARMED / " .. label
+end
+
+local function getFlightState(telemetry)
+    local armflags = sensor(telemetry, "armflags")
+    local governor = sensor(telemetry, "governor")
+    local armed = nil
+
+    if rfsuite.utils and rfsuite.utils.armFlagsToIsArmed then
+        armed = rfsuite.utils.armFlagsToIsArmed(armflags)
+    end
+
+    if armed == nil and armflags == nil and governor == nil then
+        local session = rfsuite and rfsuite.session
+        if session and session.telemetryState then armed = session.isArmed == true end
+    end
+
+    if armed == false then return "DISARMED", C.green end
+
+    local governorCode = governor and floor(governor + 0.5) or nil
+    local governorLabel = governorCode and GOVERNOR_LABELS[governorCode] or nil
+    local governorColor = governorCode and GOVERNOR_COLORS[governorCode] or nil
+
+    if governorCode == 101 then return "DISARMED", C.green end
+    if armed == true then
+        if governorLabel and governorCode ~= 100 then
+            return ARMED_GOVERNOR_LABELS[governorCode], governorColor or C.red
+        end
+        return "ARMED", C.red
+    end
+    if governorLabel then return governorLabel, governorColor or C.cyan end
+    return "STATE --", C.muted
+end
+
+local function fmt(value, decimals, suffix, missing)
+    if value == nil then return missing or "--" end
+    local text
+    if decimals == 1 then
+        text = format("%.1f", value)
+    elseif decimals == 2 then
+        text = format("%.2f", value)
+    else
+        text = tostring(floor(value + 0.5))
+    end
+    return text .. (suffix or "")
+end
+
+local function cacheText(c, textKey, valueKey, unitKey, value, decimals, suffix, prefix)
+    suffix = suffix or ""
+    local scale = decimals == 2 and 100 or (decimals == 1 and 10 or 1)
+    value = value and floor(value * scale + 0.5) / scale or nil
+    if c[valueKey] ~= value or c[unitKey] ~= suffix or c[textKey] == nil then
+        c[valueKey] = value
+        c[unitKey] = suffix
+        c[textKey] = (prefix or "") .. fmt(value, decimals, suffix)
+    end
+end
+
+local layout = {cols = 12, rows = 12, padding = 0}
+local screenBorderStyle = {enabled = false}
+
+local function updateFlightTime(c)
+    local session = rfsuite and rfsuite.session
+    local rawTime = session and session.timer and session.timer.live
+    local seconds = tonumber(rawTime)
+    local invalidTime = rawTime ~= nil and (seconds == nil or seconds < 0)
+    seconds = floor(max(0, seconds or 0))
+    if c._timerSecond ~= seconds or c._invalidTime ~= invalidTime then
+        c._invalidTime = invalidTime
+        c._timerSecond = seconds
+        c.timer = invalidTime and "--:--" or format("%02d:%02d", floor(seconds / 60), seconds % 60)
+    end
+end
+
+local function inflightWakeup(box, telemetry)
+    local c = box._cache or {}
+    box._cache = c
+
+    local escWarnC = getThemeValue("esc_warn")
+    local escMaxC = getThemeValue("esc_max")
+
+    c.rpm = sensor(telemetry, "rpm", "headspeed", "erpm")
+    local rpmStats = telemetry and telemetry.sensorStats and telemetry.sensorStats.rpm
+    c.maxRpm = tonumber(rpmStats and rpmStats.max)
+    if c.rpm ~= nil and (c.maxRpm == nil or c.rpm > c.maxRpm) then
+        c.maxRpm = c.rpm
+    end
+    c.throttle = sensor(telemetry, "throttle_percent", "throttle")
+    c.esc, c.escUnit, c.escWarn, c.escMax = temperatureSensor(telemetry, escWarnC, escMaxC)
+    c.fuel = sensor(telemetry, "smartfuel")
+    c.current = sensor(telemetry, "current")
+    c.voltage = sensor(telemetry, "voltage")
+    c.bec = sensor(telemetry, "bec_voltage", "bec")
+    c.link = sensor(telemetry, "vfr")
+    -- Only percentage readings can populate the link instrument.
+    if c.link == nil or c.link < 0 or c.link > 100 then c.link = sensor(telemetry, "rssi") end
+    if c.link ~= nil and (c.link < 0 or c.link > 100) then c.link = nil end
+    c.consumed = sensor(telemetry, "smartconsumption", "consumption")
+    c.flightState, c.flightStateColor = getFlightState(telemetry)
+    updateFlightTime(c)
+
+    -- Cache theme thresholds here (wakeup runs at a bounded rate) instead of
+    -- calling getThemeValue() from paint(), which runs on every invalidate.
+    c.fuelWarn = getThemeValue("fuel_warn")
+    c.becMin = getThemeValue("bec_min")
+    c.becWarn = getThemeValue("bec_warn")
+    c.linkWarn = getThemeValue("link_warn")
+    c.rpmMax = getThemeValue("rpm_max")
+
+    cacheText(c, "rpmText", "_rpmTextValue", "_rpmTextUnit", c.rpm, 0, "")
+    cacheText(c, "maxRpmText", "_maxRpmTextValue", "_maxRpmTextUnit", c.maxRpm, 0, " RPM", "MAX ")
+    cacheText(c, "rpmLimitText", "_rpmLimitTextValue", "_rpmLimitTextUnit", c.rpmMax, 0, " RPM", "LIMIT ")
+    cacheText(c, "escText", "_escTextValue", "_escTextUnit", c.esc, 0, c.escUnit)
+    cacheText(c, "throttleText", "_throttleTextValue", "_throttleTextUnit", c.throttle, 0, "%")
+    cacheText(c, "fuelText", "_fuelTextValue", "_fuelTextUnit", c.fuel, 0, "%")
+    cacheText(c, "voltageText", "_voltageTextValue", "_voltageTextUnit", c.voltage, 1, " V")
+    cacheText(c, "escWarnText", "_escWarnTextValue", "_escWarnTextUnit", c.escWarn, 0, c.escUnit, "WARN ")
+    cacheText(c, "throttleLabelText", "_throttleLabelValue", "_throttleLabelUnit", c.throttle, 0, "%", "THROTTLE ")
+    cacheText(c, "usedText", "_usedValue", "_usedUnit", c.consumed, 0, " mAh", "USED ")
+    cacheText(c, "currentText", "_currentTextValue", "_currentTextUnit", c.current, 1, " A")
+    cacheText(c, "becText", "_becTextValue", "_becTextUnit", c.bec, 1, " V")
+    cacheText(c, "linkText", "_linkTextValue", "_linkTextUnit", c.link, 0, "%")
+    cacheText(c, "consumedText", "_consumedTextValue", "_consumedTextUnit", c.consumed, 0, " mAh")
+
+    cacheText(c, "linkLabelText", "_linkLabelValue", "_linkLabelUnit", c.link, 0, "%", "LINK ")
+    return c
+end
+
+local function inflightPaint(x, y, w, h, box, c)
+    c = c or box._cache or {}
+    box._cache = c
+    panels.inflight(x, y, w, h, c)
+end
+
+local boxes_cache = nil
+
+local function boxes()
+    if boxes_cache == nil then
+        boxes_cache = {{
+        col = 1, row = 1, colspan = 12, rowspan = 12,
+        type = "func", subtype = "func",
+        wakeup = inflightWakeup,
+        paint = inflightPaint,
+        bgcolor = "transparent"
+        }}
+    end
+    return boxes_cache
+end
+
+return {
+    layout = layout,
+    boxes = boxes,
+    header_boxes = header_boxes,
+    header_layout = header_layout,
+    screenBorderStyle = screenBorderStyle,
+    scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.85}
+}

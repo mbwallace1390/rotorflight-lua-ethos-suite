@@ -1,32 +1,24 @@
 # Bastion
 
-A graphite and cyan dashboard with a technical shield motif.
+A graphite and cyan Rotorflight dashboard with a restrained technical layout.
 
-- **Preflight:** current telemetry and setup/status information before flight.
-- **Inflight:** live flight instruments, timing, and warning presentation.
-- **Postflight:** recorded flight results; unavailable readings remain marked.
+The physical folder is `bastion`. All Themes preserves `system/aegis` and
+`dashboard.aegis` so existing saved selections and warning settings survive.
+The upstream Bastion submission uses the canonical `bastion` identity; those
+saved sections are distinct.
 
-Full 800 × 480 and compact 784 × 294 layouts are supported. The theme and its
-configuration tile require at least 784 × 294 pixels; smaller windows hide
-both choices. The current model name and native transmitter header remain
-visible in full screen, with a smaller MWRC signature beside the centered title.
 
-## Installation and settings
+## Compatible installation
 
-Install the complete matching Suite build with this theme's registrations,
-preserve `rfsuite.user`, and restart scripts or the radio. Copying this folder
-alone onto a stock build that does not register it is insufficient. Select
-**System → Settings → Dashboard → Themes → Bastion** and configure display
-limits under **Dashboard → Settings → Bastion**.
+Use a complete All Themes package, or a stock Suite package containing this
+theme's registrations. On a compatible All Themes installation, copy the
+complete `bastion` folder under
+`SCRIPTS:/rfsuite/widgets/dashboard/themes/`, then restart the Suite Lua session
+or radio. Select **Bastion** in **System → Settings → Dashboard → Themes**;
+configure it in **Dashboard → Settings → Bastion**. Both choices require at least
+784 × 294 available pixels. Full-screen rendering is 800 × 480.
 
-The folder and internal ID are `bastion`; the saved selection is
-`system/bastion`. Instrument settings use `dashboard.bastion` in the radio's
-`SCRIPTS:/rfsuite.user/settings.ini`. Save does not write flight-controller
-EEPROM. Temperature thresholds remain stored in Celsius and display in the
-selected Celsius/Fahrenheit units.
-
-See the [theme guide](../../../../../../docs/dashboard/bastion.md) for
-model overrides, installation details, and previews. Desktop previews use
-simulated telemetry and approximate fonts; physical-radio acceptance is separate.
-
-GPLv3, consistent with the Suite. Preserve source notices and included artwork attribution.
+All Themes uses `system/aegis` and `dashboard.aegis`. Settings save
+on the radio; they do not write flight-controller EEPROM. Preserve user
+settings when updating. [Full theme guide](../../../../../../docs/dashboard/bastion.md)
+and [submission standard](../../../../../../docs/theme-submissions.md).

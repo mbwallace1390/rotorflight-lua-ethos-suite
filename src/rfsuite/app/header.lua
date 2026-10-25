@@ -124,6 +124,7 @@ local function noop() end
 
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local tileGrid = requireModule("app/tile_grid.lua")
+local themeBridge = requireModule("app/theme_bridge.lua")
 local connectionDetails = requireModule("app/connection_details.lua")
 
 -- The static text's own font (form.addStaticText takes no font option).
@@ -264,6 +265,7 @@ end
 -- rightEdge is the x where the button row ends, so content below can line up
 -- with it (app/menu_container.lua spreads its tile columns out to it).
 function header.build(title, opts)
+  themeBridge.clearPage()
   local line = form.addLine("")
   local showBanner, updateBanner, paintBanner = newBanner()
 
@@ -276,11 +278,18 @@ function header.build(title, opts)
     local slots = layoutSlots(line)
     local titleRect = buildTitleRect(slots)
     local titleField = form.addStaticText(line, titleRect, fitTitle(title, titleRect.w), LEFT)
+    themeBridge.registerHeaderRect(titleRect)
+    themeBridge.styleStaticText(titleField, "accent")
     local menuButton = addNavButton(line, slots[2], MENU_ICON, opts.onBack)
+    themeBridge.registerNavigationRect(slots[2], "menu")
     addNavButton(line, slots[3], SAVE_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[3], "save")
     addNavButton(line, slots[4], RELOAD_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[4], "reload")
     addNavButton(line, slots[5], TOOL_ICON, noop):enable(false)
+    themeBridge.registerNavigationRect(slots[5], "tool")
     addNavButton(line, slots[6], INFO_ICON, function() connectionDetails.open() end)
+    themeBridge.registerNavigationRect(slots[6], "info")
     return {
       setTitle = function(newTitle) titleField:value(fitTitle(newTitle, titleRect.w)) end,
       setSaveEnabled = noop,
@@ -301,17 +310,24 @@ function header.build(title, opts)
 
   local titleRect = buildTitleRect(slots)
   local titleField = form.addStaticText(line, titleRect, fitTitle(title, titleRect.w), LEFT)
+  themeBridge.registerHeaderRect(titleRect)
+  themeBridge.styleStaticText(titleField, "accent")
   local menuButton = addNavButton(line, slots[2], MENU_ICON, opts.onBack)
+  themeBridge.registerNavigationRect(slots[2], "menu")
 
   local saveButton = addNavButton(line, slots[3], SAVE_ICON, opts.onSave or noop)
+  themeBridge.registerNavigationRect(slots[3], "save")
   saveButton:enable(opts.onSave ~= nil)
 
   local reloadButton = addNavButton(line, slots[4], RELOAD_ICON, opts.onReload or noop)
+  themeBridge.registerNavigationRect(slots[4], "reload")
   reloadButton:enable(opts.onReload ~= nil)
 
   local toolButton = addNavButton(line, slots[5], resolveToolIcon(opts.toolIcon), opts.onTool or noop)
+  themeBridge.registerNavigationRect(slots[5], "tool")
   -- The connection details, on every page (#2318): an icon only, opens the link's status.
   local infoButton = addNavButton(line, slots[6], INFO_ICON, function() connectionDetails.open() end)
+  themeBridge.registerNavigationRect(slots[6], "info")
   toolButton:enable(opts.onTool ~= nil)
 
   return {

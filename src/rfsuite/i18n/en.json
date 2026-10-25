@@ -6156,11 +6156,23 @@
           "needs_translation": false,
           "translation": "AERC Nitro"
         },
+        "dashboard_theme_america250": {
+          "english": "America 250",
+          "max_length": 11,
+          "needs_translation": false,
+          "translation": "America 250"
+        },
         "dashboard_theme_bastion": {
           "english": "Bastion",
           "max_length": 7,
           "needs_translation": false,
           "translation": "Bastion"
+        },
+        "dashboard_theme_cinder": {
+          "english": "Cinder",
+          "max_length": 6,
+          "needs_translation": false,
+          "translation": "Cinder"
         },
         "dashboard_theme_claude": {
           "english": "Claude",
@@ -6198,6 +6210,12 @@
           "needs_translation": false,
           "translation": "Inflight Theme"
         },
+        "dashboard_theme_inkhalo": {
+          "english": "Ink & Halo",
+          "max_length": 10,
+          "needs_translation": false,
+          "translation": "Ink & Halo"
+        },
         "dashboard_theme_kevd": {
           "english": "Kevd",
           "max_length": 4,
@@ -6215,6 +6233,24 @@
           "max_length": 4,
           "needs_translation": false,
           "translation": "KSE5"
+        },
+        "dashboard_theme_libertyops250": {
+          "english": "Liberty Ops 250",
+          "max_length": 15,
+          "needs_translation": false,
+          "translation": "Liberty Ops 250"
+        },
+        "dashboard_theme_meridian": {
+          "english": "Meridian",
+          "max_length": 8,
+          "needs_translation": false,
+          "translation": "Meridian"
+        },
+        "dashboard_theme_mwrc": {
+          "english": "MWRC",
+          "max_length": 4,
+          "needs_translation": false,
+          "translation": "MWRC"
         },
         "dashboard_theme_panel_global": {
           "english": "Default theme for all models",
@@ -6264,6 +6300,12 @@
           "needs_translation": false,
           "translation": "RT-RC Nitro"
         },
+        "dashboard_theme_singularity": {
+          "english": "Singularity",
+          "max_length": 11,
+          "needs_translation": false,
+          "translation": "Singularity"
+        },
         "dashboard_theme_srb_rc": {
           "english": "SRB-RC",
           "max_length": 6,
@@ -6281,6 +6323,18 @@
           "max_length": 14,
           "needs_translation": false,
           "translation": "Use same theme"
+        },
+        "dashboard_theme_vantage": {
+          "english": "Vantage",
+          "max_length": 7,
+          "needs_translation": false,
+          "translation": "Vantage"
+        },
+        "dashboard_theme_zafira": {
+          "english": "Zafira",
+          "max_length": 6,
+          "needs_translation": false,
+          "translation": "Zafira"
         },
         "debug_logs": {
           "english": "Debug logs",
@@ -6647,6 +6701,12 @@
           "max_length": 9,
           "needs_translation": false,
           "translation": "Developer"
+        },
+        "txt_follow_dashboard_theme": {
+          "english": "Follow dashboard theme",
+          "max_length": 22,
+          "needs_translation": false,
+          "translation": "Follow dashboard theme"
         },
         "txt_general": {
           "english": "General",

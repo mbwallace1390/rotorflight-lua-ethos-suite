@@ -1,0 +1,63 @@
+<div id="inkhalo-radio-preview" aria-label="Ink and Halo Rotorflight theme preview">
+  <style>
+    #inkhalo-radio-preview .preview-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    #inkhalo-radio-preview .phase-buttons { display:flex; flex-wrap:wrap; gap:6px; }
+    #inkhalo-radio-preview .preview-screen { display:block; width:100%; height:auto; max-width:800px; margin:0 auto; }
+    #inkhalo-radio-preview .preview-caption { margin-top:8px; }
+  </style>
+  <div class="preview-toolbar">
+    <div class="phase-buttons" role="group" aria-label="Flight screen">
+      <button class="btn" type="button" data-phase="preflight" aria-pressed="false">Preflight</button>
+      <button class="btn" type="button" data-phase="inflight" aria-pressed="true">Inflight</button>
+      <button class="btn" type="button" data-phase="postflight" aria-pressed="false">Postflight</button>
+    </div>
+    <label class="form-label">Layout
+      <select class="form-select" data-layout>
+        <option value="800x480">Full screen · 800 × 480</option>
+        <option value="784x294">Compact · 784 × 294</option>
+      </select>
+    </label>
+  </div>
+  <img class="preview-screen" data-screen src="__INKHALO_HERO__" width="800" height="480" alt="Ink and Halo inflight radio screen, with a halo headspeed gauge and fuel, temperature, current, voltage and link readings">
+  <div class="text-small text-muted preview-caption" data-caption aria-live="polite">Inflight · 800 × 480 · Sample telemetry</div>
+  <script>
+    (() => {
+      const root = document.getElementById('inkhalo-radio-preview');
+      const images = __INKHALO_IMAGES__;
+      const phases = {preflight:'Preflight', inflight:'Inflight', postflight:'Postflight'};
+      const layouts = ['800x480', '784x294'];
+      const state = {phase:'inflight', layout:'800x480'};
+      const screen = root.querySelector('[data-screen]');
+      const caption = root.querySelector('[data-caption]');
+      const picker = root.querySelector('[data-layout]');
+      const buttons = root.querySelectorAll('[data-phase]');
+      function restore(saved) {
+        const value = saved?.modelContent;
+        if (value?.theme !== 'inkhalo') return;
+        if (Object.hasOwn(phases, value.phase)) state.phase = value.phase;
+        if (layouts.includes(value.layout)) state.layout = value.layout;
+      }
+      function show() {
+        screen.src = images[`${state.phase}-${state.layout}`];
+        const [width, height] = state.layout.split('x');
+        screen.width = Number(width); screen.height = Number(height);
+        screen.alt = `Ink and Halo ${phases[state.phase].toLowerCase()} Rotorflight screen at ${width} by ${height}, rendered from Lua with sample telemetry`;
+        caption.textContent = `${phases[state.phase]} · ${width} × ${height} · Sample telemetry`;
+        picker.value = state.layout;
+        buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.phase === state.phase)));
+      }
+      function remember() {
+        if (window.openai?.setWidgetState) {
+          window.openai.setWidgetState({modelContent:{theme:'inkhalo',phase:state.phase,layout:state.layout},privateContent:null}).catch(() => {});
+        }
+      }
+      buttons.forEach(button => button.addEventListener('click', () => {
+        state.phase = button.dataset.phase; show(); remember();
+      }));
+      picker.addEventListener('change', () => { state.layout = picker.value; show(); remember(); });
+      window.addEventListener('openai:set_globals', event => { restore(event.detail?.globals?.widgetState); show(); });
+      restore(window.openai?.widgetState);
+      show();
+    })();
+  </script>
+</div>
