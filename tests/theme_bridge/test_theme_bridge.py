@@ -1,4 +1,4 @@
-"""Theme Bridge behavior against the suite's unchanged bus and flight tracker.
+"""Theme Bridge behavior against the suite's unchanged bus and session flight state.
 
 Run with Python and Lupa available: python -m unittest discover -s tests/theme_bridge
 The optional build/test-deps directory supports an isolated local Lupa install.
@@ -120,10 +120,10 @@ class ThemeBridgeTests(unittest.TestCase):
             end
         ''')
 
-    def test_open_midflight_uses_retained_phase_without_false_arm_edge(self):
+    def test_open_midflight_uses_the_session_flight_state(self):
         self.run_lua('''
             bus.publish("session.update", {connected = true, isArmed = true,
-                timerFlightCounted = true, timerSession = 30, mcuId = "craft-a"})
+                flightState = "inflight", timerSession = 30, mcuId = "craft-a"})
             bridge.open(initialSettings)
             flush()
             assert(palettePath() == "system/singularity", "midflight opened as preflight")
@@ -146,38 +146,25 @@ class ThemeBridgeTests(unittest.TestCase):
                 contrast = (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05)
                 self.assertGreaterEqual(contrast, 4.5, "small native page title lacks contrast")
 
-    def test_same_aircraft_reconnect_preserves_postflight_but_new_aircraft_resets(self):
+    def test_each_session_flight_state_selects_its_layout_palette(self):
+        # The session owns the flight state (#2613), including a reconnect and a
+        # new aircraft; armed draws the preflight layout and offline the postflight one.
         self.run_lua('''
             bridge.open(initialSettings)
-            bus.publish("session.update", {connected = true, isArmed = true,
-                governorState = 4, timerSession = 30, mcuId = "craft-a"})
-            flush(); tick()
-            assert(palettePath() == "system/singularity")
-            bus.publish("session.update", {connected = false, timerSession = 0})
-            flush()
-            assert(palettePath() == "system/zafira")
-            bus.publish("session.update", {connected = true, isArmed = false,
-                timerSession = 0, mcuId = "craft-a"})
-            flush()
-            assert(palettePath() == "system/zafira", "same craft lost postflight history")
-            bus.publish("session.update", {connected = true, isArmed = false,
-                timerSession = 0, mcuId = "craft-b"})
-            flush()
-            assert(palettePath() == "system/aegis", "new craft retained old history")
-        ''')
-
-    def test_tracker_does_not_mutate_retained_snapshot_or_resolve_source_each_update(self):
-        self.run_lua('''
-            bridge.open(initialSettings)
-            for i = 1, 5 do
-                local snapshot = {connected = true, isArmed = true, governorState = 0,
-                    rxMap = {throttle = 2}, mcuId = "craft-a"}
-                bus.publish("session.update", snapshot)
+            local cases = {
+                {"preflight", true, false, "system/aegis"},
+                {"armed", true, true, "system/aegis"},
+                {"inflight", true, true, "system/singularity"},
+                {"postflight", true, false, "system/zafira"},
+                {"offline", false, false, "system/zafira"},
+                {nil, false, false, "system/aegis"},
+            }
+            for _, case in ipairs(cases) do
+                bus.publish("session.update", {connected = case[2], isArmed = case[3],
+                    flightState = case[1], timerSession = 0, mcuId = case[2] and "craft-a" or nil})
                 flush()
-                assert(snapshot._throttleChannelMember == nil, "mutated retained bus snapshot")
-                assert(snapshot._throttleChannelSource == nil, "source leaked into retained snapshot")
+                assert(palettePath() == case[4], tostring(case[1]) .. " drew " .. tostring(palettePath()))
             end
-            assert(sourceReads == 1, "source cache discarded on every snapshot")
         ''')
 
     def test_model_override_and_live_disable(self):

@@ -13,7 +13,7 @@ end
 
 local requireModule = package.loaded["rfsuite.lib.require"] or assert(loadfile("lib/require.lua"))()
 local bus = requireModule("lib/bus.lua")
-local flightmode = requireModule("widgets/dashboard/flightmode.lua")
+local flightStats = requireModule("lib/flight_stats.lua")
 local modelPreferences = requireModule("lib/model_preferences.lua")
 local paletteRegistry = requireModule("app/theme_palettes.lua")
 local settingsStore = requireModule("lib/settings_store.lua")
@@ -34,10 +34,6 @@ local lcdGetWindowSize = lcd.getWindowSize
 local lcdRGB = lcd.RGB
 
 local bridge = {}
-local tracker = flightmode.new()
--- The flight tracker caches radio sources on its input. Keep that state private:
--- bus snapshots are retained and shared with other subscribers.
-local phaseInput = {}
 local paletteCache = {}
 local chromeRects = {}
 local titleFields = {}
@@ -47,7 +43,6 @@ local settings
 local session
 local modelDashboard
 local loadedMcuId
-local lastConnectedMcuId
 local pendingSession
 local pendingSettings
 local modelLoadPending = false
@@ -420,21 +415,10 @@ local function rebuildGeometry()
 end
 
 local function updateFlightPhase(snapshot)
-  if not snapshot then
-    activePhase = "preflight"
-    return
-  end
-  if snapshot.timerFlightCounted == true or (tonumber(snapshot.timerSession) or 0) > 0 then
-    tracker.hasBeenInFlight = true
-  end
-  phaseInput.connected = snapshot.connected
-  phaseInput.isArmed = snapshot.isArmed
-  phaseInput.governorState = snapshot.governorState
-  phaseInput.throttlePercent = snapshot.throttlePercent
-  phaseInput.rxMap = snapshot.rxMap
-  -- The tracker also reports "armed" and "offline"; like the dashboard, follow the
-  -- layout each one draws with (preflight and postflight) when choosing the palette.
-  activePhase = flightmode.layoutPhase(tracker:update(phaseInput))
+  -- The session owns the flight state, across reconnects and aircraft changes. It
+  -- also reports "armed" and "offline"; like the dashboard, follow the layout each
+  -- one draws with (preflight and postflight) when choosing the palette.
+  activePhase = flightStats.layoutPhase(snapshot and snapshot.flightState or "preflight")
 end
 
 local function applyPending(now)
@@ -449,13 +433,6 @@ local function applyPending(now)
     pendingSession = nil
     local nextMcuId = nextSession.connected == true and nextSession.mcuId or nil
     if nextMcuId ~= loadedMcuId then
-      if nextMcuId ~= nil and nextMcuId ~= lastConnectedMcuId then
-        -- Only a different aircraft starts a new phase history. A temporary
-        -- disconnect must retain postflight, matching the dashboard tracker.
-        tracker:reset()
-        wipe(phaseInput)
-      end
-      if nextMcuId ~= nil then lastConnectedMcuId = nextMcuId end
       loadedMcuId = nextMcuId
       modelDashboard = nil
       modelLoadPending = nextMcuId ~= nil
@@ -498,15 +475,12 @@ function bridge.open(initialSettings)
   themeCatalog.list()
   if opened then bridge.clearCache() end
   opened = true
-  tracker:reset()
-  wipe(phaseInput)
   settings = initialSettings or settingsStore.load()
   activePhase = "preflight"
   activePath = nil
   activePalette = nil
   activeDark = nil
   loadedMcuId = nil
-  lastConnectedMcuId = nil
   modelDashboard = nil
   modelLoadPending = false
   pendingSession = nil
@@ -519,7 +493,6 @@ function bridge.open(initialSettings)
     session = pendingSession
     pendingSession = nil
     loadedMcuId = session.connected == true and session.mcuId or nil
-    lastConnectedMcuId = loadedMcuId
     modelLoadPending = loadedMcuId ~= nil
     updateFlightPhase(session)
   end
@@ -629,13 +602,10 @@ function bridge.clearCache()
   wipe(paletteCache)
   bridge.clearPage()
   wipe(railSegments)
-  tracker:reset()
-  wipe(phaseInput)
   settings = nil
   session = nil
   modelDashboard = nil
   loadedMcuId = nil
-  lastConnectedMcuId = nil
   pendingSession = nil
   pendingSettings = nil
   modelLoadPending = false
